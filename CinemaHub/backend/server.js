@@ -2,12 +2,16 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
+import seedDatabase from './utils/seedData.js';
 
 // Load env vars
 dotenv.config();
 
 // Connect to database
-connectDB();
+connectDB().then(() => {
+    // Seed data if DB is empty
+    seedDatabase();
+});
 
 const app = express();
 
