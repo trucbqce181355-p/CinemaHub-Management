@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Ticket, Search, CheckCircle, XCircle, AlertTriangle, QrCode, ScanLine, ArrowRight } from 'lucide-react';
+import { Ticket, Search, CheckCircle, XCircle, AlertTriangle, QrCode, ScanLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const TicketCheckIn = () => {
@@ -78,7 +78,7 @@ const TicketCheckIn = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Scanner Panel */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden h-[450px]">
+        <div className="glass-panel p-8 rounded-3xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden min-h-[450px]">
           {scanMode === 'qr' ? (
             <>
               <h2 className="text-xl font-bold mb-6 text-gray-300">Đưa mã QR vào khu vực quét</h2>
@@ -143,7 +143,7 @@ const TicketCheckIn = () => {
         </div>
 
         {/* Validation Results Panel */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 h-[450px] flex flex-col">
+        <div className="glass-panel p-8 rounded-3xl border border-white/10 min-h-[450px] flex flex-col">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
             <Ticket className="w-6 h-6 text-primary" /> Kết quả Xác thực
           </h2>
@@ -173,8 +173,8 @@ const TicketCheckIn = () => {
 
                   <div>
                     <h3 className="font-bold text-lg">{
-                      result.type === 'success' ? 'Hợp lệ - Check-in Thành công' :
-                        result.type === 'warning' ? 'Cảnh báo - Vé đã sử dụng' : 'Vé Không Hợp Lệ'
+                      result.type === 'success' ? 'Vé hợp lệ' :
+                        result.type === 'warning' ? 'Vé đã sử dụng' : 'Vé không hợp lệ'
                     }</h3>
                     <p className="text-sm mt-1 opacity-90">{result.message}</p>
                   </div>
@@ -202,13 +202,13 @@ const TicketCheckIn = () => {
                 {result.ticket && (
                   <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                     <div className="text-center mb-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-widest">Phim</p>
-                      <p className="font-bold text-lg text-white">{result.ticket.movieName}</p>
+                      <p className="text-xs text-gray-400 uppercase tracking-widest">Mã Đặt Chỗ</p>
+                      <p className="font-bold text-lg text-white">{result.ticket.bookingReference}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-center border-t border-white/10 pt-4 mt-2">
                       <div>
-                        <p className="text-xs text-gray-400">Phòng chiếu</p>
-                        <p className="font-bold text-white">{result.ticket.screenRoomName}</p>
+                        <p className="text-xs text-gray-400">Mã Suất Chiếu</p>
+                        <p className="font-bold text-white text-sm truncate px-2" title={result.ticket.showtimeId}>{result.ticket.showtimeId}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400">Ghế ngồi</p>
