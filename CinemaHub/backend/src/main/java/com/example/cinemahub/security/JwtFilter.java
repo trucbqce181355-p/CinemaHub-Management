@@ -10,6 +10,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.example.cinemahub.repository.UserRepository;
+import com.example.cinemahub.model.User;
+import java.util.Optional;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +24,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -43,9 +49,16 @@ public class JwtFilter extends OncePerRequestFilter {
                             .collect(Collectors.toList()));
                 }
 
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        userId, null, authorities);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // Check Database to ensure user is not locked or unverified
+                Optional<User> userOpt = userRepository.findById(userId);
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    if (!"Locked".equals(user.getStatus()) && Boolean.TRUE.equals(user.getIsVerified())) {
+                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                                userId, null, authorities);
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
+                }
             } catch (Exception e) {
                 // Invalid token
             }

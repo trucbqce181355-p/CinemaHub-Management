@@ -7,7 +7,7 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  if (!user || user.role !== 'Admin') {
+  if (!user || !['Admin', 'Manager', 'Staff'].includes(user.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <h1 className="text-2xl text-red-500 font-bold">Không có quyền truy cập</h1>
@@ -20,13 +20,30 @@ const AdminLayout = () => {
     navigate('/login');
   };
 
-  const navItems = [
-    { name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
-    { name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> },
-    { name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> },
-    { name: 'Cài đặt', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
-  ];
+  const getNavItems = () => {
+    const items = [{ name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> }];
+    
+    if (user.role === 'Admin') {
+      items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });
+      items.push({ name: 'Cài đặt', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> });
+    }
+    
+    if (user.role === 'Admin' || user.role === 'Manager') {
+      items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
+    }
+    
+    if (user.role === 'Admin' || user.role === 'Manager' || user.role === 'Staff') {
+      items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
+    }
+    
+    // Sắp xếp lại thứ tự cho đẹp
+    const order = ['/admin', '/admin/users', '/admin/movies', '/admin/showtimes', '/admin/settings'];
+    items.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
+    
+    return items;
+  };
+
+  const navItems = getNavItems();
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0a] text-white">
@@ -38,7 +55,7 @@ const AdminLayout = () => {
               <Clapperboard className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-display font-bold tracking-wider">
-              Admin<span className="text-primary">Panel</span>
+              {user.role}<span className="text-primary">Panel</span>
             </span>
           </Link>
         </div>

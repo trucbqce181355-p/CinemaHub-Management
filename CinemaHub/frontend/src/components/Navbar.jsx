@@ -92,8 +92,8 @@ const Navbar = () => {
                         <Ticket className="w-4 h-4" /> Lịch sử đặt vé
                       </Link>
 
-                      {user.role === 'Admin' && (
-                        <Link to="/admin/users" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
+                      {['Admin', 'Manager', 'Staff'].includes(user.role) && (
+                        <Link to="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                           <User className="w-4 h-4" /> Quản trị hệ thống
                         </Link>
                       )}

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Play, Ticket, Clock, Calendar as CalendarIcon, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const MovieDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('detail'); // 'detail' or 'trailer'
@@ -15,16 +16,22 @@ const MovieDetails = () => {
         const res = await fetch(`http://localhost:5000/api/movies/${id}`);
         if (res.ok) {
           const data = await res.json();
+          if (data.status === 'DISABLED') {
+            navigate('/', { state: { message: 'Phim này đã ngừng chiếu hoặc không khả dụng!' } });
+            return;
+          }
           setMovie(data);
+          setLoading(false);
+        } else {
+          setLoading(false);
         }
       } catch (error) {
         console.error("Lỗi khi tải thông tin phim:", error);
-      } finally {
         setLoading(false);
       }
     };
     fetchMovie();
-  }, [id]);
+  }, [id, navigate]);
 
   if (loading) {
     return (
@@ -116,12 +123,21 @@ const MovieDetails = () => {
 
             {/* Mua vé Button */}
             <div className="mt-8">
-              <Link 
-                to="/booking" 
-                className="inline-flex items-center gap-2 bg-[#e31837] hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg transition-colors uppercase tracking-wider shadow-lg shadow-red-500/20"
-              >
-                <Ticket className="w-5 h-5" /> Mua Vé
-              </Link>
+              {movie.status === 'DISABLED' ? (
+                <button 
+                  disabled
+                  className="inline-flex items-center gap-2 bg-gray-600 text-gray-300 font-bold py-3 px-8 rounded-lg uppercase tracking-wider cursor-not-allowed"
+                >
+                  <Ticket className="w-5 h-5" /> Phim Ngừng Chiếu
+                </button>
+              ) : (
+                <Link 
+                  to={`/booking/${movie._id || movie.id}`} 
+                  className="inline-flex items-center gap-2 bg-[#e31837] hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg transition-colors uppercase tracking-wider shadow-lg shadow-red-500/20"
+                >
+                  <Ticket className="w-5 h-5" /> Mua Vé
+                </Link>
+              )}
             </div>
           </motion.div>
         </div>

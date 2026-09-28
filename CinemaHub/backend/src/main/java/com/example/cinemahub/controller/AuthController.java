@@ -37,7 +37,7 @@ public class AuthController {
         
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "Email hoặc mật khẩu không chính xác!"));
         }
         
         User user = userOpt.get();
@@ -50,7 +50,7 @@ public class AuthController {
         }
         
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "Email hoặc mật khẩu không chính xác!"));
         }
         
         String token = jwtUtil.generateToken(user.getId(), user.getRole(), user.getPermissions());
@@ -79,6 +79,8 @@ public class AuthController {
         user.setOtp(otp);
         user.setOtpExpires(new Date(System.currentTimeMillis() + 10 * 60 * 1000)); // 10 mins
         user.setIsVerified(false);
+        user.setRole("Customer"); // Ngăn chặn Leo thang đặc quyền (Privilege Escalation)
+        user.setPermissions(null); // Không cấp quyền gì cho khách hàng
         
         userRepository.save(user);
         
@@ -92,9 +94,7 @@ public class AuthController {
             System.err.println("Failed to send OTP email: " + e.getMessage());
         }
         
-        String token = jwtUtil.generateToken(user.getId(), user.getRole(), user.getPermissions());
         Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
         response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("email", user.getEmail());

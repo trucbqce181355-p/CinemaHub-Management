@@ -49,6 +49,7 @@ function App() {
           <Route path="/movies" element={<Movies />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
+          <Route path="/booking/:id" element={<Booking />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/profile" element={<Profile />} />

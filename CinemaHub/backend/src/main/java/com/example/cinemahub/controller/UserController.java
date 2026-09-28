@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Date;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/api/users")
@@ -22,6 +23,12 @@ public class UserController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    private boolean isProtectedAccount(String email) {
+        return "admin@cinemahub.com".equals(email) || 
+               "manager@cinemahub.com".equals(email) || 
+               "staff@cinemahub.com".equals(email);
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('manage_users')")
@@ -38,6 +45,7 @@ public class UserController {
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+        user.setIsVerified(true);
         user.setCreatedAt(new Date());
         user.setUpdatedAt(new Date());
         return ResponseEntity.status(201).body(userRepository.save(user));
@@ -51,6 +59,13 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
         User user = userOpt.get();
+        
+        // Prevent modifying protected accounts' role or status
+        if (isProtectedAccount(user.getEmail())) {
+            // Can only update non-critical fields for themselves if needed, but for manage_users this is usually blocked.
+            return ResponseEntity.status(403).body(Map.of("message", "Cannot modify protected core accounts"));
+        }
+
         if (userDetails.getUsername() != null) user.setUsername(userDetails.getUsername());
         if (userDetails.getEmail() != null) user.setEmail(userDetails.getEmail());
         if (userDetails.getRole() != null) user.setRole(userDetails.getRole());
@@ -70,6 +85,9 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
         User user = userOpt.get();
+        if (isProtectedAccount(user.getEmail())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Cannot modify status of protected core accounts"));
+        }
         user.setStatus(body.get("status"));
         user.setUpdatedAt(new Date());
         userRepository.save(user);
@@ -84,6 +102,9 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
         User user = userOpt.get();
+        if (isProtectedAccount(user.getEmail())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Cannot modify role/permissions of protected core accounts"));
+        }
         if (body.containsKey("role")) {
             user.setRole((String) body.get("role"));
         }
@@ -102,7 +123,64 @@ public class UserController {
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
+        if (isProtectedAccount(userOpt.get().getEmail())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Cannot delete protected core accounts"));
+        }
         userRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
+    }
+
+    // PROFILE ENDPOINTS FOR CURRENT USER
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile() {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(userOpt.get());
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> body) {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        if (body.containsKey("username")) user.setUsername(body.get("username"));
+        if (body.containsKey("email")) user.setEmail(body.get("email"));
+        if (body.containsKey("phoneNumber")) user.setPhoneNumber(body.get("phoneNumber"));
+        if (body.containsKey("dateOfBirth")) {
+            try {
+                user.setDateOfBirth(new java.text.SimpleDateFormat("yyyy-MM-dd").parse(body.get("dateOfBirth")));
+            } catch (Exception e) {
+                // Ignore invalid date
+            }
+        }
+        user.setUpdatedAt(new Date());
+        return ResponseEntity.ok(userRepository.save(user));
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+        
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại không chính xác"));
+        }
+        
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(new Date());
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
     }
 }

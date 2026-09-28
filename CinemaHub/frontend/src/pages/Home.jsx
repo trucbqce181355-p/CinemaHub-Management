@@ -1,11 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Play, Calendar, Star, Sparkles, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Home = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    if (location.state?.message) {
+      setToastMessage(location.state.message);
+      navigate('/', { replace: true, state: {} });
+      
+      // Tự động tắt sau 5 giây
+      setTimeout(() => {
+        setToastMessage('');
+      }, 5000);
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -29,7 +44,22 @@ const Home = () => {
   const comingSoonMovies = movies.filter(m => m.status === 'COMING_SOON');
 
   return (
-    <div className="w-full">
+    <div className="w-full relative">
+      {/* Toast Popup */}
+      {toastMessage && (
+        <motion.div 
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-[#e31837] text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3"
+        >
+          <span className="font-medium">{toastMessage}</span>
+          <button onClick={() => setToastMessage('')} className="bg-white/20 hover:bg-white/40 p-1 rounded-full transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </motion.div>
+      )}
+
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Background Image with Overlay */}

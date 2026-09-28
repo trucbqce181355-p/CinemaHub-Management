@@ -13,7 +13,7 @@ import java.util.List;
 @Component
 public class JwtUtil {
     private final Key key = Keys.hmacShaKeyFor("CinemaHubSuperSecretKeyThatIsAtLeast32BytesLongForHS256Algorithm123!".getBytes());
-    private final long EXPIRATION_TIME = 86400000; // 24h
+    private final long EXPIRATION_TIME = 900000; // 15m
 
     public String generateToken(String userId, String role, List<String> permissions) {
         return Jwts.builder()

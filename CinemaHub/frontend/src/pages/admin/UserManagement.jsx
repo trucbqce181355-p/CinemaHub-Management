@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, Lock, Unlock, UserPlus, Mail, User, Shield, X, Key, CheckSquare } from 'lucide-react';
+import { Edit2, Trash2, Lock, Unlock, UserPlus, Mail, User, Shield, X, Key, CheckSquare, Eye, EyeOff, Filter } from 'lucide-react';
+import { motion } from 'framer-motion';
+import CustomSelect from '../../components/CustomSelect';
 
 const UserManagement = () => {
   const { user, logout } = useAuth();
@@ -10,10 +12,47 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [filterRole, setFilterRole] = useState('All');
   
+  const getDisplayId = (id) => {
+    if (!id) return 'N/A';
+    const index = users.findIndex(u => (u._id || u.id) === id);
+    return index !== -1 ? index + 1 : 'N/A';
+  };
+
+  const isProtectedAccount = (email) => {
+    return ['admin@cinemahub.com', 'manager@cinemahub.com', 'staff@cinemahub.com'].includes(email);
+  };
+
+  // Advanced Filters & Stats
+  const [filterStatus, setFilterStatus] = useState('All');
+  
+  const avatarColors = [
+    'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
+    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  
+  const getAvatarColor = (name) => {
+    if (!name) return 'bg-gray-500';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  };
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.status === 'Active').length;
+  const bannedUsers = users.filter(u => u.status !== 'Active').length;
+  const adminUsers = users.filter(u => u.role === 'Admin').length;
+
+  const filteredUsers = users.filter(u => {
+    const roleMatch = filterRole === 'All' || u.role === filterRole;
+    const statusMatch = filterStatus === 'All' || u.status === filterStatus;
+    return roleMatch && statusMatch;
+  });
+
   // Permission Modal State
   const [isPermModalOpen, setIsPermModalOpen] = useState(false);
   const [selectedPermUser, setSelectedPermUser] = useState(null);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
 
   const AVAILABLE_PERMISSIONS = [
     { id: 'manage_movies', label: 'Quản lý Phim (Thêm, Sửa, Xóa phim)' },
@@ -44,6 +83,10 @@ const UserManagement = () => {
   const [editError, setEditError] = useState('');
   const [editLoading, setEditLoading] = useState(false);
 
+  // Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+
   // Session Expiry Modal
   const [isSessionExpired, setIsSessionExpired] = useState(false);
 
@@ -61,7 +104,6 @@ const UserManagement = () => {
         console.error('API Error:', data);
         setUsers([]); // Prevent crash if data is an object
         if (res.status === 401) {
-           setIsSessionExpired(true);
            return;
         }
       }
@@ -75,22 +117,6 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
-    
-    // Auto-check token expiration every second
-    const interval = setInterval(() => {
-      if (user && user.token) {
-        try {
-          const payload = JSON.parse(atob(user.token.split('.')[1]));
-          if (payload.exp * 1000 < Date.now()) {
-            setIsSessionExpired(true);
-          }
-        } catch (e) {
-          console.error('Invalid token format');
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
   }, [user]);
 
   const handleToggleStatus = async (userId, currentStatus) => {
@@ -113,8 +139,8 @@ const UserManagement = () => {
 
   const handleToggleRole = async (userId, currentRole) => {
     try {
-      // Rotate Role: Customer -> Staff -> Admin -> Customer
-      const roles = ['Customer', 'Staff', 'Admin'];
+      // Rotate Role: Customer -> Staff -> Manager -> Admin -> Customer
+      const roles = ['Customer', 'Staff', 'Manager', 'Admin'];
       const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
 
       const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
@@ -132,17 +158,26 @@ const UserManagement = () => {
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) return;
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const res = await fetch(`http://localhost:5000/api/users/${userToDelete._id || userToDelete.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
       });
       if (res.status === 401) { setIsSessionExpired(true); return; }
-      if (res.ok) fetchUsers();
+      if (res.ok) {
+        fetchUsers();
+        setIsDeleteModalOpen(false);
+        setUserToDelete(null);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -184,7 +219,7 @@ const UserManagement = () => {
   const openEditModal = (u) => {
     setEditError('');
     setEditUserData({
-      _id: u._id,
+      _id: u._id || u.id,
       username: u.username,
       email: u.email,
       phoneNumber: u.phoneNumber || '',
@@ -205,6 +240,7 @@ const UserManagement = () => {
         username: editUserData.username,
         email: editUserData.email,
         phoneNumber: editUserData.phoneNumber,
+        role: editUserData.role,
       };
 
       const res = await fetch(`http://localhost:5000/api/users/${editUserData._id}`, {
@@ -235,7 +271,7 @@ const UserManagement = () => {
 
   const handleSavePermissions = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${selectedPermUser._id}`, {
+      const res = await fetch(`http://localhost:5000/api/users/${selectedPermUser._id || selectedPermUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -258,28 +294,76 @@ const UserManagement = () => {
 
   return (
     <div className="h-full">
-      <div className="max-w-6xl">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
+      <div className="max-w-6xl space-y-8">
+        
+        {/* Overview Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="glass-panel p-6 rounded-2xl border border-white/10 flex items-center gap-4 hover:border-white/20 transition-all">
+            <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Tổng người dùng</p>
+              <h3 className="text-2xl font-bold text-white">{totalUsers}</h3>
+            </div>
+          </div>
+          <div className="glass-panel p-6 rounded-2xl border border-white/10 flex items-center gap-4 hover:border-white/20 transition-all">
+            <div className="w-12 h-12 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+              <CheckSquare className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Đang hoạt động</p>
+              <h3 className="text-2xl font-bold text-white">{activeUsers}</h3>
+            </div>
+          </div>
+          <div className="glass-panel p-6 rounded-2xl border border-white/10 flex items-center gap-4 hover:border-white/20 transition-all">
+            <div className="w-12 h-12 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center">
+              <Lock className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Bị khóa</p>
+              <h3 className="text-2xl font-bold text-white">{bannedUsers}</h3>
+            </div>
+          </div>
+          <div className="glass-panel p-6 rounded-2xl border border-white/10 flex items-center gap-4 hover:border-white/20 transition-all">
+            <div className="w-12 h-12 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Quản trị viên</p>
+              <h3 className="text-2xl font-bold text-white">{adminUsers}</h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
           <h1 className="text-3xl font-display font-bold text-white">Quản lý người dùng</h1>
           <div className="flex items-center gap-3">
-            {/* Dropdown Filter */}
-            <div className="relative group min-w-[200px]">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-              </div>
-              <select
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
-              >
-                <option value="All">Tất cả chức vụ</option>
-                <option value="Customer">Khách hàng</option>
-                <option value="Staff">Nhân viên</option>
-                <option value="Admin">Quản trị viên</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-              </div>
+            {/* Custom Dropdown Filters */}
+            <CustomSelect
+              value={filterRole}
+              onChange={setFilterRole}
+              icon={Filter}
+              options={[
+                { value: 'All', label: 'Tất cả chức vụ' },
+                { value: 'Customer', label: 'Khách hàng' },
+                { value: 'Staff', label: 'Nhân viên' },
+                { value: 'Manager', label: 'Quản lý' },
+                { value: 'Admin', label: 'Quản trị viên' }
+              ]}
+            />
+
+            <div className="hidden sm:block">
+              <CustomSelect
+                value={filterStatus}
+                onChange={setFilterStatus}
+                icon={Lock}
+                options={[
+                  { value: 'All', label: 'Tất cả trạng thái' },
+                  { value: 'Active', label: 'Đang hoạt động' },
+                  { value: 'Disabled', label: 'Bị khóa' }
+                ]}
+              />
             </div>
 
             <button 
@@ -308,7 +392,7 @@ const UserManagement = () => {
                   <tr>
                     <td colSpan="5" className="p-8 text-center text-gray-400">Đang tải...</td>
                   </tr>
-                ) : users.filter(u => filterRole === 'All' || u.role === filterRole).length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-12 text-center text-gray-400">
                       <div className="flex flex-col items-center gap-3">
@@ -318,22 +402,30 @@ const UserManagement = () => {
                     </td>
                   </tr>
                 ) : (
-                  users.filter(u => filterRole === 'All' || u.role === filterRole).map((u) => (
-                    <tr key={u._id} className="hover:bg-white/5 transition-colors">
+                  filteredUsers.map((u) => (
+                    <tr key={u._id || u.id} className="hover:bg-white/5 transition-colors group">
                       <td className="p-4">
-                        <div className="font-medium text-white">{u.username}</div>
-                        <div className="text-xs text-gray-500">{u._id}</div>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg ${getAvatarColor(u.username)}`}>
+                            {u.username ? u.username.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div>
+                            <div className="font-medium text-white group-hover:text-primary transition-colors">{u.username}</div>
+                            <div className="text-xs font-mono text-gray-500 bg-white/5 w-max px-2 py-0.5 rounded mt-1">ID: {getDisplayId(u._id || u.id)}</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="p-4 text-gray-300">{u.email}</td>
                       <td className="p-4">
                         <button 
-                          onClick={() => handleToggleRole(u._id, u.role)}
-                          disabled={u.email === 'admin@cinemahub.com'}
+                          onClick={() => handleToggleRole(u._id || u.id, u.role)}
+                          disabled={isProtectedAccount(u.email)}
                           className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
                             u.role === 'Admin' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 
+                            u.role === 'Manager' ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30' : 
                             u.role === 'Staff' ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 
-                            'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                          } ${u.email === 'admin@cinemahub.com' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                          } ${isProtectedAccount(u.email) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {u.role}
                         </button>
@@ -349,12 +441,12 @@ const UserManagement = () => {
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            onClick={() => handleToggleStatus(u._id, u.status)}
-                            disabled={u.email === 'admin@cinemahub.com'}
+                            onClick={() => handleToggleStatus(u.id, u.status)}
+                            disabled={isProtectedAccount(u.email)}
                             title={u.status === 'Active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                             className={`p-2 rounded-lg transition-colors ${
                               u.status === 'Active' ? 'text-orange-400 hover:bg-orange-400/20' : 'text-green-400 hover:bg-green-400/20'
-                            } ${u.email === 'admin@cinemahub.com' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                            } ${isProtectedAccount(u.email) ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
                             {u.status === 'Active' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                           </button>
@@ -371,9 +463,9 @@ const UserManagement = () => {
                               setSelectedPermissions(u.permissions || []);
                               setIsPermModalOpen(true);
                             }}
-                            disabled={u.email === 'admin@cinemahub.com'}
+                            disabled={isProtectedAccount(u.email)}
                             className={`p-2 rounded-lg transition-colors ${
-                              u.email === 'admin@cinemahub.com'
+                              isProtectedAccount(u.email)
                                 ? 'text-purple-400/30 cursor-not-allowed'
                                 : 'text-purple-400 hover:bg-purple-400/20'
                             }`}
@@ -382,10 +474,10 @@ const UserManagement = () => {
                             <Key className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleDelete(u._id)}
-                            disabled={u.email === 'admin@cinemahub.com'}
+                            onClick={() => handleDeleteClick(u)}
+                            disabled={isProtectedAccount(u.email)}
                             title="Xóa tài khoản"
-                            className={`p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors ${u.email === 'admin@cinemahub.com' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                            className={`p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors ${isProtectedAccount(u.email) ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -467,13 +559,20 @@ const UserManagement = () => {
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     value={newUserData.password}
                     onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
-                    className="w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-gray-600"
+                    className="w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-12 py-3.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-gray-600"
                     placeholder="••••••••"
                   />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
 
@@ -490,6 +589,7 @@ const UserManagement = () => {
                   >
                     <option value="Customer">Khách hàng (Customer)</option>
                     <option value="Staff">Nhân viên (Staff)</option>
+                    <option value="Manager">Quản lý (Manager)</option>
                     <option value="Admin">Quản trị viên (Admin)</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-500">
@@ -542,9 +642,11 @@ const UserManagement = () => {
                 </div>
 
                 <div className="space-y-4 mb-8">
-                  <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-                    <p className="text-xs text-gray-500 mb-1">User ID</p>
-                    <p className="text-sm text-gray-300 font-mono break-all">{editUserData._id}</p>
+                  <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col justify-center">
+                    <p className="text-xs text-gray-500 mb-1">Mã định danh (User ID)</p>
+                    <div className="inline-flex items-center gap-2">
+                       <span className="px-2 py-1 bg-primary/20 text-primary border border-primary/30 rounded text-sm font-bold tracking-wider">{getDisplayId(editUserData._id || editUserData.id)}</span>
+                    </div>
                   </div>
                   <div className="bg-black/20 p-4 rounded-xl border border-white/5">
                     <p className="text-xs text-gray-500 mb-1">Trạng thái tài khoản</p>
@@ -569,15 +671,15 @@ const UserManagement = () => {
               <div className="pt-4 border-t border-white/5">
                 <button
                   onClick={async () => {
-                    await handleToggleStatus(editUserData._id, editUserData.status);
+                    await handleToggleStatus(editUserData._id || editUserData.id, editUserData.status);
                     setIsEditModalOpen(false);
                   }}
-                  disabled={editUserData.email === 'admin@cinemahub.com'}
+                  disabled={isProtectedAccount(editUserData.email)}
                   className={`w-full py-3 px-4 rounded-xl font-bold transition-all flex justify-center items-center gap-2 ${
                     editUserData.status === 'Active' 
                     ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20' 
                     : 'bg-green-500/10 text-green-500 hover:bg-green-500/20 border border-green-500/20'
-                  } ${editUserData.email === 'admin@cinemahub.com' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${isProtectedAccount(editUserData.email) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {editUserData.status === 'Active' ? (
                     <><Lock className="w-5 h-5" /> Ban User (Khóa tài khoản)</>
@@ -652,6 +754,29 @@ const UserManagement = () => {
                       className="w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all placeholder:text-gray-600"
                       placeholder="Chưa cập nhật"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-400 pl-1">Chức vụ (Role)</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500 group-focus-within:text-blue-400 transition-colors">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <select
+                      value={editUserData.role}
+                      onChange={(e) => setEditUserData({...editUserData, role: e.target.value})}
+                      disabled={isProtectedAccount(editUserData.email)}
+                      className={`w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all appearance-none ${isProtectedAccount(editUserData.email) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <option value="Customer">Khách hàng (Customer)</option>
+                      <option value="Staff">Nhân viên (Staff)</option>
+                      <option value="Manager">Quản lý (Manager)</option>
+                      <option value="Admin">Quản trị viên (Admin)</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-500">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
                   </div>
                 </div>
 
@@ -852,6 +977,41 @@ const UserManagement = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {isDeleteModalOpen && userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsDeleteModalOpen(false)}></div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="glass-panel w-full max-w-md rounded-2xl border border-white/10 overflow-hidden relative z-10 p-6 text-center"
+          >
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+              <Trash2 className="w-8 h-8 text-red-500" />
+            </div>
+            <h3 className="text-xl font-bold font-display text-white mb-2">Xóa người dùng?</h3>
+            <p className="text-gray-400 mb-6">
+              Bạn có chắc chắn muốn xóa tài khoản <span className="font-bold text-white">{userToDelete.username}</span> ({userToDelete.email})? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 py-3 px-4 rounded-xl font-bold bg-white/5 hover:bg-white/10 text-white transition-colors border border-white/10"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-3 px-4 rounded-xl font-bold bg-[#e31837] hover:bg-red-700 text-white transition-colors shadow-lg shadow-red-500/20"
+              >
+                Xóa vĩnh viễn
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

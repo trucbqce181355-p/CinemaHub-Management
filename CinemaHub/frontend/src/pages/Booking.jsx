@@ -1,9 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Monitor, Info, CreditCard } from 'lucide-react';
 
 const Booking = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [movie, setMovie] = useState(null);
+  const [loading, setLoading] = useState(!!id);
   const [selectedSeats, setSelectedSeats] = useState([]);
+
+  useEffect(() => {
+    if (id) {
+      fetch(`http://localhost:5000/api/movies/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'DISABLED') {
+            navigate('/', { state: { message: 'Phim này đã ngừng chiếu hoặc không khả dụng!' } });
+            return;
+          }
+          setMovie(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, [id, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
   
   // Generate dummy seats (5 rows, 8 cols)
   const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -116,11 +150,11 @@ const Booking = () => {
             <h3 className="text-xl font-bold font-display mb-6">Thông tin đặt vé</h3>
             
             <div className="flex gap-4 mb-6 pb-6 border-b border-white/10">
-              <img src="/images/poster1.jpg" alt="Movie" className="w-20 h-28 object-cover rounded-lg shadow-md" />
+              <img src={movie?.posterUrl || movie?.image || "/images/poster1.jpg"} alt="Movie" className="w-20 h-28 object-cover rounded-lg shadow-md" />
               <div>
-                <h4 className="font-bold text-lg mb-1">Astral Bound</h4>
-                <p className="text-sm text-gray-400 mb-2">2D Phụ đề | 120 phút</p>
-                <div className="inline-flex text-xs font-medium bg-red-500/20 text-red-400 px-2 py-1 rounded">T16</div>
+                <h4 className="font-bold text-lg mb-1">{movie?.title || "Vui lòng chọn phim"}</h4>
+                <p className="text-sm text-gray-400 mb-2">2D Phụ đề | {movie?.duration || 120} phút</p>
+                {movie?.ageRating && <div className="inline-flex text-xs font-medium bg-red-500/20 text-red-400 px-2 py-1 rounded">{movie.ageRating}</div>}
               </div>
             </div>
             
