@@ -26,7 +26,7 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Trang chủ', path: '/' },
-    { name: 'Phim đang chiếu', path: '/' },
+    { name: 'Phim', path: '/movies' },
     { name: 'Rạp phim', path: '/' },
     { name: 'Khuyến mãi', path: '/' },
   ];
@@ -53,14 +53,14 @@ const Navbar = () => {
               </Link>
             ))}
           </div>
-          
+
           <div className="flex items-center gap-4 border-l border-white/20 pl-6">
             <button className="text-gray-300 hover:text-white transition-colors">
               <Search className="w-5 h-5" />
             </button>
             {user ? (
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-2 py-1.5 pr-4 rounded-full border border-white/10 transition-all duration-300"
                 >
@@ -84,23 +84,23 @@ const Navbar = () => {
                         <p className="text-sm text-gray-400">Đăng nhập với tư cách</p>
                         <p className="text-sm font-bold text-white truncate">{user.email}</p>
                       </div>
-                      
+
                       <Link to="/profile" state={{ tab: 'info' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                         <Settings className="w-4 h-4" /> Tài khoản của tôi
                       </Link>
                       <Link to="/profile" state={{ tab: 'booking' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                         <Ticket className="w-4 h-4" /> Lịch sử đặt vé
                       </Link>
-                      
+
                       {user.role === 'Admin' && (
                         <Link to="/admin/users" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                           <User className="w-4 h-4" /> Quản trị hệ thống
                         </Link>
                       )}
-                      
+
                       <div className="border-t border-white/5 mt-1 pt-1">
-                        <button 
-                          onClick={handleLogout} 
+                        <button
+                          onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-primary/10 transition-colors"
                         >
                           <LogOut className="w-4 h-4" /> Đăng xuất
@@ -140,29 +140,29 @@ const Navbar = () => {
               </Link>
             ))}
             <div className="border-t border-white/10 mt-2 pt-4 flex flex-col gap-4 px-4">
-               <button className="w-full btn-secondary text-sm">Tìm kiếm</button>
-               {user ? (
-                 <div className="flex items-center justify-between w-full bg-white/5 p-3 rounded-lg border border-white/10">
-                   <div className="flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 text-primary font-bold">
-                       {user.name.charAt(0).toUpperCase()}
-                     </div>
-                     <span className="text-sm font-medium">{user.name}</span>
-                   </div>
-                   <div className="flex items-center gap-2">
-                     {user.role === 'Admin' && (
-                       <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
-                         <Settings className="w-4 h-4" />
-                       </Link>
-                     )}
-                     <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
-                       <LogOut className="w-4 h-4" />
-                     </button>
-                   </div>
-                 </div>
-               ) : (
-                 <Link to="/login" className="w-full btn-primary text-sm text-center">Đăng nhập</Link>
-               )}
+              <button className="w-full btn-secondary text-sm">Tìm kiếm</button>
+              {user ? (
+                <div className="flex items-center justify-between w-full bg-white/5 p-3 rounded-lg border border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 text-primary font-bold">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium">{user.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {user.role === 'Admin' && (
+                      <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
+                        <Settings className="w-4 h-4" />
+                      </Link>
+                    )}
+                    <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link to="/login" className="w-full btn-primary text-sm text-center">Đăng nhập</Link>
+              )}
             </div>
           </motion.div>
         )}

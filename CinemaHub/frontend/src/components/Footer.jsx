@@ -37,7 +37,7 @@ const Footer = () => {
               <li><Link to="/" className="hover:text-primary transition-colors">Khuyến mãi</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-white font-medium mb-4">Hỗ trợ</h4>
             <ul className="space-y-2 text-sm text-gray-400">
@@ -53,9 +53,9 @@ const Footer = () => {
             <h4 className="text-white font-medium mb-4">Đăng ký nhận tin</h4>
             <p className="text-sm text-gray-400 mb-4">Nhận thông tin về phim mới và ưu đãi hấp dẫn.</p>
             <div className="flex gap-2">
-              <input 
-                type="email" 
-                placeholder="Email của bạn" 
+              <input
+                type="email"
+                placeholder="Email của bạn"
                 className="bg-background border border-white/10 rounded-lg px-4 py-2 text-sm w-full focus:outline-none focus:border-primary transition-colors"
               />
               <button className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm transition-colors shadow-lg">
@@ -64,7 +64,7 @@ const Footer = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="border-t border-white/5 pt-8 text-center text-sm text-gray-500">
           <p>&copy; {new Date().getFullYear()} CinemaHub. All rights reserved.</p>
         </div>

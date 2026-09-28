@@ -6,10 +6,13 @@ import Booking from './pages/Booking';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import MovieDetails from './pages/MovieDetails';
 import UserManagement from './pages/admin/UserManagement';
+import MovieManagement from './pages/admin/MovieManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
+import Movies from './pages/Movies';
 
 function App() {
   return (
@@ -37,11 +40,14 @@ function App() {
             </div>
           } />
           <Route path="users" element={<UserManagement />} />
+          <Route path="movies" element={<MovieManagement />} />
         </Route>
 
         {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
+          <Route path="/movies" element={<Movies />} />
+          <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
