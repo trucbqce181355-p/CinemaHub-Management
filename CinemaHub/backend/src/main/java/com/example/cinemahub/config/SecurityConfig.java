@@ -33,6 +33,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/movies/**").permitAll()
                 .requestMatchers("/api/cinemas/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions/active").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -53,4 +54,3 @@ public class SecurityConfig {
         return new CorsFilter(source);
     }
 }
-
