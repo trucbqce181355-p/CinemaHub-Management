@@ -27,7 +27,7 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Trang chủ', path: '/' },
     { name: 'Phim', path: '/movies' },
-    { name: 'Rạp phim', path: '/' },
+    { name: 'Rạp phim', path: '/cinemas' },
     { name: 'Khuyến mãi', path: '/' },
   ];
 
@@ -172,3 +172,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+

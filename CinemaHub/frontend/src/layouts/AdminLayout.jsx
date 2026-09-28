@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings } from 'lucide-react';
+import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin } from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -24,7 +24,10 @@ const AdminLayout = () => {
     { name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
     { name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> },
+    { name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> },
     { name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> },
+    { name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> },
+    { name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> },
     { name: 'Cài đặt', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
   ];
 

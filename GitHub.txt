@@ -1,0 +1,22 @@
+3. Cách xử lý lấy code mới khi đang làm dở (Merge code)
+Giả sử bạn đang làm ở nhánh feature/an-promotion-api, tự dưng Trực (thành viên trong ảnh) đẩy code phân quyền mới lên nhánh dev và bạn cần đoạn code đó ngay:
+
+Mở cái Graph ở nửa dưới màn hình của bạn ra.
+Click chuột phải vào dấu chấm tròn màu xanh của nhánh dev (hiện đang chứa code mới của Trực).
+Chọn Merge branch into current branch (Ghép nhánh này vào nhánh hiện tại của tôi).
+Nhấn xác nhận. Code mới của Trực sẽ tự động hòa trộn vào nhánh đang làm dở của bạn!
+
+.\mvnw.cmd spring-boot:run
+
+{
+  "bookingReference": "VE-TEST-001",
+  "showtimeId": "SHOW123",
+  "status": "Paid",
+  "seats": [
+    {
+      "seatId": "A1",
+      "seatNumber": "A1",
+      "usageStatus": "Unused"
+    }
+  ]
+}
