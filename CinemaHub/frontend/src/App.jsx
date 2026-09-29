@@ -18,6 +18,7 @@ import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
 import Movies from './pages/Movies';
 import Cinemas from './pages/Cinemas';
+import PaymentCallback from './pages/PaymentCallback';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-reset-otp" element={<VerifyResetOtp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/payment-callback" element={<PaymentCallback />} />
         </Route>
       </Routes>
     </Router>
