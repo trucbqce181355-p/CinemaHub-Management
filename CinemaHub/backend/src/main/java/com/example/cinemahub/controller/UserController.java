@@ -24,10 +24,8 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    private boolean isProtectedAccount(String email) {
-        return "admin@cinemahub.com".equals(email) || 
-               "manager@cinemahub.com".equals(email) || 
-               "staff@cinemahub.com".equals(email);
+    private boolean isProtectedAccount(User user) {
+        return "Admin".equals(user.getRole());
     }
 
     @GetMapping
@@ -61,7 +59,7 @@ public class UserController {
         User user = userOpt.get();
         
         // Prevent modifying protected accounts' role or status
-        if (isProtectedAccount(user.getEmail())) {
+        if (isProtectedAccount(user)) {
             // Can only update non-critical fields for themselves if needed, but for manage_users this is usually blocked.
             return ResponseEntity.status(403).body(Map.of("message", "Cannot modify protected core accounts"));
         }
@@ -85,7 +83,7 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
         User user = userOpt.get();
-        if (isProtectedAccount(user.getEmail())) {
+        if (isProtectedAccount(user)) {
             return ResponseEntity.status(403).body(Map.of("message", "Cannot modify status of protected core accounts"));
         }
         user.setStatus(body.get("status"));
@@ -102,7 +100,7 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
         User user = userOpt.get();
-        if (isProtectedAccount(user.getEmail())) {
+        if (isProtectedAccount(user)) {
             return ResponseEntity.status(403).body(Map.of("message", "Cannot modify role/permissions of protected core accounts"));
         }
         if (body.containsKey("role")) {
@@ -123,7 +121,7 @@ public class UserController {
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        if (isProtectedAccount(userOpt.get().getEmail())) {
+        if (isProtectedAccount(userOpt.get())) {
             return ResponseEntity.status(403).body(Map.of("message", "Cannot delete protected core accounts"));
         }
         userRepository.deleteById(id);
@@ -150,7 +148,15 @@ public class UserController {
         }
         User user = userOpt.get();
         if (body.containsKey("username")) user.setUsername(body.get("username"));
-        if (body.containsKey("email")) user.setEmail(body.get("email"));
+        if (body.containsKey("email")) {
+            String newEmail = body.get("email");
+            if (!newEmail.equals(user.getEmail())) {
+                if (userRepository.findByEmail(newEmail).isPresent()) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Email đã được sử dụng bởi tài khoản khác"));
+                }
+                user.setEmail(newEmail);
+            }
+        }
         if (body.containsKey("phoneNumber")) user.setPhoneNumber(body.get("phoneNumber"));
         if (body.containsKey("dateOfBirth")) {
             try {

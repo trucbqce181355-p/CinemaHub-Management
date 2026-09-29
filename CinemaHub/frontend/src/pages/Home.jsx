@@ -25,7 +25,7 @@ const Home = () => {
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/movies');
+        const res = await fetch('http://localhost:8080/api/movies');
         if (res.ok) {
           const data = await res.json();
           // Lọc bỏ phim đã ẩn (DISABLED)

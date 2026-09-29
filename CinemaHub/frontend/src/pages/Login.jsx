@@ -19,7 +19,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch('http://localhost:8080/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -33,7 +33,11 @@ const Login = () => {
         login({ email: data.email, name: data.username, role: data.role, token: data.token });
         navigate('/');
       } else {
-        setError(data.message || 'Đăng nhập thất bại');
+        if (data.message === "Account is not verified. Please verify your email first.") {
+          setError(data.message);
+        } else {
+          setError(data.message || 'Đăng nhập thất bại');
+        }
       }
     } catch (err) {
       setError('Lỗi kết nối đến máy chủ');
@@ -59,8 +63,17 @@ const Login = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm text-center">
-            {error}
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm text-center flex flex-col items-center gap-2">
+            <span>{error}</span>
+            {error === "Account is not verified. Please verify your email first." && (
+               <button 
+                 type="button"
+                 onClick={() => navigate('/register', { state: { email, requireOtp: true } })}
+                 className="px-4 py-2 bg-primary/20 hover:bg-primary/40 text-primary-hover rounded-xl border border-primary/50 transition-colors font-medium text-sm"
+               >
+                 Xác thực tài khoản
+               </button>
+            )}
           </div>
         )}
 
@@ -74,7 +87,7 @@ const Login = () => {
               <input 
                 type="email" 
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
                 required
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
                 placeholder="Nhập email của bạn"
@@ -94,7 +107,7 @@ const Login = () => {
               <input 
                 type={showPassword ? 'text' : 'password'} 
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
                 required
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
                 placeholder="••••••••"

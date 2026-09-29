@@ -1,4 +1,4 @@
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings } from 'lucide-react';
 
@@ -8,11 +8,7 @@ const AdminLayout = () => {
   const location = useLocation();
 
   if (!user || !['Admin', 'Manager', 'Staff'].includes(user.role)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <h1 className="text-2xl text-red-500 font-bold">Không có quyền truy cập</h1>
-      </div>
-    );
+    return <Navigate to="/" replace />;
   }
 
   const handleLogout = () => {

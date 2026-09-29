@@ -44,7 +44,7 @@ const Profile = () => {
     
     const fetchProfile = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/users/profile', {
+        const res = await fetch('http://localhost:8080/api/users/profile', {
           headers: { Authorization: `Bearer ${user.token}` }
         });
         const data = await res.json();
@@ -71,7 +71,7 @@ const Profile = () => {
     setInfoLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/users/profile', {
+      const res = await fetch('http://localhost:8080/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +115,7 @@ const Profile = () => {
     setPassLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/users/change-password', {
+      const res = await fetch('http://localhost:8080/api/users/change-password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

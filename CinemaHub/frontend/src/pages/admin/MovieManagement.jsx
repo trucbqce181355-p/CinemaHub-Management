@@ -52,7 +52,7 @@ const MovieManagement = () => {
       if (searchTerm) queryParams.append('search', searchTerm);
       if (filterStatus !== 'All') queryParams.append('status', filterStatus);
 
-      const res = await fetch(`http://localhost:5000/api/movies?${queryParams.toString()}`, {
+      const res = await fetch(`http://localhost:8080/api/movies?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
@@ -108,7 +108,7 @@ const MovieManagement = () => {
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch('http://localhost:5000/api/movies', {
+      const res = await fetch('http://localhost:8080/api/movies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,7 +158,7 @@ const MovieManagement = () => {
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch(`http://localhost:5000/api/movies/${formData._id || formData.id}`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${formData._id || formData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ const MovieManagement = () => {
   const handleToggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
     try {
-      const res = await fetch(`http://localhost:5000/api/movies/${id}/status`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ const MovieManagement = () => {
   const executeDelete = async () => {
     if (!movieToDelete) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/movies/${movieToDelete.id || movieToDelete._id}`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${movieToDelete.id || movieToDelete._id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${user.token}`,

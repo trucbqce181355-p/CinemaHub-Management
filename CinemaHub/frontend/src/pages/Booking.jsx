@@ -12,7 +12,7 @@ const Booking = () => {
 
   useEffect(() => {
     if (id) {
-      fetch(`http://localhost:5000/api/movies/${id}`)
+      fetch(`http://localhost:8080/api/movies/${id}`)
         .then(res => res.json())
         .then(data => {
           if (data.status === 'DISABLED') {

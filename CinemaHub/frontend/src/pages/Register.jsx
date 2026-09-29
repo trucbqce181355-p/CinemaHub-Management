@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const Register = () => {
+  const location = useLocation();
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState('');
-  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(location.state?.requireOtp || false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      const res = await fetch('http://localhost:8080/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+      const res = await fetch('http://localhost:8080/api/auth/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,6 +74,29 @@ const Register = () => {
         navigate('/login');
       } else {
         setError(data.message || 'Xác thực thất bại');
+      }
+    } catch (err) {
+      setError('Lỗi kết nối đến máy chủ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch('http://localhost:8080/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || 'Mã OTP mới đã được gửi đến email của bạn.');
+      } else {
+        setError(data.message || 'Gửi lại OTP thất bại');
       }
     } catch (err) {
       setError('Lỗi kết nối đến máy chủ');
@@ -120,7 +144,7 @@ const Register = () => {
                 <input 
                   type="text" 
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => { setUsername(e.target.value); setError(''); }}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
                   placeholder="Nhập tên người dùng"
@@ -137,7 +161,7 @@ const Register = () => {
                 <input 
                   type="email" 
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setError(''); }}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
                   placeholder="Nhập email của bạn"
@@ -154,7 +178,7 @@ const Register = () => {
                 <input 
                   type={showPassword ? 'text' : 'password'} 
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
                   required
                   minLength={6}
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
@@ -190,7 +214,7 @@ const Register = () => {
                 <input 
                   type="text" 
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white text-center tracking-widest text-xl placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
                   placeholder="------"
@@ -199,14 +223,24 @@ const Register = () => {
               <p className="text-xs text-gray-400 mt-2 text-center">Chúng tôi đã gửi mã OTP gồm 6 chữ số đến email {email}</p>
             </div>
 
-            <button 
-              type="submit"
-              disabled={loading || otp.length !== 6}
-              className="w-full btn-primary flex items-center justify-center gap-2 group mt-8 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Đang xác thực...' : 'Xác thực tài khoản'}
-              {!loading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
-            </button>
+            <div className="flex gap-4 mt-8">
+              <button 
+                type="button"
+                onClick={handleResendOtp}
+                disabled={loading}
+                className="w-1/2 flex items-center justify-center py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-70 disabled:cursor-not-allowed text-white font-medium"
+              >
+                Gửi lại mã
+              </button>
+              <button 
+                type="submit"
+                disabled={loading || otp.length !== 6}
+                className="w-1/2 btn-primary flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Đang...' : 'Xác thực'}
+                {!loading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+              </button>
+            </div>
           </form>
         )}
 

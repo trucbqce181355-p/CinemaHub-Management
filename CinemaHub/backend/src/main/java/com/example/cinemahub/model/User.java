@@ -30,6 +30,8 @@ public class User {
     private String otp;
     @JsonIgnore
     private Date otpExpires;
+    @JsonIgnore
+    private Integer failedOtpAttempts = 0;
     private List<String> permissions = new ArrayList<>();
     private Date createdAt = new Date();
     private Date updatedAt = new Date();

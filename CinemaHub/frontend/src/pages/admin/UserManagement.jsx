@@ -92,7 +92,7 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
+      const res = await fetch('http://localhost:8080/api/users', {
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
@@ -122,7 +122,7 @@ const UserManagement = () => {
   const handleToggleStatus = async (userId, currentStatus) => {
     try {
       const newStatus = currentStatus === 'Active' ? 'Locked' : 'Active';
-      const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const res = await fetch(`http://localhost:8080/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const UserManagement = () => {
       const roles = ['Customer', 'Staff', 'Manager', 'Admin'];
       const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
 
-      const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const res = await fetch(`http://localhost:8080/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -166,7 +166,7 @@ const UserManagement = () => {
   const confirmDelete = async () => {
     if (!userToDelete) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${userToDelete._id || userToDelete.id}`, {
+      const res = await fetch(`http://localhost:8080/api/users/${userToDelete._id || userToDelete.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -189,7 +189,7 @@ const UserManagement = () => {
     setAddLoading(true);
     
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
+      const res = await fetch('http://localhost:8080/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ const UserManagement = () => {
         role: editUserData.role,
       };
 
-      const res = await fetch(`http://localhost:5000/api/users/${editUserData._id}`, {
+      const res = await fetch(`http://localhost:8080/api/users/${editUserData._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -271,7 +271,7 @@ const UserManagement = () => {
 
   const handleSavePermissions = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${selectedPermUser._id || selectedPermUser.id}`, {
+      const res = await fetch(`http://localhost:8080/api/users/${selectedPermUser._id || selectedPermUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
