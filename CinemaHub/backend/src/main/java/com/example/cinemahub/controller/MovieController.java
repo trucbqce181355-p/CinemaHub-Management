@@ -4,6 +4,7 @@ import com.example.cinemahub.model.Movie;
 import com.example.cinemahub.service.MovieService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,11 +33,13 @@ public class MovieController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('manage_movies')")
     public Movie addMovie(@RequestBody Movie movie) {
         return movieService.addMovie(movie);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('manage_movies')")
     public ResponseEntity<Movie> updateMovie(@PathVariable String id, @RequestBody Movie movie) {
         try {
             return ResponseEntity.ok(movieService.updateMovie(id, movie));
@@ -46,12 +49,14 @@ public class MovieController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('manage_movies')")
     public ResponseEntity<Void> deleteMovie(@PathVariable String id) {
         movieService.deleteMovie(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('manage_movies')")
     public ResponseEntity<Movie> updateStatus(@PathVariable String id, @RequestBody Map<String, String> body) {
         try {
             return ResponseEntity.ok(movieService.updateStatus(id, body.get("status")));

@@ -37,7 +37,7 @@ public class AuthController {
         
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "Email hoặc mật khẩu không chính xác!"));
         }
         
         User user = userOpt.get();
@@ -50,7 +50,7 @@ public class AuthController {
         }
         
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "Email hoặc mật khẩu không chính xác!"));
         }
         
         String token = jwtUtil.generateToken(user.getId(), user.getRole(), user.getPermissions());
@@ -74,11 +74,13 @@ public class AuthController {
         user.setCreatedAt(new Date());
         user.setUpdatedAt(new Date());
         
-        // Generate OTP
         String otp = String.format("%06d", (int)(Math.random() * 1000000));
         user.setOtp(otp);
         user.setOtpExpires(new Date(System.currentTimeMillis() + 10 * 60 * 1000)); // 10 mins
+        user.setFailedOtpAttempts(0);
         user.setIsVerified(false);
+        user.setRole("Customer"); // Ngăn chặn Leo thang đặc quyền (Privilege Escalation)
+        user.setPermissions(null); // Không cấp quyền gì cho khách hàng
         
         userRepository.save(user);
         
@@ -90,11 +92,11 @@ public class AuthController {
             emailService.sendEmail(user.getEmail(), "Account Verification OTP", message);
         } catch (Exception e) {
             System.err.println("Failed to send OTP email: " + e.getMessage());
+            userRepository.delete(user);
+            return ResponseEntity.status(500).body(Map.of("message", "Failed to send OTP email. Please try again later."));
         }
         
-        String token = jwtUtil.generateToken(user.getId(), user.getRole(), user.getPermissions());
         Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
         response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("email", user.getEmail());
@@ -119,16 +121,58 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Account is already verified"));
         }
         
+        if (user.getFailedOtpAttempts() != null && user.getFailedOtpAttempts() >= 5) {
+            user.setOtp(null);
+            user.setFailedOtpAttempts(0);
+            userRepository.save(user);
+            return ResponseEntity.badRequest().body(Map.of("message", "Too many failed attempts. Please request a new OTP."));
+        }
+        
         if (user.getOtp() == null || !user.getOtp().equals(otp) || user.getOtpExpires().before(new Date())) {
+            user.setFailedOtpAttempts(user.getFailedOtpAttempts() == null ? 1 : user.getFailedOtpAttempts() + 1);
+            userRepository.save(user);
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid or expired OTP"));
         }
         
         user.setIsVerified(true);
         user.setOtp(null);
         user.setOtpExpires(null);
+        user.setFailedOtpAttempts(0);
         userRepository.save(user);
         
         return ResponseEntity.ok(Map.of("message", "Account verified successfully"));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<?> resendOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
+        }
+        User user = userOpt.get();
+        
+        if (Boolean.TRUE.equals(user.getIsVerified())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Account is already verified"));
+        }
+        
+        String otp = String.format("%06d", (int)(Math.random() * 1000000));
+        user.setOtp(otp);
+        user.setOtpExpires(new Date(System.currentTimeMillis() + 10 * 60 * 1000)); // 10 mins
+        user.setFailedOtpAttempts(0);
+        userRepository.save(user);
+        
+        String message = "Welcome to CinemaHub!\n\n" +
+                         "Your new OTP for account verification is: " + otp + "\n\n" +
+                         "This OTP is valid for 10 minutes.";
+        try {
+            emailService.sendEmail(user.getEmail(), "Account Verification OTP", message);
+            return ResponseEntity.ok(Map.of("message", "A new OTP has been sent to your email."));
+        } catch (Exception e) {
+            System.err.println("Failed to resend OTP email: " + e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("message", "Failed to resend OTP email. Please try again later."));
+        }
     }
 
     @PostMapping("/forgot-password")
@@ -142,6 +186,7 @@ public class AuthController {
         String otp = String.format("%06d", (int)(Math.random() * 1000000));
         user.setOtp(otp);
         user.setOtpExpires(new Date(System.currentTimeMillis() + 10 * 60 * 1000)); // 10 mins
+        user.setFailedOtpAttempts(0);
         userRepository.save(user);
         
         String message = "You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n" +
@@ -169,7 +214,15 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
         }
         User user = userOpt.get();
+        if (user.getFailedOtpAttempts() != null && user.getFailedOtpAttempts() >= 5) {
+            user.setOtp(null);
+            user.setFailedOtpAttempts(0);
+            userRepository.save(user);
+            return ResponseEntity.badRequest().body(Map.of("message", "Too many failed attempts. Please request a new OTP."));
+        }
         if (user.getOtp() == null || !user.getOtp().equals(otp) || user.getOtpExpires().before(new Date())) {
+            user.setFailedOtpAttempts(user.getFailedOtpAttempts() == null ? 1 : user.getFailedOtpAttempts() + 1);
+            userRepository.save(user);
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid or expired OTP"));
         }
         
@@ -187,13 +240,22 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
         }
         User user = userOpt.get();
+        if (user.getFailedOtpAttempts() != null && user.getFailedOtpAttempts() >= 5) {
+            user.setOtp(null);
+            user.setFailedOtpAttempts(0);
+            userRepository.save(user);
+            return ResponseEntity.badRequest().body(Map.of("message", "Too many failed attempts. Please request a new OTP."));
+        }
         if (user.getOtp() == null || !user.getOtp().equals(otp) || user.getOtpExpires().before(new Date())) {
+            user.setFailedOtpAttempts(user.getFailedOtpAttempts() == null ? 1 : user.getFailedOtpAttempts() + 1);
+            userRepository.save(user);
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid or expired OTP"));
         }
         
         user.setPassword(passwordEncoder.encode(password));
         user.setOtp(null);
         user.setOtpExpires(null);
+        user.setFailedOtpAttempts(0);
         userRepository.save(user);
         
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));

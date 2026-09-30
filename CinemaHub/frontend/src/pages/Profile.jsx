@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star, LogOut, Clock, MapPin, Film, QrCode, Printer, X, CheckCircle2, CreditCard } from 'lucide-react';
+import { User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star, LogOut, Clock, MapPin, Film, QrCode, Printer, X, CheckCircle2, CreditCard, Eye, EyeOff } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
-
 const Profile = () => {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
@@ -17,10 +16,8 @@ const Profile = () => {
     if (location.state?.tab === 'booking' || location.state?.tab === 'bookings') return 'booking';
     return location.state?.tab || 'info';
   };
-
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedTicketModal, setSelectedTicketModal] = useState(null);
-
   // Info state
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -28,14 +25,15 @@ const Profile = () => {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [infoMessage, setInfoMessage] = useState({ text: '', type: '' });
   const [infoLoading, setInfoLoading] = useState(false);
-
   // Password state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passMessage, setPassMessage] = useState({ text: '', type: '' });
   const [passLoading, setPassLoading] = useState(false);
-
   // Handle tab change from navigation state or URL query
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -48,7 +46,6 @@ const Profile = () => {
       setActiveTab(location.state.tab === 'bookings' ? 'booking' : location.state.tab);
     }
   }, [location.search, location.state]);
-
   // Fetch full user profile on load to get phone and DOB
   useEffect(() => {
     if (!user) {
@@ -79,10 +76,8 @@ const Profile = () => {
     fetchProfile();
     fetchBookings();
   }, [user, navigate]);
-
   const [realBookings, setRealBookings] = useState([]);
   const [bookingLoading, setBookingLoading] = useState(false);
-
   const fetchBookings = async () => {
     if (!user) return;
     setBookingLoading(true);
@@ -100,7 +95,6 @@ const Profile = () => {
       setBookingLoading(false);
     }
   };
-
   const handleOpenTicketDetail = async (bookingItem) => {
     setSelectedTicketModal(bookingItem);
     try {
@@ -116,11 +110,9 @@ const Profile = () => {
       console.error("Error fetching ticket detail:", err);
     }
   };
-
   const handleContinuePayment = (booking) => {
     navigate(`/booking?movieId=${booking.movieId}&showtimeId=${booking.showtimeId}&resumeBookingId=${booking.id}`);
   };
-
   const handleCancelBooking = async (bookingId) => {
     if (!window.confirm("Bạn có chắc chắn muốn hủy vé này? Ghế sẽ được giải phóng cho người khác.")) return;
     try {
@@ -140,12 +132,10 @@ const Profile = () => {
       alert("Lỗi khi kết nối đến máy chủ");
     }
   };
-
   const handleUpdateInfo = async (e) => {
     e.preventDefault();
     setInfoMessage({ text: '', type: '' });
     setInfoLoading(true);
-
     try {
       const res = await fetch('http://127.0.0.1:5000/api/users/profile', {
         method: 'PUT',
@@ -155,9 +145,7 @@ const Profile = () => {
         },
         body: JSON.stringify({ username, email, phoneNumber, dateOfBirth }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         setInfoMessage({ text: 'Cập nhật thông tin thành công!', type: 'success' });
         login({ ...user, name: data.username, email: data.email });
@@ -170,26 +158,20 @@ const Profile = () => {
       setInfoLoading(false);
     }
   };
-
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPassMessage({ text: '', type: '' });
-
     if (newPassword === currentPassword) {
       return setPassMessage({ text: 'Mật khẩu mới không được giống mật khẩu cũ!', type: 'error' });
     }
-
     if (newPassword !== confirmPassword) {
       return setPassMessage({ text: 'Mật khẩu mới và Nhập lại mật khẩu không khớp!', type: 'error' });
     }
-
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(newPassword)) {
       return setPassMessage({ text: 'Mật khẩu mới phải có ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường và 1 số.', type: 'error' });
     }
-
     setPassLoading(true);
-
     try {
       const res = await fetch('http://127.0.0.1:5000/api/users/change-password', {
         method: 'PUT',
@@ -199,9 +181,7 @@ const Profile = () => {
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         setPassMessage({ text: 'Đổi mật khẩu thành công!', type: 'success' });
         setCurrentPassword('');
@@ -216,14 +196,11 @@ const Profile = () => {
       setPassLoading(false);
     }
   };
-
   const handleLogout = () => {
     logout();
     navigate('/');
   };
-
   if (!user) return null;
-
   const menuItems = [
     { id: 'info', icon: <User className="w-5 h-5" />, label: 'Personal Info' },
     { id: 'password', icon: <Lock className="w-5 h-5 text-orange-400" />, label: 'Change Pass' },
@@ -232,7 +209,6 @@ const Profile = () => {
     { id: 'notifications', icon: <Bell className="w-5 h-5 text-yellow-400" />, label: 'Notifications' },
     { id: 'membership', icon: <Star className="w-5 h-5 text-yellow-500" />, label: 'Membership' },
   ];
-
   const mockBookings = [
     {
       id: "TKT-892374",
@@ -271,7 +247,6 @@ const Profile = () => {
       color: "bg-gray-500"
     }
   ];
-
   return (
     <div className="container mx-auto px-4 py-8 md:py-16 pt-24 min-h-screen">
       <h1 className="text-3xl font-display font-bold tracking-widest mb-10 text-center uppercase">MY PROFILE</h1>
@@ -298,7 +273,6 @@ const Profile = () => {
               {user.role.toUpperCase()}
             </div>
           </div>
-
           {/* Navigation Menu */}
           <div className="glass-panel rounded-2xl overflow-hidden py-2">
             {menuItems.map((item) => (
@@ -325,7 +299,6 @@ const Profile = () => {
             </button>
           </div>
         </motion.div>
-
         {/* Right Content Area */}
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
@@ -349,7 +322,6 @@ const Profile = () => {
                     {infoMessage.text}
                   </motion.div>
                 )}
-
                 <form onSubmit={handleUpdateInfo} className="space-y-6 max-w-2xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -366,7 +338,6 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Email</label>
                       <div className="relative">
@@ -381,7 +352,6 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone Number</label>
                       <div className="relative">
@@ -397,7 +367,6 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Date of Birth</label>
                       <div className="relative">
@@ -413,7 +382,6 @@ const Profile = () => {
                       </div>
                     </div>
                   </div>
-
                   <div className="pt-8">
                     <button type="submit" disabled={infoLoading} className="btn-primary flex items-center gap-2 px-8 py-3 w-full md:w-auto justify-center">
                       {infoLoading ? 'Đang lưu...' : <><Save className="w-5 h-5" /> Save Changes</>}
@@ -422,7 +390,6 @@ const Profile = () => {
                 </form>
               </motion.div>
             )}
-
             {/* TAB: CHANGE PASSWORD */}
             {activeTab === 'password' && (
               <motion.div 
@@ -438,7 +405,6 @@ const Profile = () => {
                     {passMessage.text}
                   </motion.div>
                 )}
-
                 <form onSubmit={handleChangePassword} className="space-y-6 max-w-xl">
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mật khẩu hiện tại</label>
@@ -447,15 +413,21 @@ const Profile = () => {
                         <Lock className="w-5 h-5" />
                       </div>
                       <input 
-                        type="password" 
+                        type={showCurrentPassword ? 'text' : 'password'} 
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         required
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                       />
+                      <button 
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      >
+                        {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mật khẩu mới</label>
                     <div className="relative">
@@ -463,16 +435,22 @@ const Profile = () => {
                         <Shield className="w-5 h-5" />
                       </div>
                       <input 
-                        type="password" 
+                        type={showNewPassword ? 'text' : 'password'} 
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                       />
+                      <button 
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      >
+                        {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường và 1 số.</p>
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nhập lại mật khẩu mới</label>
                     <div className="relative">
@@ -480,15 +458,21 @@ const Profile = () => {
                         <Shield className="w-5 h-5" />
                       </div>
                       <input 
-                        type="password" 
+                        type={showConfirmPassword ? 'text' : 'password'} 
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                       />
+                      <button 
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
                     </div>
                   </div>
-
                   <div className="pt-4">
                     <button type="submit" disabled={passLoading} className="btn-primary flex items-center gap-2 px-8 py-3 w-full md:w-auto justify-center">
                       {passLoading ? 'Đang lưu...' : <><Save className="w-5 h-5" /> Cập nhật mật khẩu</>}
@@ -497,7 +481,6 @@ const Profile = () => {
                 </form>
               </motion.div>
             )}
-
             {/* TAB: BOOKING HISTORY */}
             {activeTab === 'booking' && (
               <motion.div 
@@ -517,19 +500,16 @@ const Profile = () => {
                     Làm mới
                   </button>
                 </div>
-
                 <div className="space-y-6">
                   {realBookings.length > 0 ? (
                     realBookings.map((b, index) => {
                       const isConfirmed = b.status === 'CONFIRMED';
                       const isCancelled = b.status === 'CANCELLED';
                       const isPending = b.status === 'PENDING';
-
                       let badgeColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
                       if (isConfirmed) badgeColor = 'bg-green-500/20 text-green-400 border-green-500/30';
                       else if (isCancelled) badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
                       else if (isPending) badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-
                       return (
                         <motion.div 
                           initial={{ opacity: 0, y: 20 }}
@@ -571,7 +551,6 @@ const Profile = () => {
                                 </div>
                               </div>
                             </div>
-
                             <div className="border-t border-dashed border-white/20 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                               <div>
                                 <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Ghế đã chọn ({b.seats?.length || 0})</span>
@@ -669,7 +648,6 @@ const Profile = () => {
                               </div>
                             </div>
                           </div>
-
                           <div className="border-t border-dashed border-white/20 pt-4 flex justify-between items-center">
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Ghế của bạn</span>
@@ -694,7 +672,6 @@ const Profile = () => {
                 </div>
               </motion.div>
             )}
-
             {/* PLACEHOLDER FOR OTHER TABS */}
             {['favorites', 'notifications', 'membership'].includes(activeTab) && (
               <motion.div 
@@ -710,11 +687,9 @@ const Profile = () => {
                 <p className="text-gray-500 max-w-sm">Mục này sẽ sớm ra mắt trong các phiên bản cập nhật tiếp theo của hệ thống.</p>
               </motion.div>
             )}
-
           </AnimatePresence>
         </motion.div>
       </div>
-
       {/* MODAL CHI TIẾT VÉ & MÃ QR */}
       <AnimatePresence>
         {selectedTicketModal && (
@@ -742,7 +717,6 @@ const Profile = () => {
                   {selectedTicketModal.cinemaName} • {selectedTicketModal.roomName} ({selectedTicketModal.showtimeFormat || '2D'})
                 </p>
               </div>
-
               {/* Body */}
               <div className="p-6 space-y-5">
                 {/* QR Code Container */}
@@ -760,7 +734,6 @@ const Profile = () => {
                     Quét mã này tại cổng soát vé hoặc quầy CGV để vào xem phim
                   </p>
                 </div>
-
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-3 bg-white/5 rounded-2xl p-4 border border-white/10 text-xs">
                   <div>
@@ -791,7 +764,6 @@ const Profile = () => {
                     </span>
                   </div>
                 </div>
-
                 <div className="flex justify-between items-center text-sm pt-1 px-1">
                   <span className="text-gray-400">Tổng thanh toán:</span>
                   <span className="text-xl font-black text-primary">
@@ -799,7 +771,6 @@ const Profile = () => {
                   </span>
                 </div>
               </div>
-
               {/* Footer */}
               <div className="bg-[#1a1a1a] p-4 flex justify-between gap-3 border-t border-white/10">
                 <button
@@ -824,5 +795,4 @@ const Profile = () => {
     </div>
   );
 };
-
 export default Profile;

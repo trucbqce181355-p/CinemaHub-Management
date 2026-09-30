@@ -5,6 +5,7 @@ import {
   Edit2, Trash2, Plus, Search, Filter, Image as ImageIcon,
   PlaySquare, X, Film, Check, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 
 const MovieManagement = () => {
   const { user, logout } = useAuth();
@@ -23,6 +24,7 @@ const MovieManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [movieToDelete, setMovieToDelete] = useState(null);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
 
   // Form State
   const initialFormState = {
@@ -50,7 +52,7 @@ const MovieManagement = () => {
       if (searchTerm) queryParams.append('search', searchTerm);
       if (filterStatus !== 'All') queryParams.append('status', filterStatus);
 
-      const res = await fetch(`http://localhost:5000/api/movies?${queryParams.toString()}`, {
+      const res = await fetch(`http://localhost:8080/api/movies?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
@@ -60,6 +62,7 @@ const MovieManagement = () => {
         setMovies(data);
       } else {
         console.error('Failed to fetch movies', data);
+        if (res.status === 401) setIsSessionExpired(true);
       }
     } catch (err) {
       console.error(err);
@@ -71,6 +74,22 @@ const MovieManagement = () => {
   useEffect(() => {
     fetchMovies();
   }, [searchTerm, filterStatus]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user && user.token) {
+        try {
+          const payload = JSON.parse(atob(user.token.split('.')[1]));
+          if (payload.exp * 1000 < Date.now()) {
+            setIsSessionExpired(true);
+          }
+        } catch (e) {
+          console.error('Invalid token format');
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -89,7 +108,7 @@ const MovieManagement = () => {
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch('http://localhost:5000/api/movies', {
+      const res = await fetch('http://localhost:8080/api/movies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,8 +125,7 @@ const MovieManagement = () => {
         console.error("Lỗi Backend:", errorData);
         setFormError(`Lỗi server (${res.status}): Vui lòng kiểm tra Terminal Backend để xem nguyên nhân`);
         if (res.status === 401) {
-          logout();
-          navigate('/login');
+          setIsSessionExpired(true);
         }
       }
     } catch (err) {
@@ -140,7 +158,7 @@ const MovieManagement = () => {
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch(`http://localhost:5000/api/movies/${formData._id || formData.id}`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${formData._id || formData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -156,8 +174,7 @@ const MovieManagement = () => {
         console.error("Lỗi Backend:", errorData);
         setFormError(`Lỗi server (${res.status}): Vui lòng kiểm tra Terminal Backend`);
         if (res.status === 401) {
-          logout();
-          navigate('/login');
+          setIsSessionExpired(true);
         }
       }
     } catch (err) {
@@ -171,7 +188,7 @@ const MovieManagement = () => {
   const handleToggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
     try {
-      const res = await fetch(`http://localhost:5000/api/movies/${id}/status`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -192,7 +209,7 @@ const MovieManagement = () => {
   const executeDelete = async () => {
     if (!movieToDelete) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/movies/${movieToDelete.id || movieToDelete._id}`, {
+      const res = await fetch(`http://localhost:8080/api/movies/${movieToDelete.id || movieToDelete._id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -232,20 +249,18 @@ const MovieManagement = () => {
             </div>
 
             {/* Filter Status */}
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                <Filter className="w-4 h-4" />
-              </div>
-              <select
+            <div className="hidden sm:block">
+              <CustomSelect
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-[#1a1a1a] border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer"
-              >
-                <option value="All">Tất cả trạng thái</option>
-                <option value="ACTIVE">Đang chiếu</option>
-                <option value="COMING_SOON">Sắp chiếu</option>
-                <option value="DISABLED">Đã ẩn</option>
-              </select>
+                onChange={setFilterStatus}
+                icon={Filter}
+                options={[
+                  { value: 'All', label: 'Tất cả trạng thái' },
+                  { value: 'ACTIVE', label: 'Đang chiếu' },
+                  { value: 'COMING_SOON', label: 'Sắp chiếu' },
+                  { value: 'DISABLED', label: 'Đã ẩn' }
+                ]}
+              />
             </div>
 
             <button
@@ -402,16 +417,38 @@ const MovieManagement = () => {
                       placeholder="VD: Hành Tinh Cát: Phần 2"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative group">
                     <label className="block text-sm font-medium text-gray-300">Thể loại </label>
                     <input
                       type="text"
                       name="genres"
                       value={formData.genres}
                       onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all peer"
                       placeholder="Hành động, Viễn tưởng..."
+                      autoComplete="off"
                     />
+                    <div className="absolute z-10 w-full mt-1 bg-[#2a2a2a] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto opacity-0 invisible peer-focus:opacity-100 peer-focus:visible hover:opacity-100 hover:visible transition-all">
+                      <div className="p-3 flex flex-wrap gap-2">
+                        {Array.from(new Set([...(movies.flatMap(m => m.genres || [])), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Tâm lý', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
+                          const isSelected = formData.genres?.includes(g);
+                          return (
+                            <span 
+                              key={g} 
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const current = formData.genres ? formData.genres.split(',').map(s=>s.trim()).filter(Boolean) : [];
+                                if (!current.includes(g)) setFormData({...formData, genres: [...current, g].join(', ')});
+                                else setFormData({...formData, genres: current.filter(x => x !== g).join(', ')});
+                              }}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-full cursor-pointer transition-colors ${isSelected ? 'bg-primary text-white shadow-lg' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+                            >
+                              {g}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -424,8 +461,9 @@ const MovieManagement = () => {
                       name="directors"
                       value={formData.directors}
                       onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
-                      placeholder="Christopher Nolan, Denis Villeneuve..."
+                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                      placeholder="Christopher Nolan, Trấn Thành..."
+                      autoComplete="off"
                     />
                   </div>
                   <div className="space-y-2">
@@ -435,8 +473,9 @@ const MovieManagement = () => {
                       name="actors"
                       value={formData.actors}
                       onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
+                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                       placeholder="Timothée Chalamet, Zendaya..."
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -469,32 +508,30 @@ const MovieManagement = () => {
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-300">Phân loại tuổi *</label>
-                    <select
-                      name="ageRating"
-                      required
+                    <CustomSelect
                       value={formData.ageRating}
-                      onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
-                    >
-                      <option value="P">P (Mọi lứa tuổi)</option>
-                      <option value="C13">C13 (Trên 13 tuổi)</option>
-                      <option value="C16">C16 (Trên 16 tuổi)</option>
-                      <option value="C18">C18 (Trên 18 tuổi)</option>
-                    </select>
+                      onChange={(val) => setFormData({...formData, ageRating: val})}
+                      options={[
+                        { value: 'P', label: 'P (Mọi lứa tuổi)' },
+                        { value: 'C13', label: 'C13 (Trên 13 tuổi)' },
+                        { value: 'C16', label: 'C16 (Trên 16 tuổi)' },
+                        { value: 'C18', label: 'C18 (Trên 18 tuổi)' }
+                      ]}
+                      className="w-full"
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-300">Trạng thái *</label>
-                    <select
-                      name="status"
-                      required
+                    <CustomSelect
                       value={formData.status}
-                      onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
-                    >
-                      <option value="ACTIVE">Đang chiếu</option>
-                      <option value="COMING_SOON">Sắp chiếu</option>
-                      <option value="DISABLED">Đã ẩn (Disabled)</option>
-                    </select>
+                      onChange={(val) => setFormData({...formData, status: val})}
+                      options={[
+                        { value: 'ACTIVE', label: 'Đang chiếu' },
+                        { value: 'COMING_SOON', label: 'Sắp chiếu' },
+                        { value: 'DISABLED', label: 'Đã ẩn (Disabled)' }
+                      ]}
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
@@ -597,6 +634,28 @@ const MovieManagement = () => {
                 Xóa ngay
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Expired Modal */}
+      {isSessionExpired && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-all duration-300">
+          <div className="w-full max-w-md bg-[#121212] rounded-3xl border border-red-500/30 relative shadow-2xl p-8 text-center">
+            <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-display font-bold text-white mb-2">Phiên đăng nhập hết hạn</h3>
+            <p className="text-gray-400 mb-8">Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.</p>
+            <button
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+              className="w-full py-3 bg-primary hover:bg-red-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-primary/20"
+            >
+              Đăng nhập lại
+            </button>
           </div>
         </div>
       )}
