@@ -7,6 +7,7 @@ import com.example.cinemahub.repository.ShowtimeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,37 +21,77 @@ public class ShowtimeService {
     @Autowired
     private MovieRepository movieRepository;
 
-    public List<Showtime> searchShowtimes(String movieId, String roomId) {
-        List<Showtime> all = showtimeRepository.findAll();
-        if (movieId != null && !movieId.isEmpty()) {
-            all = all.stream().filter(s -> movieId.equals(s.getMovieId())).collect(Collectors.toList());
+    public List<Showtime> getShowtimes(String movieId, String cinemaId, String dateStr, Boolean includePast) {
+        List<Showtime> list;
+        if (movieId != null && !movieId.isBlank() && cinemaId != null && !cinemaId.isBlank()) {
+            list = showtimeRepository.findByMovieIdAndCinemaId(movieId, cinemaId);
+        } else if (movieId != null && !movieId.isBlank()) {
+            list = showtimeRepository.findByMovieId(movieId);
+        } else if (cinemaId != null && !cinemaId.isBlank()) {
+            list = showtimeRepository.findByCinemaId(cinemaId);
+        } else {
+            list = showtimeRepository.findAll();
         }
-        if (roomId != null && !roomId.isEmpty()) {
-            all = all.stream().filter(s -> roomId.equals(s.getRoomId())).collect(Collectors.toList());
+
+        if (dateStr != null && !dateStr.isBlank()) {
+            try {
+                LocalDate filterDate = LocalDate.parse(dateStr);
+                list = list.stream().filter(s -> {
+                    if (s.getStartTime() == null) return false;
+                    return s.getStartTime().toLocalDate().isEqual(filterDate);
+                }).collect(Collectors.toList());
+            } catch (Exception ignored) {
+            }
         }
-        return all;
+
+        // Filter out past showtimes unless includePast is explicitly true
+        if (includePast == null || !includePast) {
+            LocalDateTime now = LocalDateTime.now();
+            list = list.stream().filter(s -> {
+                if (s.getStartTime() == null) return false;
+                return s.getStartTime().isAfter(now);
+            }).collect(Collectors.toList());
+        }
+
+        return list.stream()
+                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()))
+                .sorted((a, b) -> a.getStartTime().compareTo(b.getStartTime()))
+                .collect(Collectors.toList());
+    }
+
+    public List<Showtime> getShowtimes(String movieId, String cinemaId, String dateStr) {
+        return getShowtimes(movieId, cinemaId, dateStr, false);
     }
 
     public Showtime getShowtimeById(String id) {
-        return showtimeRepository.findById(id).orElse(null);
+        return showtimeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy suất chiếu với ID: " + id));
     }
 
     public Showtime createShowtime(Showtime showtime) throws Exception {
         validateShowtime(showtime, null);
-        if (showtime.getStatus() == null) showtime.setStatus("ACTIVE");
+        if (showtime.getStatus() == null) {
+            showtime.setStatus("Active");
+        }
         return showtimeRepository.save(showtime);
     }
 
     public Showtime updateShowtime(String id, Showtime updated) throws Exception {
         Showtime existing = getShowtimeById(id);
-        if (existing == null) throw new Exception("Showtime not found");
         
         validateShowtime(updated, id);
         
         existing.setMovieId(updated.getMovieId());
+        existing.setMovieTitle(updated.getMovieTitle());
+        existing.setMoviePoster(updated.getMoviePoster());
+        existing.setCinemaId(updated.getCinemaId());
+        existing.setCinemaName(updated.getCinemaName());
         existing.setRoomId(updated.getRoomId());
+        existing.setRoomName(updated.getRoomName());
         existing.setStartTime(updated.getStartTime());
         existing.setEndTime(updated.getEndTime());
+        existing.setFormat(updated.getFormat());
+        existing.setBasePrice(updated.getBasePrice());
         if (updated.getStatus() != null) {
             existing.setStatus(updated.getStatus());
         }
@@ -58,23 +99,22 @@ public class ShowtimeService {
         return showtimeRepository.save(existing);
     }
 
-    public void deleteShowtime(String id) {
-        showtimeRepository.deleteById(id);
-    }
-
     public Showtime updateStatus(String id, String status) throws Exception {
         Showtime existing = getShowtimeById(id);
-        if (existing == null) throw new Exception("Showtime not found");
         existing.setStatus(status);
         return showtimeRepository.save(existing);
     }
 
+    public void deleteShowtime(String id) {
+        showtimeRepository.deleteById(id);
+    }
+
     private void validateShowtime(Showtime showtime, String currentId) throws Exception {
         Movie movie = movieRepository.findById(showtime.getMovieId())
-                .orElseThrow(() -> new Exception("Movie not found"));
+                .orElseThrow(() -> new Exception("Không tìm thấy phim với ID: " + showtime.getMovieId()));
         
         if (showtime.getStartTime() == null) {
-             throw new Exception("Start time is required");
+             throw new Exception("Thời gian bắt đầu không được để trống");
         }
         
         if (showtime.getStartTime().isBefore(LocalDateTime.now().plusHours(1))) {
@@ -83,7 +123,7 @@ public class ShowtimeService {
         
         int duration = movie.getDuration() != null ? movie.getDuration() : 120;
         
-        // Setup EndTime based on duration + 0 mins (actual movie end)
+        // Setup EndTime based on duration
         showtime.setEndTime(showtime.getStartTime().plusMinutes(duration));
         
         List<Showtime> roomShowtimes = showtimeRepository.findByRoomId(showtime.getRoomId());
@@ -92,13 +132,12 @@ public class ShowtimeService {
                 continue;
             }
             
-            if ("DISABLED".equals(st.getStatus())) {
+            if ("CANCELLED".equalsIgnoreCase(st.getStatus()) || "DISABLED".equalsIgnoreCase(st.getStatus())) {
                 continue;
             }
             
             LocalDateTime stEnd = st.getEndTime();
             if (stEnd == null) {
-                // Fallback in case old data has no end time (assume 2 hours)
                 stEnd = st.getStartTime().plusMinutes(120);
             }
 

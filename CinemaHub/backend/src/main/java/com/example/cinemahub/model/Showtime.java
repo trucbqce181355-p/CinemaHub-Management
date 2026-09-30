@@ -1,29 +1,42 @@
 package com.example.cinemahub.model;
 
+import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
+@Data
 @Document(collection = "showtimes")
 public class Showtime {
     @Id
     private String id;
-    private String movieId;
-    private String roomId;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
-    private String status;
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public String getMovieId() { return movieId; }
-    public void setMovieId(String movieId) { this.movieId = movieId; }
-    public String getRoomId() { return roomId; }
-    public void setRoomId(String roomId) { this.roomId = roomId; }
-    public LocalDateTime getStartTime() { return startTime; }
-    public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
-    public LocalDateTime getEndTime() { return endTime; }
-    public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    @NotBlank(message = "Movie ID không được để trống")
+    private String movieId;
+
+    private String movieTitle;
+    private String moviePoster;
+
+    @NotBlank(message = "Cinema ID không được để trống")
+    private String cinemaId;
+
+    private String cinemaName;
+
+    @NotBlank(message = "Room ID không được để trống")
+    private String roomId;
+
+    private String roomName;
+
+    @NotNull(message = "Thời gian bắt đầu không được để trống")
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
+
+    private String format = "2D"; // 2D, 3D, IMAX
+
+    private Double basePrice = 90000.0;
+
+    private String status = "Active"; // Active, Cancelled
 }

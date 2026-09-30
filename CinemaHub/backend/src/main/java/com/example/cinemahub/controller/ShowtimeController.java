@@ -18,16 +18,22 @@ public class ShowtimeController {
     private ShowtimeService showtimeService;
 
     @GetMapping
-    public List<Showtime> searchShowtimes(
+    public ResponseEntity<List<Showtime>> getShowtimes(
             @RequestParam(required = false) String movieId,
-            @RequestParam(required = false) String roomId) {
-        return showtimeService.searchShowtimes(movieId, roomId);
+            @RequestParam(required = false) String cinemaId,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false, defaultValue = "false") Boolean includePast) {
+        return ResponseEntity.ok(showtimeService.getShowtimes(movieId, cinemaId, date, includePast));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Showtime> getShowtime(@PathVariable String id) {
-        Showtime st = showtimeService.getShowtimeById(id);
-        return st != null ? ResponseEntity.ok(st) : ResponseEntity.notFound().build();
+    public ResponseEntity<?> getShowtimeById(@PathVariable String id) {
+        try {
+            Showtime st = showtimeService.getShowtimeById(id);
+            return st != null ? ResponseEntity.ok(st) : ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping
@@ -36,7 +42,7 @@ public class ShowtimeController {
             Showtime created = showtimeService.createShowtime(showtime);
             return ResponseEntity.ok(created);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -46,7 +52,7 @@ public class ShowtimeController {
             Showtime updated = showtimeService.updateShowtime(id, showtime);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -57,13 +63,17 @@ public class ShowtimeController {
             Showtime updated = showtimeService.updateStatus(id, status);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteShowtime(@PathVariable String id) {
-        showtimeService.deleteShowtime(id);
-        return ResponseEntity.ok(Map.of("message", "Deleted successfully"));
+        try {
+            showtimeService.deleteShowtime(id);
+            return ResponseEntity.ok(Map.of("message", "Đã xóa suất chiếu thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }
