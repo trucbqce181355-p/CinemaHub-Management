@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import CustomerLayout from './layouts/CustomerLayout';
 import AdminLayout from './layouts/AdminLayout';
@@ -14,6 +15,7 @@ import PromotionManagement from './pages/admin/PromotionManagement';
 import TicketCheckIn from './pages/admin/TicketCheckIn';
 import CinemaManagement from './pages/admin/CinemaManagement';
 import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
+import ShowtimeManagement from './pages/admin/ShowtimeManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
@@ -69,9 +71,20 @@ const SessionModal = () => {
   );
 };
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <SessionModal />
       <Routes>
         {/* Admin Routes */}
@@ -100,6 +113,7 @@ function App() {
           <Route path="cinemas" element={<CinemaManagement />} />
           <Route path="cinemas/:cinemaId/rooms" element={<ScreenRoomManagement />} />
           <Route path="promotions" element={<PromotionManagement />} />
+          <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
         </Route>
 

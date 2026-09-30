@@ -20,6 +20,11 @@ public class Movie {
     private List<String> actors;
     private String releaseDate;
 
+    // Pricing Config (Seat Prices for this movie)
+    private Double standardPrice = 90000.0;
+    private Double vipPrice = 120000.0;
+    private Double couplePrice = 200000.0;
+
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -45,4 +50,10 @@ public class Movie {
     public void setActors(List<String> actors) { this.actors = actors; }
     public String getReleaseDate() { return releaseDate; }
     public void setReleaseDate(String releaseDate) { this.releaseDate = releaseDate; }
+    public Double getStandardPrice() { return standardPrice; }
+    public void setStandardPrice(Double standardPrice) { this.standardPrice = standardPrice; }
+    public Double getVipPrice() { return vipPrice; }
+    public void setVipPrice(Double vipPrice) { this.vipPrice = vipPrice; }
+    public Double getCouplePrice() { return couplePrice; }
+    public void setCouplePrice(Double couplePrice) { this.couplePrice = couplePrice; }
 }

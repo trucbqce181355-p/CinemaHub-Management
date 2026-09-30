@@ -24,18 +24,17 @@ const AdminLayout = () => {
     // Quyền Admin
     if (user.role === 'Admin') {
       items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });
-      items.push({ name: 'Cài đặt', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> });
     }
 
-    // Quyền Admin & Manager
-    if (user.role === 'Admin' || user.role === 'Manager') {
+    // Quyền Manager
+    if (user.role === 'Manager') {
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
     }
 
-    // Cả 3 vai trò: Admin, Manager, Staff
-    if (user.role === 'Admin' || user.role === 'Manager' || user.role === 'Staff') {
+    // Manager & Staff
+    if (user.role === 'Manager' || user.role === 'Staff') {
       items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }

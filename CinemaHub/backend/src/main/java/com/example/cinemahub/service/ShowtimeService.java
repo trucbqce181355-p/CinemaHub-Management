@@ -2,8 +2,10 @@ package com.example.cinemahub.service;
 
 import com.example.cinemahub.model.Movie;
 import com.example.cinemahub.model.Showtime;
+import com.example.cinemahub.model.ScreenRoom;
 import com.example.cinemahub.repository.MovieRepository;
 import com.example.cinemahub.repository.ShowtimeRepository;
+import com.example.cinemahub.repository.ScreenRoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +23,10 @@ public class ShowtimeService {
     @Autowired
     private MovieRepository movieRepository;
 
-    public List<Showtime> getShowtimes(String movieId, String cinemaId, String dateStr, Boolean includePast) {
+    @Autowired
+    private ScreenRoomRepository screenRoomRepository;
+
+    public List<Showtime> getShowtimes(String movieId, String cinemaId, String dateStr, Boolean includePast, Boolean allStatuses) {
         List<Showtime> list;
         if (movieId != null && !movieId.isBlank() && cinemaId != null && !cinemaId.isBlank()) {
             list = showtimeRepository.findByMovieIdAndCinemaId(movieId, cinemaId);
@@ -54,13 +59,16 @@ public class ShowtimeService {
         }
 
         return list.stream()
-                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()))
-                .sorted((a, b) -> a.getStartTime().compareTo(b.getStartTime()))
+                .filter(s -> (allStatuses != null && allStatuses) || "Active".equalsIgnoreCase(s.getStatus()))
+                .sorted((a, b) -> {
+                    if (a.getStartTime() == null || b.getStartTime() == null) return 0;
+                    return a.getStartTime().compareTo(b.getStartTime());
+                })
                 .collect(Collectors.toList());
     }
 
     public List<Showtime> getShowtimes(String movieId, String cinemaId, String dateStr) {
-        return getShowtimes(movieId, cinemaId, dateStr, false);
+        return getShowtimes(movieId, cinemaId, dateStr, false, false);
     }
 
     public Showtime getShowtimeById(String id) {
@@ -126,6 +134,12 @@ public class ShowtimeService {
         // Setup EndTime based on duration
         showtime.setEndTime(showtime.getStartTime().plusMinutes(duration));
         
+        // Cập nhật Format (Định Dạng) theo đúng Dạng màn hình của Phòng chiếu (ScreenRoom)
+        ScreenRoom room = screenRoomRepository.findById(showtime.getRoomId()).orElse(null);
+        if (room != null) {
+            showtime.setFormat(room.getScreenType());
+        }
+
         List<Showtime> roomShowtimes = showtimeRepository.findByRoomId(showtime.getRoomId());
         for (Showtime st : roomShowtimes) {
             if (currentId != null && st.getId().equals(currentId)) {

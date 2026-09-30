@@ -23,9 +23,18 @@ const Home = () => {
   }, [location, navigate]);
 
   useEffect(() => {
+    if (location.hash) {
+      setTimeout(() => {
+        const el = document.getElementById(location.hash.substring(1));
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [location]);
+
+  useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/movies');
+        const res = await fetch('http://localhost:5000/api/movies');
         if (res.ok) {
           const data = await res.json();
           // Lọc bỏ phim đã ẩn (DISABLED)
@@ -99,7 +108,7 @@ const Home = () => {
       </section>
 
       {/* Phim Đang Chiếu Section */}
-      <section className="py-16 bg-background relative overflow-hidden">
+      <section id="phim-dang-chieu" className="py-16 bg-background relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-[120px] pointer-events-none"></div>
         
         <div className="container mx-auto px-4 md:px-8 relative z-10">
@@ -156,7 +165,7 @@ const Home = () => {
       </section>
 
       {/* Phim Sắp Chiếu Section */}
-      <section className="py-16 bg-[#121212] relative overflow-hidden border-t border-white/5">
+      <section id="phim-sap-chieu" className="py-16 bg-[#121212] relative overflow-hidden border-t border-white/5">
         <div className="container mx-auto px-4 md:px-8 relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 30 }}

@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Search, AlertCircle, X, Calendar, Clock, Film, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_URL = 'http://localhost:8081/api';
+const API_URL = 'http://localhost:5000/api';
 
-const ROOMS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5'];
+
 
 export default function ShowtimeManagement() {
   const { user } = useAuth();
   const [showtimes, setShowtimes] = useState([]);
   const [movies, setMovies] = useState([]);
+  const [cinemas, setCinemas] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
+  const [availableRooms, setAvailableRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +32,8 @@ export default function ShowtimeManagement() {
   const [formData, setFormData] = useState({
     id: '',
     movieId: '',
-    roomId: ROOMS[0],
+    cinemaId: '',
+    roomId: '',
     startTime: '',
     status: 'ACTIVE'
   });
@@ -41,17 +45,33 @@ export default function ShowtimeManagement() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [showtimesRes, moviesRes] = await Promise.all([
-        fetch(`${API_URL}/showtimes`, { headers: { Authorization: `Bearer ${user.token}` } }),
-        fetch(`${API_URL}/movies`, { headers: { Authorization: `Bearer ${user.token}` } })
+      const [showtimesRes, moviesRes, cinemasRes] = await Promise.all([
+        fetch(`${API_URL}/showtimes?includePast=true&allStatuses=true`, { headers: { Authorization: `Bearer ${user.token}` } }),
+        fetch(`${API_URL}/movies`, { headers: { Authorization: `Bearer ${user.token}` } }),
+        fetch(`${API_URL}/cinemas`, { headers: { Authorization: `Bearer ${user.token}` } })
       ]);
-      if (!showtimesRes.ok || !moviesRes.ok) throw new Error("Unauthorized");
+      if (!showtimesRes.ok || !moviesRes.ok || !cinemasRes.ok) throw new Error("Unauthorized");
       const showtimesData = await showtimesRes.json();
       const moviesData = await moviesRes.json();
+      const cinemasData = await cinemasRes.json();
+      const cinemasArray = Array.isArray(cinemasData) ? cinemasData : (cinemasData.content || []);
       
-      // Kiểm tra nếu backend trả về Array thì mới set (tránh lỗi nếu lỡ trả về string/html lỗi)
       setShowtimes(Array.isArray(showtimesData) ? showtimesData : (showtimesData.content || []));
       setMovies(Array.isArray(moviesData) ? moviesData : (moviesData.content || []));
+      setCinemas(cinemasArray);
+
+      // Fetch all rooms to display names instead of ObjectIDs
+      let allRoomsTemp = [];
+      await Promise.all(cinemasArray.map(async (c) => {
+        try {
+          const rRes = await fetch(`${API_URL}/cinemas/${c.id || c._id}/rooms`, { headers: { Authorization: `Bearer ${user.token}` } });
+          if (rRes.ok) {
+            const rData = await rRes.json();
+            allRoomsTemp = [...allRoomsTemp, ...(Array.isArray(rData) ? rData : [])];
+          }
+        } catch (e) {}
+      }));
+      setAllRooms(allRoomsTemp);
     } catch (err) {
       setError('Lỗi kết nối máy chủ');
     } finally {
@@ -64,13 +84,41 @@ export default function ShowtimeManagement() {
     return movie ? movie.title : 'Phim không tồn tại';
   };
 
-  const handleOpenModal = (showtime = null) => {
+  const getCinemaName = (id) => {
+    const cinema = cinemas.find(c => c.id === id || c._id === id);
+    return cinema ? cinema.name : 'Rạp không tồn tại';
+  };
+
+  const getRoomName = (id) => {
+    const room = allRooms.find(r => r.id === id || r._id === id);
+    return room ? room.name : id; // Fallback to id if not found
+  };
+
+  const fetchRoomsForCinema = async (cinemaId) => {
+    if (!cinemaId) {
+      setAvailableRooms([]);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/cinemas/${cinemaId}/rooms`, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableRooms(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch rooms', err);
+    }
+  };
+
+  const handleOpenModal = async (showtime = null) => {
     if (showtime) {
       setIsEditMode(true);
       setMovieSearchTerm(getMovieTitle(showtime.movieId));
+      await fetchRoomsForCinema(showtime.cinemaId);
       setFormData({
         id: showtime.id,
         movieId: showtime.movieId,
+        cinemaId: showtime.cinemaId || '',
         roomId: showtime.roomId,
         // Chuyển đổi định dạng LocalDateTime từ backend (vd: 2024-05-12T14:30:00) 
         // thành chuẩn của thẻ input type="datetime-local" (YYYY-MM-DDThh:mm)
@@ -80,10 +128,12 @@ export default function ShowtimeManagement() {
     } else {
       setIsEditMode(false);
       setMovieSearchTerm('');
+      setAvailableRooms([]);
       setFormData({
         id: '',
         movieId: '',
-        roomId: ROOMS[0],
+        cinemaId: '',
+        roomId: '',
         startTime: '',
         status: 'ACTIVE'
       });
@@ -111,7 +161,11 @@ export default function ShowtimeManagement() {
         },
         body: JSON.stringify({
           movieId: formData.movieId,
+          movieTitle: getMovieTitle(formData.movieId),
+          cinemaId: formData.cinemaId,
+          cinemaName: getCinemaName(formData.cinemaId),
           roomId: formData.roomId,
+          roomName: getRoomName(formData.roomId),
           startTime: formData.startTime, // Cần format ISO (thẻ input đã làm phần này)
           status: formData.status
         })
@@ -173,7 +227,7 @@ export default function ShowtimeManagement() {
     const date = new Date(timeStr);
     return date.toLocaleString('vi-VN', { 
         year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit'
+        hour: '2-digit', minute: '2-digit', hour12: false
     });
   };
 
@@ -236,7 +290,7 @@ export default function ShowtimeManagement() {
             className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-primary transition-colors text-sm"
           >
             <option value="">Tất cả phòng</option>
-            {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
+            {allRooms.map(r => <option key={r.id || r._id} value={r.id || r._id}>{r.name} ({getCinemaName(r.cinemaId)})</option>)}
           </select>
         </div>
 
@@ -273,6 +327,7 @@ export default function ShowtimeManagement() {
             <thead className="bg-[#1a1a1a] text-xs uppercase text-gray-400 border-b border-white/10">
               <tr>
                 <th className="px-6 py-4 font-medium">Phim</th>
+                <th className="px-6 py-4 font-medium">Cụm rạp</th>
                 <th className="px-6 py-4 font-medium">Phòng chiếu</th>
                 <th className="px-6 py-4 font-medium">Thời gian bắt đầu</th>
                 <th className="px-6 py-4 font-medium">Thời gian kết thúc</th>
@@ -289,8 +344,11 @@ export default function ShowtimeManagement() {
                         <span className="font-medium text-white">{getMovieTitle(st.movieId)}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 font-medium text-blue-400">
+                    {getCinemaName(st.cinemaId)}
+                  </td>
                   <td className="px-6 py-4 font-medium text-green-500">
-                    {st.roomId}
+                    {getRoomName(st.roomId)}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -337,7 +395,7 @@ export default function ShowtimeManagement() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                     Chưa có suất chiếu nào được lên lịch hoặc tìm thấy.
                   </td>
                 </tr>
@@ -419,44 +477,77 @@ export default function ShowtimeManagement() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Phòng chiếu</label>
-                <select 
-                  required
-                  value={formData.roomId}
-                  onChange={e => setFormData({...formData, roomId: e.target.value})}
-                  className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
-                >
-                  {ROOMS.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Cụm rạp</label>
+                  <select 
+                    required
+                    value={formData.cinemaId}
+                    onChange={(e) => {
+                      const newCinemaId = e.target.value;
+                      setFormData({...formData, cinemaId: newCinemaId, roomId: ''});
+                      fetchRoomsForCinema(newCinemaId);
+                    }}
+                    className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="" disabled>-- Chọn rạp --</option>
+                    {cinemas.map(c => (
+                      <option key={c.id || c._id} value={c.id || c._id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Phòng chiếu</label>
+                  <select 
+                    required
+                    value={formData.roomId}
+                    onChange={e => setFormData({...formData, roomId: e.target.value})}
+                    className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+                    disabled={!formData.cinemaId}
+                  >
+                    <option value="" disabled>-- Chọn phòng --</option>
+                    {availableRooms.map(r => (
+                      <option key={r.id || r._id} value={r.id || r._id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Thời gian bắt đầu</label>
-                <input 
-                  type="datetime-local" 
-                  required
-                  min={getMinDateTime()}
-                  value={formData.startTime}
-                  onChange={e => setFormData({...formData, startTime: e.target.value})}
-                  className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors [color-scheme:dark]"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Thời gian bắt đầu</label>
+                  <input 
+                    type="datetime-local" 
+                    required
+                    min={getMinDateTime()}
+                    value={formData.startTime}
+                    onChange={e => setFormData({...formData, startTime: e.target.value})}
+                    className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors [color-scheme:dark]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Thời gian kết thúc (Tự động)</label>
+                  <input 
+                    type="text" 
+                    disabled
+                    value={(() => {
+                      if (!formData.startTime || !formData.movieId) return '---';
+                      const m = movies.find(x => x.id === formData.movieId || x._id === formData.movieId);
+                      const duration = m?.duration || 120;
+                      const date = new Date(formData.startTime);
+                      date.setMinutes(date.getMinutes() + duration);
+                      return date.toLocaleString('vi-VN', { 
+                          year: 'numeric', month: '2-digit', day: '2-digit',
+                          hour: '2-digit', minute: '2-digit', hour12: false
+                      });
+                    })()}
+                    className="w-full bg-[#1a1a1a]/50 border border-white/5 rounded-xl px-4 py-3 text-gray-500 cursor-not-allowed"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Trạng thái</label>
-                <select 
-                  required
-                  value={formData.status}
-                  onChange={e => setFormData({...formData, status: e.target.value})}
-                  className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-                  <option value="DISABLED">Vô hiệu hóa (DISABLED)</option>
-                </select>
-              </div>
+
 
               <div className="pt-4 border-t border-white/5 flex gap-3">
                 <button 

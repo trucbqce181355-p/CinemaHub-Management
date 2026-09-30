@@ -48,6 +48,9 @@ public class MovieService {
             movie.setDirectors(updatedMovie.getDirectors());
             movie.setActors(updatedMovie.getActors());
             movie.setReleaseDate(updatedMovie.getReleaseDate());
+            movie.setStandardPrice(updatedMovie.getStandardPrice());
+            movie.setVipPrice(updatedMovie.getVipPrice());
+            movie.setCouplePrice(updatedMovie.getCouplePrice());
             return movieRepository.save(movie);
         }).orElseThrow(() -> new RuntimeException("Movie not found"));
     }

@@ -9,7 +9,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE = 'http://127.0.0.1:5000/api';
+const API_BASE = 'http://localhost:5000/api';
 
 const Booking = () => {
   const [searchParams] = useSearchParams();
@@ -26,7 +26,11 @@ const Booking = () => {
 
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedCinema, setSelectedCinema] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateString = (d = new Date()) => {
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [selectedShowtime, setSelectedShowtime] = useState(null);
 
   // Seat state (Step 2)
@@ -137,7 +141,7 @@ const Booking = () => {
         const data = await res.json();
 
         // Check if selectedDate is today; if so, filter out past showtimes
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalDateString();
         const isToday = selectedDate === todayStr;
         const now = new Date();
 
@@ -643,7 +647,7 @@ const Booking = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = getLocalDateString(d);
       const dayName = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : `Thứ ${d.getDay() + 1 === 1 ? 'CN' : d.getDay() + 1}`;
       const dayDisplay = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
       dates.push({ iso, dayName, dayDisplay });
@@ -846,14 +850,12 @@ const Booking = () => {
                 ) : (
                   <div className="space-y-4">
                     {/* Phân nhóm theo định dạng */}
-                    {['IMAX', '2D', '3D'].map(fmt => {
-                      const fmtShowtimes = showtimes.filter(s => s.format === fmt);
+                    {Array.from(new Set(showtimes.map(s => s.format || '2D'))).sort().map(fmt => {
+                      const fmtShowtimes = showtimes.filter(s => (s.format || '2D') === fmt);
                       if (fmtShowtimes.length === 0) return null;
                       return (
                         <div key={fmt} className="bg-white/5 p-4 rounded-xl border border-white/5">
-                          <span className="text-xs font-black px-2.5 py-1 bg-white/10 rounded text-amber-300 uppercase tracking-wider mb-3 inline-block">
-                            Định dạng: {fmt}
-                          </span>
+
                           <div className="flex flex-wrap gap-3 mt-2">
                             {fmtShowtimes.map(st => {
                               const isSelected = selectedShowtime?.id === st.id;
@@ -871,7 +873,7 @@ const Booking = () => {
                                   <div className="text-base font-extrabold">{timeStr}</div>
                                   <div className="text-xs opacity-80">{st.roomName || 'Phòng 1'}</div>
                                   <div className="text-[11px] text-accent font-semibold mt-1">
-                                    từ {st.basePrice?.toLocaleString()}đ
+                                    từ {(selectedMovie?.standardPrice || 90000).toLocaleString()}đ
                                   </div>
                                 </button>
                               );
@@ -1173,48 +1175,7 @@ const Booking = () => {
                   </div>
                 </div>
 
-                {/* 3.2 Combo Bắp Nước CGV (Concessions - CGV Style) */}
-                <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <span className="text-xl">🍿</span> Combo Bắp Nước CGV (Tùy chọn)
-                    </h3>
-                    <span className="text-xs text-gray-400">Thêm bắp nước để trải nghiệm trọn vẹn</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {combos.map(item => (
-                      <div key={item.id} className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{item.icon}</span>
-                          <div>
-                            <div className="font-bold text-white text-sm">{item.name}</div>
-                            <div className="text-[11px] text-gray-400 line-clamp-1">{item.desc}</div>
-                            <div className="text-xs font-bold text-amber-400 mt-0.5">{item.price.toLocaleString()} đ</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 bg-black/40 rounded-lg p-1 border border-white/10">
-                          <button
-                            type="button"
-                            onClick={() => updateComboQty(item.id, -1)}
-                            disabled={item.qty === 0}
-                            className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white font-bold flex items-center justify-center text-sm"
-                          >
-                            -
-                          </button>
-                          <span className="w-5 text-center font-bold text-sm text-primary">{item.qty}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateComboQty(item.id, 1)}
-                            className="w-7 h-7 rounded bg-primary hover:bg-primary-hover text-white font-bold flex items-center justify-center text-sm"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+                {/* Combo Bắp Nước CGV removed */}
                 {/* 3.3 Mã giảm giá (Voucher CGV) */}
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10">
                   <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
@@ -1323,12 +1284,6 @@ const Booking = () => {
                       <span>Tạm tính vé</span>
                       <span>{pricing.subtotal.toLocaleString()} đ</span>
                     </div>
-                    {comboTotal > 0 && (
-                      <div className="flex justify-between text-amber-300 font-semibold">
-                        <span>Combo bắp nước</span>
-                        <span>+{comboTotal.toLocaleString()} đ</span>
-                      </div>
-                    )}
                     {pricing.discount > 0 && (
                       <div className="flex justify-between text-green-400 font-bold">
                         <span>Voucher ({appliedPromo?.code})</span>
@@ -1337,7 +1292,7 @@ const Booking = () => {
                     )}
                     <div className="flex justify-between items-baseline pt-3 border-t border-white/10">
                       <span className="text-base font-bold text-white">Tổng thanh toán</span>
-                      <span className="text-2xl font-black text-primary">{(pricing.total + comboTotal).toLocaleString()} đ</span>
+                      <span className="text-2xl font-black text-primary">{pricing.total.toLocaleString()} đ</span>
                     </div>
                   </div>
 

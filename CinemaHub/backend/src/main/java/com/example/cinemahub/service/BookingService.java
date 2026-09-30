@@ -5,6 +5,8 @@ import com.example.cinemahub.model.*;
 import com.example.cinemahub.repository.BookingRepository;
 import com.example.cinemahub.repository.ShowtimeRepository;
 import com.example.cinemahub.repository.TicketRepository;
+import com.example.cinemahub.repository.SeatRepository;
+import com.example.cinemahub.repository.MovieRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +29,12 @@ public class BookingService {
 
     @Autowired
     private TicketRepository ticketRepository;
+
+    @Autowired
+    private SeatRepository seatRepository;
+
+    @Autowired
+    private MovieRepository movieRepository;
 
     @Autowired
     private PromotionValidationService promotionValidationService;
@@ -71,32 +79,41 @@ public class BookingService {
             }
         }
 
-        // Generate Standard 6x10 seat layout: Rows A-F, Cols 1-10
-        String[] rows = {"A", "B", "C", "D", "E", "F"};
+        // Fetch actual seats from database
+        List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+        if (actualSeats == null || actualSeats.isEmpty()) {
+            throw new RuntimeException("Phòng chiếu này chưa được cấu hình sơ đồ ghế!");
+        }
+
+        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
         List<SeatAvailabilityDTO.SeatItem> seatItems = new ArrayList<>();
 
-        for (String row : rows) {
-            for (int col = 1; col <= 10; col++) {
-                String seatId = row + col;
-                String seatType = getSeatType(row);
-                Double price = calculateSingleSeatPrice(showtime, seatType);
-
-                String status = "AVAILABLE";
-                if (bookedSeats.contains(seatId)) {
-                    status = "BOOKED";
-                } else if (heldSeats.contains(seatId)) {
-                    status = "HELD";
-                }
-
-                seatItems.add(SeatAvailabilityDTO.SeatItem.builder()
-                        .seatId(seatId)
-                        .row(row)
-                        .col(col)
-                        .seatType(seatType)
-                        .price(price)
-                        .status(status)
-                        .build());
+        for (Seat seat : actualSeats) {
+            String seatId = seat.getSeatNumber();
+            String seatType = seat.getSeatType();
+            
+            // Skip disabled or maintenance seats
+            if (!"ACTIVE".equalsIgnoreCase(seat.getStatus())) {
+                continue;
             }
+
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
+
+            String status = "AVAILABLE";
+            if (bookedSeats.contains(seatId)) {
+                status = "BOOKED";
+            } else if (heldSeats.contains(seatId)) {
+                status = "HELD";
+            }
+
+            seatItems.add(SeatAvailabilityDTO.SeatItem.builder()
+                    .seatId(seatId)
+                    .row(seat.getRow())
+                    .col(seat.getCol())
+                    .seatType(seatType)
+                    .price(price)
+                    .status(status)
+                    .build());
         }
 
         int bookedCount = (int) seatItems.stream().filter(s -> "BOOKED".equals(s.getStatus())).count();
@@ -155,13 +172,15 @@ public class BookingService {
             }
         }
 
-        // Build booked seats list
+        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+
         List<Booking.BookedSeat> seatList = new ArrayList<>();
         double subtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
-            String row = seatId.substring(0, 1).toUpperCase();
-            String seatType = getSeatType(row);
-            Double price = calculateSingleSeatPrice(showtime, seatType);
+            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
+            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
             subtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
@@ -245,13 +264,16 @@ public class BookingService {
         Showtime showtime = showtimeRepository.findById(req.getShowtimeId())
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không tồn tại"));
 
+        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+
         List<CalculatePriceRequest.SeatPriceItem> seatItems = new ArrayList<>();
         double subtotal = 0.0;
 
         for (String seatId : req.getSeatIds()) {
-            String row = seatId.substring(0, 1).toUpperCase();
-            String seatType = getSeatType(row);
-            Double price = calculateSingleSeatPrice(showtime, seatType);
+            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
+            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
             subtotal += price;
 
             seatItems.add(CalculatePriceRequest.SeatPriceItem.builder()
@@ -472,13 +494,16 @@ public class BookingService {
             }
         }
 
+        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+
         // Build seats and price
         List<Booking.BookedSeat> seatList = new ArrayList<>();
         double subtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
-            String row = seatId.substring(0, 1).toUpperCase();
-            String seatType = getSeatType(row);
-            Double price = calculateSingleSeatPrice(showtime, seatType);
+            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
+            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
             subtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
@@ -632,21 +657,22 @@ public class BookingService {
         return "STANDARD";
     }
 
-    private Double calculateSingleSeatPrice(Showtime showtime, String seatType) {
-        double base = showtime.getBasePrice() != null ? showtime.getBasePrice() : 90000.0;
+    private Double calculateSingleSeatPrice(Showtime showtime, Movie movie, String seatType) {
+        // Retrieve base prices from the movie configuration, fallback to default if missing
+        double base = 90000.0;
+        if ("VIP".equalsIgnoreCase(seatType)) {
+            base = movie.getVipPrice() != null ? movie.getVipPrice() : 120000.0;
+        } else if ("COUPLE".equalsIgnoreCase(seatType)) {
+            base = movie.getCouplePrice() != null ? movie.getCouplePrice() : 200000.0;
+        } else {
+            base = movie.getStandardPrice() != null ? movie.getStandardPrice() : 90000.0;
+        }
         
-        // Format surcharge
+        // Format surcharge (if showtime has special format)
         if ("3D".equalsIgnoreCase(showtime.getFormat())) {
             base += 20000.0;
         } else if ("IMAX".equalsIgnoreCase(showtime.getFormat())) {
             base += 40000.0;
-        }
-
-        // Seat type surcharge
-        if ("VIP".equalsIgnoreCase(seatType)) {
-            base += 30000.0;
-        } else if ("COUPLE".equalsIgnoreCase(seatType)) {
-            base = base * 2 + 20000.0;
         }
 
         return base;

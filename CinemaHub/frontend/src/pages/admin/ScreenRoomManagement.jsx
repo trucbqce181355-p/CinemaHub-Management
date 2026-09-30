@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Monitor, Plus, Edit, Trash2, ArrowLeft, X, XOctagon } from 'lucide-react';
+import { Monitor, Plus, Edit, Trash2, ArrowLeft, X, XOctagon, LayoutGrid } from 'lucide-react';
+import SeatManagementModal from './SeatManagementModal';
 import { useParams, Link } from 'react-router-dom';
 
 const ScreenRoomManagement = () => {
@@ -7,6 +8,7 @@ const ScreenRoomManagement = () => {
   const [cinema, setCinema] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [seatModalRoom, setSeatModalRoom] = useState(null);
 
   const [showModal, setShowModal] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
@@ -126,7 +128,8 @@ const ScreenRoomManagement = () => {
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="flex justify-end gap-2">
+                                            <div className="flex justify-end gap-2">
+                        <button onClick={() => setSeatModalRoom(r)} className="p-2 text-purple-400 hover:bg-purple-400/10 rounded-lg transition-colors" title="Sơ đồ ghế"><LayoutGrid className="w-4 h-4" /></button>
                         <button onClick={() => handleEdit(r)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
                         {r.status !== 'Disabled' ? (
                           <button onClick={() => handleDelete(r.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Tạm ngưng"><Trash2 className="w-4 h-4" /></button>
@@ -163,6 +166,9 @@ const ScreenRoomManagement = () => {
             </form>
           </div>
         </div>
+      )}
+      {seatModalRoom && (
+        <SeatManagementModal room={seatModalRoom} onClose={() => { setSeatModalRoom(null); fetchData(); }} />
       )}
     </div>
   );

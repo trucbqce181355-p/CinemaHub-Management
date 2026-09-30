@@ -1,7 +1,20 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Clapperboard, Globe, MessageCircle, Camera, Video } from 'lucide-react';
 
 const Footer = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleScrollTo = (e, id) => {
+    e.preventDefault();
+    if (location.pathname === '/') {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      window.history.pushState(null, '', '/#' + id);
+    } else {
+      navigate('/#' + id);
+    }
+  };
   return (
     <footer className="bg-surface border-t border-white/5 pt-16 pb-8">
       <div className="container mx-auto px-4 md:px-8">
@@ -31,10 +44,10 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-medium mb-4">Khám phá</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/" className="hover:text-primary transition-colors">Phim đang chiếu</Link></li>
-              <li><Link to="/" className="hover:text-primary transition-colors">Phim sắp chiếu</Link></li>
-              <li><Link to="/" className="hover:text-primary transition-colors">Cụm rạp</Link></li>
-              <li><Link to="/" className="hover:text-primary transition-colors">Khuyến mãi</Link></li>
+              <li><a href="/#phim-dang-chieu" onClick={(e) => handleScrollTo(e, 'phim-dang-chieu')} className="hover:text-primary transition-colors">Phim đang chiếu</a></li>
+              <li><a href="/#phim-sap-chieu" onClick={(e) => handleScrollTo(e, 'phim-sap-chieu')} className="hover:text-primary transition-colors">Phim sắp chiếu</a></li>
+              <li><Link to="/cinemas" className="hover:text-primary transition-colors">Rạp phim</Link></li>
+              <li><Link to="/promotions" className="hover:text-primary transition-colors">Khuyến mãi</Link></li>
             </ul>
           </div>
 

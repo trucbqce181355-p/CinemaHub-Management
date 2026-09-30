@@ -22,8 +22,9 @@ public class ShowtimeController {
             @RequestParam(required = false) String movieId,
             @RequestParam(required = false) String cinemaId,
             @RequestParam(required = false) String date,
-            @RequestParam(required = false, defaultValue = "false") Boolean includePast) {
-        return ResponseEntity.ok(showtimeService.getShowtimes(movieId, cinemaId, date, includePast));
+            @RequestParam(required = false, defaultValue = "false") Boolean includePast,
+            @RequestParam(required = false, defaultValue = "false") Boolean allStatuses) {
+        return ResponseEntity.ok(showtimeService.getShowtimes(movieId, cinemaId, date, includePast, allStatuses));
     }
 
     @GetMapping("/{id}")

@@ -39,8 +39,11 @@ const MovieManagement = () => {
     posterUrl: '',
     genres: '',
     directors: '',
-    actors: ''
-  };
+    actors: '',
+      standardPrice: '',
+      vipPrice: '',
+      couplePrice: ''
+    };
   const [formData, setFormData] = useState(initialFormState);
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
@@ -52,7 +55,7 @@ const MovieManagement = () => {
       if (searchTerm) queryParams.append('search', searchTerm);
       if (filterStatus !== 'All') queryParams.append('status', filterStatus);
 
-      const res = await fetch(`http://localhost:8080/api/movies?${queryParams.toString()}`, {
+      const res = await fetch(`http://localhost:5000/api/movies?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
@@ -104,11 +107,14 @@ const MovieManagement = () => {
       const payload = {
         ...formData,
         duration: Number(formData.duration),
+          standardPrice: Number(formData.standardPrice),
+          vipPrice: Number(formData.vipPrice),
+          couplePrice: Number(formData.couplePrice),
         genres: typeof formData.genres === 'string' ? formData.genres.split(',').map(s => s.trim()).filter(Boolean) : formData.genres,
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch('http://localhost:8080/api/movies', {
+      const res = await fetch('http://localhost:5000/api/movies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -154,11 +160,14 @@ const MovieManagement = () => {
       const payload = {
         ...formData,
         duration: Number(formData.duration),
+          standardPrice: Number(formData.standardPrice),
+          vipPrice: Number(formData.vipPrice),
+          couplePrice: Number(formData.couplePrice),
         genres: typeof formData.genres === 'string' ? formData.genres.split(',').map(s => s.trim()).filter(Boolean) : formData.genres,
         directors: typeof formData.directors === 'string' ? formData.directors.split(',').map(s => s.trim()).filter(Boolean) : formData.directors,
         actors: typeof formData.actors === 'string' ? formData.actors.split(',').map(s => s.trim()).filter(Boolean) : formData.actors,
       };
-      const res = await fetch(`http://localhost:8080/api/movies/${formData._id || formData.id}`, {
+      const res = await fetch(`http://localhost:5000/api/movies/${formData._id || formData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +197,7 @@ const MovieManagement = () => {
   const handleToggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
     try {
-      const res = await fetch(`http://localhost:8080/api/movies/${id}/status`, {
+      const res = await fetch(`http://localhost:5000/api/movies/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +218,7 @@ const MovieManagement = () => {
   const executeDelete = async () => {
     if (!movieToDelete) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/movies/${movieToDelete.id || movieToDelete._id}`, {
+      const res = await fetch(`http://localhost:5000/api/movies/${movieToDelete.id || movieToDelete._id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -430,8 +439,9 @@ const MovieManagement = () => {
                     />
                     <div className="absolute z-10 w-full mt-1 bg-[#2a2a2a] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto opacity-0 invisible peer-focus:opacity-100 peer-focus:visible hover:opacity-100 hover:visible transition-all">
                       <div className="p-3 flex flex-wrap gap-2">
-                        {Array.from(new Set([...(movies.flatMap(m => m.genres || [])), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Tâm lý', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
-                          const isSelected = formData.genres?.includes(g);
+                        {Array.from(new Set([...(movies.flatMap(m => m.genres || [])), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Gia đình', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
+                          const currentGenres = formData.genres ? formData.genres.split(',').map(s=>s.trim()).filter(Boolean) : [];
+                          const isSelected = currentGenres.includes(g);
                           return (
                             <span 
                               key={g} 
@@ -565,8 +575,48 @@ const MovieManagement = () => {
                   </div>
                 </div>
 
-                {/* Row 4: Description */}
-                <div className="space-y-2">
+                                  {/* Row 4: Pricing */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-300">Giá Vé Thường (VNĐ)</label>
+                      <input
+                        type="number"
+                        name="standardPrice"
+                        min="0"
+                        required
+                        value={formData.standardPrice}
+                        onChange={handleInputChange}
+                        className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-300">Giá Vé VIP (VNĐ)</label>
+                      <input
+                        type="number"
+                        name="vipPrice"
+                        min="0"
+                        required
+                        value={formData.vipPrice}
+                        onChange={handleInputChange}
+                        className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-300">Giá Vé Couple (VNĐ)</label>
+                      <input
+                        type="number"
+                        name="couplePrice"
+                        min="0"
+                        required
+                        value={formData.couplePrice}
+                        onChange={handleInputChange}
+                        className="w-full bg-[#1a1a1a] border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 5: Description */}
+                  <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-300">Nội dung phim / Mô tả</label>
                   <textarea
                     name="description"
