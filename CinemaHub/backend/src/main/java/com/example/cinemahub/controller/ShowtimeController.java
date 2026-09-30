@@ -29,7 +29,8 @@ public class ShowtimeController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getShowtimeById(@PathVariable String id) {
         try {
-            return ResponseEntity.ok(showtimeService.getShowtimeById(id));
+            Showtime st = showtimeService.getShowtimeById(id);
+            return st != null ? ResponseEntity.ok(st) : ResponseEntity.notFound().build();
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -38,8 +39,30 @@ public class ShowtimeController {
     @PostMapping
     public ResponseEntity<?> createShowtime(@RequestBody Showtime showtime) {
         try {
-            return ResponseEntity.ok(showtimeService.createShowtime(showtime));
-        } catch (RuntimeException e) {
+            Showtime created = showtimeService.createShowtime(showtime);
+            return ResponseEntity.ok(created);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateShowtime(@PathVariable String id, @RequestBody Showtime showtime) {
+        try {
+            Showtime updated = showtimeService.updateShowtime(id, showtime);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestBody Map<String, String> body) {
+        try {
+            String status = body.get("status");
+            Showtime updated = showtimeService.updateStatus(id, status);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -48,8 +71,8 @@ public class ShowtimeController {
     public ResponseEntity<?> deleteShowtime(@PathVariable String id) {
         try {
             showtimeService.deleteShowtime(id);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa suất chiếu"));
-        } catch (RuntimeException e) {
+            return ResponseEntity.ok(Map.of("message", "Đã xóa suất chiếu thành công"));
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
