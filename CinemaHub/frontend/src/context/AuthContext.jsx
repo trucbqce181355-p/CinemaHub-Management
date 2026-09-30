@@ -5,28 +5,29 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return null;
 
-  useEffect(() => {
-    // Check localStorage on load
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      // Verify token hasn't expired before auto-login
-      if (parsedUser.token) {
-        try {
-          const payload = JSON.parse(atob(parsedUser.token.split('.')[1]));
-          if (payload.exp * 1000 > Date.now()) {
-            setUser(parsedUser);
-          } else {
-            localStorage.removeItem('user');
-          }
-        } catch (e) {
-          localStorage.removeItem('user');
+      // Kiểm tra token còn hạn hay không trước khi khởi tạo
+      if (parsedUser?.token) {
+        const payload = JSON.parse(atob(parsedUser.token.split('.')[1]));
+        if (payload.exp * 1000 > Date.now()) {
+          return parsedUser;
         }
+        localStorage.removeItem('user');
       }
+      return null;
+    } catch (e) {
+      console.error('Error reading/validating user from localStorage', e);
+      localStorage.removeItem('user');
+      return null;
     }
-  }, []);
+  });
+
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
 
   const login = (userData) => {
     setUser(userData);
@@ -38,10 +39,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
-  const [isSessionExpired, setIsSessionExpired] = useState(false);
-
   useEffect(() => {
-    // Auto-check token expiration every second for ALL accounts
+    // Tự động kiểm tra hạn token định kỳ mỗi giây khi user đăng nhập
     const interval = setInterval(() => {
       if (user && user.token) {
         try {

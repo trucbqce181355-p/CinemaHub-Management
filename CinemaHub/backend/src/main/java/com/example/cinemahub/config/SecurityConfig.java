@@ -32,6 +32,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/movies/**").permitAll()
+                .requestMatchers("/api/cinemas/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/showtimes/**").permitAll()
+                .requestMatchers("/api/bookings/**").permitAll()
+                .requestMatchers("/api/tickets/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions/**").permitAll()
+                .requestMatchers("/api/payment/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

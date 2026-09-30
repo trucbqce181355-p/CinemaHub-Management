@@ -10,10 +10,16 @@ import Profile from './pages/Profile';
 import MovieDetails from './pages/MovieDetails';
 import UserManagement from './pages/admin/UserManagement';
 import MovieManagement from './pages/admin/MovieManagement';
+import PromotionManagement from './pages/admin/PromotionManagement';
+import TicketCheckIn from './pages/admin/TicketCheckIn';
+import CinemaManagement from './pages/admin/CinemaManagement';
+import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
 import Movies from './pages/Movies';
+import Cinemas from './pages/Cinemas';
+import PaymentCallback from './pages/PaymentCallback';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -91,12 +97,17 @@ function App() {
           } />
           <Route path="users" element={<UserManagement />} />
           <Route path="movies" element={<MovieManagement />} />
+          <Route path="cinemas" element={<CinemaManagement />} />
+          <Route path="cinemas/:cinemaId/rooms" element={<ScreenRoomManagement />} />
+          <Route path="promotions" element={<PromotionManagement />} />
+          <Route path="checkin" element={<TicketCheckIn />} />
         </Route>
 
         {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/movies" element={<Movies />} />
+          <Route path="/cinemas" element={<Cinemas />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking/:id" element={<Booking />} />
@@ -106,6 +117,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-reset-otp" element={<VerifyResetOtp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/payment-callback" element={<PaymentCallback />} />
         </Route>
       </Routes>
     </Router>
