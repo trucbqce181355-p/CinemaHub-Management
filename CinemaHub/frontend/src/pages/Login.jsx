@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,15 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { user, login } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      const returnUrl = location.state?.returnUrl || '/profile';
+      navigate(returnUrl, { replace: true });
+    }
+  }, [user, navigate, location.state]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -18,7 +26,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,7 +38,8 @@ const Login = () => {
 
       if (res.ok) {
         login({ email: data.email, name: data.username, role: data.role, token: data.token });
-        navigate('/');
+        const returnUrl = location.state?.returnUrl || '/';
+        navigate(returnUrl);
       } else {
         setError(data.message || 'Đăng nhập thất bại');
       }
@@ -52,10 +61,11 @@ const Login = () => {
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="w-full max-w-md glass-panel p-8 rounded-3xl relative z-10"
       >
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">Chào mừng trở lại</h1>
-          <p className="text-gray-400">Đăng nhập để trải nghiệm điện ảnh tuyệt vời nhất</p>
+          <p className="text-gray-400 text-sm">Đăng nhập để đặt vé và trải nghiệm dịch vụ</p>
         </div>
+
 
         {error && (
           <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm text-center">

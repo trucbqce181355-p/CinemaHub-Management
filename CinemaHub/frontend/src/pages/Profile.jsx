@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star, LogOut, Clock, MapPin, Film } from 'lucide-react';
+import { User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star, LogOut, Clock, MapPin, Film, QrCode, Printer, X, CheckCircle2, CreditCard } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 
 const Profile = () => {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(location.state?.tab || 'info'); // info, password, booking, favorites, notifications, membership
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'booking' || tabParam === 'bookings' || tabParam === 'history') return 'booking';
+    if (tabParam) return tabParam;
+    if (location.state?.tab === 'booking' || location.state?.tab === 'bookings') return 'booking';
+    return location.state?.tab || 'info';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [selectedTicketModal, setSelectedTicketModal] = useState(null);
 
   // Info state
   const [username, setUsername] = useState('');
@@ -25,12 +36,18 @@ const Profile = () => {
   const [passMessage, setPassMessage] = useState({ text: '', type: '' });
   const [passLoading, setPassLoading] = useState(false);
 
-  // Handle tab change from navigation state
+  // Handle tab change from navigation state or URL query
   useEffect(() => {
-    if (location.state?.tab) {
-      setActiveTab(location.state.tab);
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'booking' || tabParam === 'bookings' || tabParam === 'history') {
+      setActiveTab('booking');
+    } else if (tabParam) {
+      setActiveTab(tabParam);
+    } else if (location.state?.tab) {
+      setActiveTab(location.state.tab === 'bookings' ? 'booking' : location.state.tab);
     }
-  }, [location.state]);
+  }, [location.search, location.state]);
 
   // Fetch full user profile on load to get phone and DOB
   useEffect(() => {
@@ -41,7 +58,7 @@ const Profile = () => {
     
     const fetchProfile = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/users/profile', {
+        const res = await fetch('http://127.0.0.1:5000/api/users/profile', {
           headers: { Authorization: `Bearer ${user.token}` }
         });
         const data = await res.json();
@@ -60,7 +77,69 @@ const Profile = () => {
     };
     
     fetchProfile();
+    fetchBookings();
   }, [user, navigate]);
+
+  const [realBookings, setRealBookings] = useState([]);
+  const [bookingLoading, setBookingLoading] = useState(false);
+
+  const fetchBookings = async () => {
+    if (!user) return;
+    setBookingLoading(true);
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/bookings/my-history?email=${user.email || ''}`, {
+        headers: user.token ? { Authorization: `Bearer ${user.token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setRealBookings(data);
+      }
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleOpenTicketDetail = async (bookingItem) => {
+    setSelectedTicketModal(bookingItem);
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/bookings/${bookingItem.id || bookingItem.bookingReference}`);
+      const data = await res.json();
+      if (res.ok && data.booking) {
+        setSelectedTicketModal({
+          ...data.booking,
+          ticket: data.ticket
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching ticket detail:", err);
+    }
+  };
+
+  const handleContinuePayment = (booking) => {
+    navigate(`/booking?movieId=${booking.movieId}&showtimeId=${booking.showtimeId}&resumeBookingId=${booking.id}`);
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn hủy vé này? Ghế sẽ được giải phóng cho người khác.")) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/bookings/${bookingId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: "Khách hàng tự hủy trên hồ sơ cá nhân" })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Hủy vé thất bại");
+      } else {
+        alert("Đã hủy vé thành công!");
+        fetchBookings();
+      }
+    } catch (err) {
+      alert("Lỗi khi kết nối đến máy chủ");
+    }
+  };
 
   const handleUpdateInfo = async (e) => {
     e.preventDefault();
@@ -68,7 +147,7 @@ const Profile = () => {
     setInfoLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/users/profile', {
+      const res = await fetch('http://127.0.0.1:5000/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +191,7 @@ const Profile = () => {
     setPassLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/users/change-password', {
+      const res = await fetch('http://127.0.0.1:5000/api/users/change-password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -427,80 +506,191 @@ const Profile = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                <h2 className="text-2xl font-bold mb-8 pb-4 border-b border-white/10 uppercase tracking-wider text-gray-200">
-                  Lịch sử đặt vé
-                </h2>
+                <div className="flex justify-between items-center mb-8 pb-4 border-b border-white/10">
+                  <h2 className="text-2xl font-bold uppercase tracking-wider text-gray-200">
+                    Lịch sử đặt vé ({realBookings.length > 0 ? realBookings.length : mockBookings.length})
+                  </h2>
+                  <button 
+                    onClick={fetchBookings} 
+                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1.5 transition-colors"
+                  >
+                    Làm mới
+                  </button>
+                </div>
 
                 <div className="space-y-6">
-                  {mockBookings.map((ticket, index) => (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      key={ticket.id}
-                      className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row hover:bg-white/10 transition-colors"
-                    >
-                      {/* Ticket Left Edge - Status indicator */}
-                      <div className={`w-full md:w-2 ${ticket.status === 'Sắp chiếu' ? 'bg-primary' : 'bg-gray-600'}`}></div>
-                      
-                      <div className="p-6 flex-grow flex flex-col justify-between">
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-white">{ticket.movie}</h3>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${ticket.status === 'Sắp chiếu' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
-                              {ticket.status}
-                            </span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6">
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Calendar className="w-4 h-4 text-gray-500" />
-                              <span>{ticket.date}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Clock className="w-4 h-4 text-gray-500" />
-                              <span>{ticket.time}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <MapPin className="w-4 h-4 text-gray-500" />
-                              <span>{ticket.cinema}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Film className="w-4 h-4 text-gray-500" />
-                              <span>{ticket.room}</span>
-                            </div>
-                          </div>
-                        </div>
+                  {realBookings.length > 0 ? (
+                    realBookings.map((b, index) => {
+                      const isConfirmed = b.status === 'CONFIRMED';
+                      const isCancelled = b.status === 'CANCELLED';
+                      const isPending = b.status === 'PENDING';
 
-                        <div className="border-t border-dashed border-white/20 pt-4 flex justify-between items-center">
-                          <div>
-                            <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Ghế của bạn</span>
-                            <div className="flex gap-2">
-                              {ticket.seats.map(seat => (
-                                <span key={seat} className="bg-white/10 text-white font-mono text-sm px-2 py-1 rounded">{seat}</span>
-                              ))}
+                      let badgeColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+                      if (isConfirmed) badgeColor = 'bg-green-500/20 text-green-400 border-green-500/30';
+                      else if (isCancelled) badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+                      else if (isPending) badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+
+                      return (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          key={b.id || b.bookingReference}
+                          className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row hover:bg-white/10 transition-colors"
+                        >
+                          <div className={`w-full md:w-2 ${isConfirmed ? 'bg-green-500' : isCancelled ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+                          
+                          <div className="p-6 flex-grow flex flex-col justify-between">
+                            <div>
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h3 className="text-xl font-bold text-white">{b.movieTitle || 'Vé Xem Phim'}</h3>
+                                  <span className="text-xs text-gray-400 font-mono">Mã đặt: {b.bookingReference}</span>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${badgeColor}`}>
+                                  {b.status === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : b.status === 'CANCELLED' ? 'ĐÃ HỦY' : b.status === 'PENDING' ? 'CHỜ THANH TOÁN' : b.status}
+                                </span>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6">
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                  <Calendar className="w-4 h-4 text-gray-500" />
+                                  <span>{b.showtimeStart ? new Date(b.showtimeStart).toLocaleDateString('vi-VN') : 'Hôm nay'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                  <Clock className="w-4 h-4 text-gray-500" />
+                                  <span>{b.showtimeStart ? new Date(b.showtimeStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                  <MapPin className="w-4 h-4 text-gray-500" />
+                                  <span>{b.cinemaName || 'CinemaHub'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                  <Film className="w-4 h-4 text-gray-500" />
+                                  <span>{b.roomName || 'Phòng chiếu'} ({b.showtimeFormat || '2D'})</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-dashed border-white/20 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                              <div>
+                                <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Ghế đã chọn ({b.seats?.length || 0})</span>
+                                <div className="flex flex-wrap gap-2">
+                                  {b.seats?.map(seat => (
+                                    <span key={seat.seatId || seat} className="bg-white/10 text-white font-mono text-sm px-2.5 py-1 rounded">
+                                      {seat.seatNumber || seat.seatId || seat}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                                <div className="text-right mr-1">
+                                  <span className="text-xs text-gray-500 uppercase tracking-wider block mb-0.5">Tổng tiền</span>
+                                  <span className="text-lg font-bold text-primary">{b.totalAmount?.toLocaleString()} đ</span>
+                                </div>
+                                {isConfirmed && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenTicketDetail(b)}
+                                      className="px-3.5 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                                    >
+                                      <QrCode className="w-3.5 h-3.5" /> Xem Vé & Mã QR
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelBooking(b.id)}
+                                      className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-xl text-xs font-bold transition-all"
+                                    >
+                                      Hủy vé
+                                    </button>
+                                  </>
+                                )}
+                                {isPending && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleContinuePayment(b)}
+                                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 animate-pulse"
+                                    >
+                                      <CreditCard className="w-3.5 h-3.5" /> Thanh Toán Ngay
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelBooking(b.id)}
+                                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 rounded-xl text-xs font-semibold transition-all"
+                                    >
+                                      Hủy giữ chỗ
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Mã vé / Tổng tiền</span>
-                            <div className="flex flex-col items-end">
-                              <span className="font-mono text-gray-400 text-xs mb-1">{ticket.id}</span>
-                              <span className="text-lg font-bold text-primary">{ticket.total}</span>
+                        </motion.div>
+                      );
+                    })
+                  ) : (
+                    mockBookings.map((ticket, index) => (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        key={ticket.id}
+                        className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row hover:bg-white/10 transition-colors"
+                      >
+                        <div className={`w-full md:w-2 ${ticket.status === 'Sắp chiếu' ? 'bg-primary' : 'bg-gray-600'}`}></div>
+                        
+                        <div className="p-6 flex-grow flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-start mb-4">
+                              <h3 className="text-xl font-bold text-white">{ticket.movie}</h3>
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${ticket.status === 'Sắp chiếu' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                                {ticket.status}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6">
+                              <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <Calendar className="w-4 h-4 text-gray-500" />
+                                <span>{ticket.date}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <Clock className="w-4 h-4 text-gray-500" />
+                                <span>{ticket.time}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <MapPin className="w-4 h-4 text-gray-500" />
+                                <span>{ticket.cinema}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <Film className="w-4 h-4 text-gray-500" />
+                                <span>{ticket.room}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-dashed border-white/20 pt-4 flex justify-between items-center">
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Ghế của bạn</span>
+                              <div className="flex gap-2">
+                                {ticket.seats.map(seat => (
+                                  <span key={seat} className="bg-white/10 text-white font-mono text-sm px-2 py-1 rounded">{seat}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs text-gray-500 uppercase tracking-wider block mb-1">Mã vé / Tổng tiền</span>
+                              <div className="flex flex-col items-end">
+                                <span className="font-mono text-gray-400 text-xs mb-1">{ticket.id}</span>
+                                <span className="text-lg font-bold text-primary">{ticket.total}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      {/* Ticket Right Edge - Tear off pattern (Desktop only) */}
-                      <div className="hidden md:flex flex-col justify-between border-l border-dashed border-white/20 w-16 bg-white/[0.02] items-center py-6">
-                        <div className="w-4 h-4 rounded-full bg-background -ml-2 -mt-8"></div>
-                        <span className="[writing-mode:vertical-lr] text-xs font-mono tracking-[0.3em] text-gray-600 rotate-180 uppercase">
-                          Admit One
-                        </span>
-                        <div className="w-4 h-4 rounded-full bg-background -ml-2 -mb-8"></div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
@@ -524,6 +714,113 @@ const Profile = () => {
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* MODAL CHI TIẾT VÉ & MÃ QR */}
+      <AnimatePresence>
+        {selectedTicketModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#141414] border border-white/15 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl relative"
+            >
+              {/* Header */}
+              <div className="bg-primary p-6 text-center text-white relative">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicketModal(null)}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] bg-black/20 px-3 py-1 rounded-full">
+                  VÉ ĐIỆN TỬ • CGV CINEMAHUB E-TICKET
+                </span>
+                <h3 className="text-2xl font-black mt-2 leading-tight">{selectedTicketModal.movieTitle}</h3>
+                <p className="text-xs opacity-90 mt-1">
+                  {selectedTicketModal.cinemaName} • {selectedTicketModal.roomName} ({selectedTicketModal.showtimeFormat || '2D'})
+                </p>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                {/* QR Code Container */}
+                <div className="flex flex-col items-center justify-center p-5 bg-white rounded-2xl shadow-inner text-black">
+                  <QRCodeSVG
+                    value={selectedTicketModal.ticket?.qrCode || selectedTicketModal.qrCode || `CINEMAHUB|${selectedTicketModal.bookingReference}`}
+                    size={185}
+                    level="H"
+                    includeMargin={true}
+                  />
+                  <p className="text-xs font-mono font-bold tracking-widest mt-2 uppercase text-gray-800">
+                    MÃ ĐẶT VÉ: {selectedTicketModal.bookingReference}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5 text-center">
+                    Quét mã này tại cổng soát vé hoặc quầy CGV để vào xem phim
+                  </p>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-3 bg-white/5 rounded-2xl p-4 border border-white/10 text-xs">
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">Ngày & Giờ Chiếu</span>
+                    <span className="font-bold text-white">
+                      {selectedTicketModal.showtimeStart ? new Date(selectedTicketModal.showtimeStart).toLocaleDateString('vi-VN') : 'Hôm nay'}
+                      {' - '}
+                      {selectedTicketModal.showtimeStart ? new Date(selectedTicketModal.showtimeStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">Ghế Ngồi ({selectedTicketModal.seats?.length || 0})</span>
+                    <span className="font-bold text-primary text-sm">
+                      {selectedTicketModal.seats?.map(s => s.seatNumber || s.seatId || s).join(', ')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">Khách Hàng</span>
+                    <span className="font-bold text-white truncate block">
+                      {selectedTicketModal.customerName || 'Khách hàng'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">Trạng Thái & TT</span>
+                    <span className="font-bold text-emerald-400">
+                      {selectedTicketModal.status === 'CONFIRMED' ? 'Đã xác nhận' : selectedTicketModal.status === 'CANCELLED' ? 'Đã hủy' : selectedTicketModal.status}
+                      {' '}({selectedTicketModal.paymentMethod || 'Online'})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-sm pt-1 px-1">
+                  <span className="text-gray-400">Tổng thanh toán:</span>
+                  <span className="text-xl font-black text-primary">
+                    {selectedTicketModal.totalAmount?.toLocaleString()} đ
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="bg-[#1a1a1a] p-4 flex justify-between gap-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer className="w-4 h-4" /> In vé
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicketModal(null)}
+                  className="px-6 py-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
