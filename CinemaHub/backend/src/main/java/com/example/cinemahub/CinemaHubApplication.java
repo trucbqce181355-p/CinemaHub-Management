@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Optional;
 
+@org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication
 public class CinemaHubApplication {
 
@@ -20,6 +21,7 @@ public class CinemaHubApplication {
 	}
 
 	@Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="app.seed-users", havingValue="true")
 	public CommandLineRunner dataSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder) {
 		return args -> {
             Optional<User> adminOpt = userRepository.findByEmail("admin@cinemahub.com");

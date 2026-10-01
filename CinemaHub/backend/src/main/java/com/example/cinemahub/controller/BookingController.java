@@ -20,12 +20,16 @@ public class BookingController {
     @Autowired
     private BookingService bookingService;
 
+    @Autowired
+    private com.example.cinemahub.service.PaymentService payments;
+
     // 1. Check seat availability for a showtime
     @GetMapping("/seats")
     public ResponseEntity<?> getSeatAvailability(@RequestParam String showtimeId) {
         try {
             return ResponseEntity.ok(bookingService.getSeatAvailability(showtimeId));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -38,16 +42,20 @@ public class BookingController {
             Booking booking = bookingService.holdSeats(req, userId);
             return ResponseEntity.ok(booking);
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // 3. Check seat hold duration & remaining time
     @GetMapping("/{id}/hold-status")
-    public ResponseEntity<?> checkHoldStatus(@PathVariable String id) {
+    public ResponseEntity<?> checkHoldStatus(@PathVariable String id, Authentication authentication) {
         try {
+            Map<String, Object> details = bookingService.getBookingDetails(id);
+            payments.owned(((Booking) details.get("booking")).getId(), authentication.getName());
             return ResponseEntity.ok(bookingService.checkHoldStatus(id));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -58,16 +66,19 @@ public class BookingController {
         try {
             return ResponseEntity.ok(bookingService.calculatePrice(req));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // 5. Apply promo code
     @PostMapping("/apply-promo")
-    public ResponseEntity<?> applyPromo(@Valid @RequestBody ApplyPromoRequest req) {
+    public ResponseEntity<?> applyPromo(@Valid @RequestBody ApplyPromoRequest req, Authentication authentication) {
         try {
+            payments.owned(req.getBookingId(), authentication.getName());
             return ResponseEntity.ok(bookingService.applyPromo(req));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -78,17 +89,20 @@ public class BookingController {
         try {
             return ResponseEntity.ok(bookingService.confirmBooking(id, req));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // 7. Cancel booking
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<?> cancelBooking(@PathVariable String id, @RequestBody(required = false) Map<String, String> body) {
+    public ResponseEntity<?> cancelBooking(@PathVariable String id, @RequestBody(required = false) Map<String, String> body, Authentication authentication) {
         try {
+            payments.owned(id, authentication.getName());
             String reason = body != null ? body.get("reason") : "Hủy theo yêu cầu";
             return ResponseEntity.ok(bookingService.cancelBooking(id, reason));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -100,6 +114,7 @@ public class BookingController {
             String staffId = (authentication != null) ? authentication.getName() : "Counter-Staff";
             return ResponseEntity.ok(bookingService.createCounterBooking(req, staffId));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -117,30 +132,39 @@ public class BookingController {
 
     // 10. View booking details by ID
     @GetMapping("/{id}")
-    public ResponseEntity<?> getBookingDetails(@PathVariable String id) {
+    public ResponseEntity<?> getBookingDetails(@PathVariable String id, Authentication authentication) {
         try {
+            Map<String, Object> details = bookingService.getBookingDetails(id);
+            payments.owned(((Booking) details.get("booking")).getId(), authentication.getName());
             return ResponseEntity.ok(bookingService.getBookingDetails(id));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // 11. View booking details by booking reference
     @GetMapping("/reference/{reference}")
-    public ResponseEntity<?> getBookingByReference(@PathVariable String reference) {
+    public ResponseEntity<?> getBookingByReference(@PathVariable String reference, Authentication authentication) {
         try {
+            Map<String, Object> details = bookingService.getBookingDetails(reference);
+            payments.owned(((Booking) details.get("booking")).getId(), authentication.getName());
             return ResponseEntity.ok(bookingService.getBookingDetails(reference));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // 12. Check booking status (Quick public verification)
     @GetMapping("/status/{reference}")
-    public ResponseEntity<?> getBookingStatus(@PathVariable String reference) {
+    public ResponseEntity<?> getBookingStatus(@PathVariable String reference, Authentication authentication) {
         try {
+            Map<String, Object> details = bookingService.getBookingDetails(reference);
+            payments.owned(((Booking) details.get("booking")).getId(), authentication.getName());
             return ResponseEntity.ok(bookingService.getBookingStatus(reference));
         } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

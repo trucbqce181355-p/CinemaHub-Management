@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="app.seed-data", havingValue="true")
 public class DatabaseSeeder {
 
     @Bean

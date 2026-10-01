@@ -53,7 +53,17 @@ const Booking = () => {
   const [customerName, setCustomerName] = useState(user?.username || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('MOMO');
+  const [paymentMethod, setPaymentMethod] = useState('VNPAY');
+  const [gatewayReady, setGatewayReady] = useState(null);
+  useEffect(() => {
+    if (!user?.token) return;
+    let active = true;
+    fetch(`${API_BASE}/payment/configuration`, { headers: { Authorization: `Bearer ${user.token}` } })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error('configuration unavailable')))
+      .then(data => { if (active) setGatewayReady(data.configured); })
+      .catch(() => { if (active) setGatewayReady(null); });
+    return () => { active = false; };
+  }, [user?.token]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedData, setConfirmedData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -224,7 +234,7 @@ const Booking = () => {
       try {
         const res = await fetch(`${API_BASE}/bookings/calculate-price`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({
             showtimeId: selectedShowtime.id,
             seatIds: selectedSeats,
@@ -270,7 +280,7 @@ const Booking = () => {
     setActiveBooking(null);
     setSelectedSeats([]);
     setCurrentStep(2);
-    setErrorMessage('Thời gian giữ ghế (10 phút) đã hết hạn! Vui lòng chọn lại ghế.');
+    setErrorMessage('Thời gian giữ ghế đã hết hạn! Vui lòng chọn lại ghế.');
     fetchSeatAvailability();
   };
 
@@ -281,7 +291,7 @@ const Booking = () => {
 
     const resumeBooking = async () => {
       try {
-        const res = await fetch(`${API_BASE}/bookings/${resumeBookingId}`);
+        const res = await fetch(`${API_BASE}/bookings/${resumeBookingId}`, { headers: { Authorization: `Bearer ${user?.token}` } });
         const data = await res.json();
         if (res.ok && data.booking && data.booking.status === 'PENDING') {
           const b = data.booking;
@@ -307,7 +317,7 @@ const Booking = () => {
             }
             setCurrentStep(3); // Jump right to Payment step!
           } else {
-            setErrorMessage('Phiên giữ chỗ này đã hết hạn 10 phút. Vui lòng chọn lại ghế.');
+            setErrorMessage('Phiên giữ chỗ này đã hết hạn. Vui lòng chọn lại ghế.');
           }
         }
       } catch (err) {
@@ -435,6 +445,7 @@ const Booking = () => {
 
     try {
       const token = user?.token;
+      if (!token) throw new Error('Vui lòng đăng nhập trước khi giữ ghế và thanh toán');
       const res = await fetch(`${API_BASE}/bookings/hold`, {
         method: 'POST',
         headers: {
@@ -475,7 +486,7 @@ const Booking = () => {
     try {
       const res = await fetch(`${API_BASE}/bookings/apply-promo`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
         body: JSON.stringify({
           code: promoCodeInput.trim().toUpperCase(),
           subtotal: pricing.subtotal,
@@ -515,14 +526,14 @@ const Booking = () => {
       if (paymentMethod === 'VNPAY') {
         const vnpRes = await fetch(`${API_BASE}/payment/create-vnpay-url`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({
             bookingId: activeBooking.id,
             customerName: finalCustomerName,
             customerEmail: finalCustomerEmail,
             customerPhone: finalCustomerPhone,
             promoCode: appliedPromo?.code || null,
-            bankCode: 'NCB'
+            bankCode: ''
           })
         });
 
@@ -536,28 +547,7 @@ const Booking = () => {
         return;
       }
 
-      const res = await fetch(`${API_BASE}/bookings/${activeBooking.id}/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentMethod,
-          customerName: finalCustomerName,
-          customerEmail: finalCustomerEmail,
-          customerPhone: finalCustomerPhone,
-          promoCode: appliedPromo?.code || null
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Xác nhận đặt vé thất bại');
-      }
-
-      setConfirmedData(data);
-      setIsHolding(false);
-      setActiveBooking(null);
-      setCurrentStep(4); // Move to E-Ticket screen
-      fetchSeatAvailability();
+      throw new Error('Phương thức này chưa được tích hợp. Vui lòng chọn VNPay.');
     } catch (err) {
       setErrorMessage(err.message);
     } finally {
@@ -619,7 +609,7 @@ const Booking = () => {
       try {
         await fetch(`${API_BASE}/bookings/${activeBooking.id}/cancel`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({ reason: 'Khách hàng hủy phiên giữ chỗ' })
         });
       } catch (ignored) {}
@@ -1094,7 +1084,7 @@ const Booking = () => {
                     <Clock className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-amber-300 text-sm md:text-base">Ghế Của Bạn Đang Được Tạm Giữ Trong 10 Phút</h3>
+                    <h3 className="font-extrabold text-amber-300 text-sm md:text-base">Ghế Của Bạn Đang Được Tạm Giữ</h3>
                     <p className="text-xs text-gray-300">Vui lòng hoàn tất thanh toán trước khi thời gian kết thúc để không bị mất ghế.</p>
                   </div>
                 </div>
@@ -1211,9 +1201,7 @@ const Booking = () => {
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { id: 'MOMO', name: 'Ví MoMo', desc: 'Thanh toán tức thì qua ứng dụng MoMo' },
-                      { id: 'VNPAY', name: 'Cổng VNPAY', desc: 'Quét mã QR qua mọi ứng dụng ngân hàng' },
-                      { id: 'CARD', name: 'Thẻ Quốc Tế', desc: 'Visa, MasterCard, JCB' },
+                      { id: 'VNPAY', name: 'Cổng VNPAY', desc: 'Chuyển sang VNPay để chọn phương thức thanh toán' },
                       ...(isCounterMode ? [{ id: 'CASH', name: 'Tiền Mặt (CASH)', desc: 'Thu tiền trực tiếp tại quầy' }] : [])
                     ].map(pm => {
                       const isSelected = paymentMethod === pm.id;
@@ -1297,6 +1285,12 @@ const Booking = () => {
                   </div>
 
                   {/* Nút hành động */}
+                  {!isCounterMode && gatewayReady === false && (
+                    <p role="status" className="text-sm text-amber-300">
+                      Đơn và ghế lấy từ hệ thống thật. Cổng VNPay chưa được cấu hình nên hiện chưa thể thanh toán.
+                      Vui lòng liên hệ quản trị viên; hệ thống không tự xác nhận thành công.
+                    </p>
+                  )}
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
@@ -1309,7 +1303,7 @@ const Booking = () => {
                   ) : (
                     <button
                       onClick={handleConfirmBooking}
-                      disabled={isProcessing}
+                      disabled={isProcessing || gatewayReady === false}
                       className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}

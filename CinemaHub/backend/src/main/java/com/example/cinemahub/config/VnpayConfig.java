@@ -10,10 +10,10 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class VnpayConfig {
 
-    @Value("${vnpay.tmnCode:WDEN17X6}")
+    @Value("${vnpay.tmnCode:}")
     private String tmnCode;
 
-    @Value("${vnpay.hashSecret:AANRNETRRXRQGSFEDGQKKXUXZQMAETHI}")
+    @Value("${vnpay.hashSecret:}")
     private String hashSecret;
 
     @Value("${vnpay.payUrl:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
@@ -55,7 +55,7 @@ public class VnpayConfig {
             }
             return sb.toString();
         } catch (Exception ex) {
-            return "";
+            throw new IllegalStateException("Cannot sign payment request", ex);
         }
     }
 }
