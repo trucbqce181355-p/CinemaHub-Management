@@ -1,1 +1,3 @@
 com\example\cinemahub\CinemaHubApplicationTests.class
+com\example\cinemahub\controller\PaymentHttpSecurityTest.class
+com\example\cinemahub\service\PaymentIntegrationTest.class

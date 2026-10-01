@@ -18,7 +18,9 @@ com\example\cinemahub\controller\BookingController.class
 com\example\cinemahub\controller\CinemaController.class
 com\example\cinemahub\dto\CalculatePriceRequest.class
 com\example\cinemahub\dto\CalculatePriceRequest$PriceResult.class
+com\example\cinemahub\repository\PaymentRepository.class
 com\example\cinemahub\controller\ShowtimeController.class
+com\example\cinemahub\model\Payment.class
 com\example\cinemahub\controller\ScreenRoomController.class
 com\example\cinemahub\dto\CalculatePriceRequest$SeatPriceItem$SeatPriceItemBuilder.class
 com\example\cinemahub\security\JwtFilter.class
@@ -40,6 +42,7 @@ com\example\cinemahub\config\DatabaseSeeder.class
 com\example\cinemahub\controller\TestController.class
 com\example\cinemahub\repository\PricingRuleRepository.class
 com\example\cinemahub\service\EmailService.class
+com\example\cinemahub\service\PaymentTimeoutScheduler.class
 com\example\cinemahub\model\Cinema.class
 com\example\cinemahub\model\Seat.class
 com\example\cinemahub\repository\CinemaRepository.class
@@ -47,6 +50,7 @@ com\example\cinemahub\repository\ScreenRoomRepository.class
 com\example\cinemahub\service\SeatService.class
 com\example\cinemahub\model\User.class
 com\example\cinemahub\dto\ConfirmBookingRequest.class
+com\example\cinemahub\service\PaymentService.class
 com\example\cinemahub\repository\BookingRepository.class
 com\example\cinemahub\service\MovieService.class
 com\example\cinemahub\service\BookingService.class

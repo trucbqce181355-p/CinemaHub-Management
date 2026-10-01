@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Film, MapPin, Calendar, Clock, Monitor, ChevronRight, ChevronLeft, 
-  Check, Ticket, QrCode, Tag, AlertTriangle, UserCheck, 
+import {
+  Film, MapPin, Calendar, Clock, Monitor, ChevronRight, ChevronLeft,
+  Check, Ticket, QrCode, Tag, AlertTriangle, UserCheck,
   RefreshCw, X, Sparkles, CreditCard, Heart, ArrowLeft, Printer
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -218,7 +218,7 @@ const Booking = () => {
             setSeatMatrix(data.seats);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 4000);
     return () => clearInterval(interval);
   }, [currentStep, selectedShowtime]);
@@ -400,10 +400,11 @@ const Booking = () => {
         setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId));
       } else {
         // CGV Orphan Seat Check (chỉ áp dụng khi khách tự đặt online)
-        if (!isCounterMode && wouldCauseOrphanSeat(seat.seatId, selectedSeats)) {
-          setErrorMessage('⚠️ Quy tắc CGV: Bạn không thể để lại 1 ghế trống đơn lẻ bên cạnh. Vui lòng chọn ghế liền kề hoặc đổi vị trí khác!');
-          return;
-        }
+        // Đã tắt theo yêu cầu:
+        // if (!isCounterMode && wouldCauseOrphanSeat(seat.seatId, selectedSeats)) {
+        //   setErrorMessage('⚠️ Quy tắc CGV: Bạn không thể để lại 1 ghế trống đơn lẻ bên cạnh. Vui lòng chọn ghế liền kề hoặc đổi vị trí khác!');
+        //   return;
+        // }
 
         if (selectedSeats.length >= 8) {
           setErrorMessage('Tối đa mỗi lần đặt là 8 ghế.');
@@ -518,9 +519,13 @@ const Booking = () => {
     setErrorMessage('');
 
     try {
-      const finalCustomerName = customerName || user?.name || user?.username || activeBooking.customerName || 'Khách hàng';
+      if (!customerName || !customerName.trim() || !customerPhone || !customerPhone.trim()) {
+        throw new Error('Vui lòng điền đầy đủ Tên người nhận vé và Số điện thoại trước khi tiếp tục thanh toán.');
+      }
+
+      const finalCustomerName = customerName.trim();
       const finalCustomerEmail = customerEmail || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
-      const finalCustomerPhone = customerPhone || user?.phone || activeBooking.customerPhone || '0900000000';
+      const finalCustomerPhone = customerPhone.trim();
 
       // If user selected VNPAY payment gateway, redirect to VNPAY Sandbox
       if (paymentMethod === 'VNPAY') {
@@ -612,7 +617,7 @@ const Booking = () => {
           headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({ reason: 'Khách hàng hủy phiên giữ chỗ' })
         });
-      } catch (ignored) {}
+      } catch (ignored) { }
     }
 
     setIsHolding(false);
@@ -663,11 +668,10 @@ const Booking = () => {
             {isStaffOrAdmin && (
               <button
                 onClick={() => setIsCounterMode(!isCounterMode)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
-                  isCounterMode
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${isCounterMode
                     ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
                     : 'bg-white/10 text-gray-300 hover:bg-white/20 border-white/10'
-                }`}
+                  }`}
               >
                 <UserCheck className="w-4 h-4" />
                 {isCounterMode ? 'Chế độ Quầy Bán Vé (POS)' : 'Chuyển sang Quầy Nhân Viên'}
@@ -714,7 +718,7 @@ const Booking = () => {
         {/* ========================================================================= */}
         {currentStep === 1 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            
+
             {/* Phim đang chọn & Đổi phim nhanh (CGV Style Header) */}
             {selectedMovie && (
               <div className="bg-[#141414] p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
@@ -772,7 +776,7 @@ const Booking = () => {
 
             {/* Chọn Cụm Rạp & Dải Ngày Chiếu */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-[#141414] p-6 rounded-2xl border border-white/10">
-              
+
               {/* Chọn Rạp */}
               <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-white/10 pb-6 lg:pb-0 lg:pr-6">
                 <h3 className="text-sm uppercase font-bold text-gray-400 mb-3 flex items-center gap-2">
@@ -789,11 +793,10 @@ const Booking = () => {
                           setSelectedSeats([]);
                           setSelectedShowtime(null);
                         }}
-                        className={`w-full text-left p-3.5 rounded-xl border text-sm font-semibold transition-all ${
-                          isSelected
+                        className={`w-full text-left p-3.5 rounded-xl border text-sm font-semibold transition-all ${isSelected
                             ? 'bg-primary text-white border-primary shadow-md'
                             : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
-                        }`}
+                          }`}
                       >
                         <div className="font-bold">{c.name}</div>
                         <div className="text-xs opacity-75 truncate">{c.address}</div>
@@ -815,11 +818,10 @@ const Booking = () => {
                       <button
                         key={item.iso}
                         onClick={() => setSelectedDate(item.iso)}
-                        className={`px-4 py-3 rounded-xl border text-center shrink-0 min-w-[90px] transition-all ${
-                          isSelected
+                        className={`px-4 py-3 rounded-xl border text-center shrink-0 min-w-[90px] transition-all ${isSelected
                             ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(229,9,20,0.5)] scale-105'
                             : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
-                        }`}
+                          }`}
                       >
                         <div className="text-xs uppercase font-medium">{item.dayName}</div>
                         <div className="text-lg font-bold mt-0.5">{item.dayDisplay}</div>
@@ -854,11 +856,10 @@ const Booking = () => {
                                 <button
                                   key={st.id}
                                   onClick={() => setSelectedShowtime(st)}
-                                  className={`px-4 py-3 rounded-xl border transition-all text-left min-w-[120px] ${
-                                    isSelected
+                                  className={`px-4 py-3 rounded-xl border transition-all text-left min-w-[120px] ${isSelected
                                       ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(229,9,20,0.5)] scale-105'
                                       : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="text-base font-extrabold">{timeStr}</div>
                                   <div className="text-xs opacity-80">{st.roomName || 'Phòng 1'}</div>
@@ -897,7 +898,7 @@ const Booking = () => {
         {/* ========================================================================= */}
         {currentStep === 2 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            
+
             {/* Thanh thông tin suất chiếu đã chọn */}
             <div className="bg-[#141414] p-4 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -916,8 +917,8 @@ const Booking = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={fetchSeatAvailability} 
+                <button
+                  onClick={fetchSeatAvailability}
                   className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-2 rounded-lg"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Làm mới ghế
@@ -927,7 +928,7 @@ const Booking = () => {
 
             {/* Màn hình chiếu cong CGV SCREEN */}
             <div className="bg-[#141414] p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col items-center">
-              
+
               <div className="w-full max-w-2xl text-center mb-10">
                 <div className="relative w-full h-12 border-t-4 border-secondary/60 rounded-t-[50%] flex items-center justify-center shadow-[0_-20px_35px_rgba(14,165,233,0.25)]">
                   <span className="text-gray-300 text-xs tracking-[0.6em] mt-3 font-bold flex items-center gap-2">
@@ -1075,7 +1076,7 @@ const Booking = () => {
         {/* ========================================================================= */}
         {currentStep === 3 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            
+
             {/* Banner đếm ngược thời gian giữ ghế (10:00 Countdown) */}
             {isHolding && (
               <div className="bg-gradient-to-r from-amber-500/20 via-primary/20 to-amber-500/20 border border-amber-500/40 p-4 rounded-2xl flex items-center justify-between shadow-lg">
@@ -1092,8 +1093,8 @@ const Booking = () => {
                   <div className="text-2xl md:text-3xl font-mono font-black text-amber-400">
                     {formatTime(remainingSeconds)}
                   </div>
-                  <button 
-                    onClick={handleCancelHold} 
+                  <button
+                    onClick={handleCancelHold}
                     className="text-xs text-red-400 hover:text-red-300 underline font-semibold mt-1"
                   >
                     Hủy giữ ghế
@@ -1103,10 +1104,10 @@ const Booking = () => {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
+
               {/* Cột trái: Thông tin nhận vé, Voucher & Cổng thanh toán */}
               <div className="lg:col-span-2 space-y-6">
-                
+
                 {/* 3.1 Thông tin người nhận vé (Tự động từ tài khoản đã đăng nhập) */}
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 space-y-4">
                   <div className="flex items-center justify-between">
@@ -1209,11 +1210,10 @@ const Booking = () => {
                         <div
                           key={pm.id}
                           onClick={() => setPaymentMethod(pm.id)}
-                          className={`cursor-pointer p-4 rounded-xl border flex items-center justify-between transition-all ${
-                            isSelected
+                          className={`cursor-pointer p-4 rounded-xl border flex items-center justify-between transition-all ${isSelected
                               ? 'bg-primary/10 border-primary ring-2 ring-primary/30 shadow-md'
                               : 'bg-white/5 border-white/10 hover:border-white/20'
-                          }`}
+                            }`}
                         >
                           <div>
                             <div className="font-bold text-white text-sm">{pm.name}</div>
@@ -1239,9 +1239,9 @@ const Booking = () => {
 
                   {/* Thông tin phim */}
                   <div className="flex gap-4">
-                    <img 
-                      src={selectedMovie?.posterUrl} 
-                      alt={selectedMovie?.title} 
+                    <img
+                      src={selectedMovie?.posterUrl}
+                      alt={selectedMovie?.title}
                       className="w-20 h-28 object-cover rounded-xl shrink-0 shadow-md"
                     />
                     <div>
@@ -1285,12 +1285,7 @@ const Booking = () => {
                   </div>
 
                   {/* Nút hành động */}
-                  {!isCounterMode && gatewayReady === false && (
-                    <p role="status" className="text-sm text-amber-300">
-                      Đơn và ghế lấy từ hệ thống thật. Cổng VNPay chưa được cấu hình nên hiện chưa thể thanh toán.
-                      Vui lòng liên hệ quản trị viên; hệ thống không tự xác nhận thành công.
-                    </p>
-                  )}
+
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
@@ -1313,7 +1308,7 @@ const Booking = () => {
 
 
                   <button
-                    onClick={() => setCurrentStep(2)}
+                    onClick={handleCancelHold}
                     className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 font-semibold rounded-xl text-xs transition-all"
                   >
                     Quay lại chọn lại ghế
@@ -1331,7 +1326,7 @@ const Booking = () => {
         {/* ========================================================================= */}
         {currentStep === 4 && confirmedData && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto space-y-6">
-            
+
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_25px_rgba(34,197,94,0.4)]">
                 <Check className="w-8 h-8" />
@@ -1342,7 +1337,7 @@ const Booking = () => {
 
             {/* CGV E-TICKET CARD */}
             <div className="bg-[#141414] rounded-3xl border border-white/15 overflow-hidden shadow-2xl relative">
-              
+
               {/* Ticket Header */}
               <div className="bg-primary p-6 text-center text-white relative">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] bg-black/20 px-3 py-1 rounded-full">
@@ -1354,11 +1349,11 @@ const Booking = () => {
 
               {/* Ticket Body */}
               <div className="p-8 space-y-6">
-                
+
                 {/* QR Code Section */}
                 <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner text-black">
-                  <QRCodeSVG 
-                    value={confirmedData.ticket?.qrCode || confirmedData.qrCode || `CINEMAHUB|${confirmedData.bookingReference || confirmedData.booking?.bookingReference}`} 
+                  <QRCodeSVG
+                    value={confirmedData.ticket?.qrCode || confirmedData.qrCode || `CINEMAHUB|${confirmedData.bookingReference || confirmedData.booking?.bookingReference}`}
                     size={190}
                     level="H"
                     includeMargin={true}
@@ -1374,8 +1369,8 @@ const Booking = () => {
                   <div>
                     <span className="text-gray-400 block mb-0.5">Ngày Chiếu</span>
                     <span className="font-extrabold text-white text-sm">
-                      {confirmedData.showtimeStart || confirmedData.booking?.showtimeStart 
-                        ? new Date(confirmedData.showtimeStart || confirmedData.booking?.showtimeStart).toLocaleDateString('vi-VN') 
+                      {confirmedData.showtimeStart || confirmedData.booking?.showtimeStart
+                        ? new Date(confirmedData.showtimeStart || confirmedData.booking?.showtimeStart).toLocaleDateString('vi-VN')
                         : selectedDate}
                     </span>
                   </div>
@@ -1473,7 +1468,7 @@ const Booking = () => {
                     <span>Đăng Nhập Ngay</span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  
+
                   <button
                     onClick={() => navigate('/register')}
                     className="w-full py-3 bg-white/10 hover:bg-white/20 text-gray-200 font-bold rounded-xl transition-all text-sm"

@@ -6,6 +6,7 @@ const SeatManagementModal = ({ room, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [showGenModal, setShowGenModal] = useState(false);
   const [genConfig, setGenConfig] = useState({ rows: 6, cols: 10 });
+  const [saveMessage, setSaveMessage] = useState(null);
 
   const getAuthHeaders = () => {
     const userStr = localStorage.getItem('user');
@@ -59,17 +60,23 @@ const SeatManagementModal = ({ room, onClose }) => {
         body: JSON.stringify(seats)
       });
       if (res.ok) {
-        alert("Lưu sơ đồ ghế thành công!");
+        setSaveMessage({ text: "Lưu sơ đồ ghế thành công!", type: 'success' });
         setSeats(await res.json());
+      } else {
+        setSaveMessage({ text: "Lưu thất bại. Vui lòng thử lại.", type: 'error' });
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+      setSaveMessage({ text: "Lỗi kết nối máy chủ", type: 'error' });
+    }
     setLoading(false);
+    setTimeout(() => setSaveMessage(null), 2500);
   };
 
   const handleSeatClick = (seatId) => {
     setSeats(seats.map(s => {
       if (s.id !== seatId && s.seatNumber !== seatId) return s;
-      
+
       // Cycle through Types and Status
       // Logic: STANDARD(Active) -> VIP(Active) -> COUPLE(Active) -> DISABLED
       let newType = s.seatType;
@@ -104,7 +111,7 @@ const SeatManagementModal = ({ room, onClose }) => {
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-4xl border border-white/10 relative max-h-[90vh] overflow-hidden flex flex-col">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
-        
+
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold font-display text-white">
             Sơ đồ ghế: <span className="text-primary">{room.name}</span>
@@ -138,7 +145,7 @@ const SeatManagementModal = ({ room, onClose }) => {
           ) : (
             <div className="min-w-max mx-auto space-y-4">
               <div className="w-full text-center py-2 bg-white/10 text-gray-400 rounded-lg mb-12 uppercase tracking-[1em] text-sm">Màn hình</div>
-              
+
               {rows.map(row => (
                 <div key={row} className="flex justify-center items-center gap-4">
                   <div className="w-8 text-center font-bold text-gray-500">{row}</div>
@@ -167,16 +174,16 @@ const SeatManagementModal = ({ room, onClose }) => {
             <div className="bg-[#121212] border border-primary/30 p-8 rounded-2xl w-full max-w-md shadow-[0_0_40px_rgba(255,255,255,0.05)] transform transition-all scale-100">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold font-display text-white">Cấu Hình Tạo Mẫu Sơ Đồ</h3>
-                <button onClick={() => setShowGenModal(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5"/></button>
+                <button onClick={() => setShowGenModal(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
-              
+
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="flex justify-between text-sm font-medium text-gray-300">
                     <span>Số Hàng (Rows)</span>
                     <span className="text-primary font-bold">{genConfig.rows}</span>
                   </label>
-                  <input type="range" min="4" max="15" value={genConfig.rows} onChange={e => setGenConfig({...genConfig, rows: parseInt(e.target.value)})} className="w-full accent-primary" />
+                  <input type="range" min="4" max="15" value={genConfig.rows} onChange={e => setGenConfig({ ...genConfig, rows: parseInt(e.target.value) })} className="w-full accent-primary" />
                   <div className="flex justify-between text-xs text-gray-500"><span>4</span><span>15</span></div>
                 </div>
 
@@ -185,14 +192,11 @@ const SeatManagementModal = ({ room, onClose }) => {
                     <span>Số Ghế Mỗi Hàng (Cols)</span>
                     <span className="text-primary font-bold">{genConfig.cols}</span>
                   </label>
-                  <input type="range" min="6" max="20" value={genConfig.cols} onChange={e => setGenConfig({...genConfig, cols: parseInt(e.target.value)})} className="w-full accent-primary" />
+                  <input type="range" min="6" max="20" value={genConfig.cols} onChange={e => setGenConfig({ ...genConfig, cols: parseInt(e.target.value) })} className="w-full accent-primary" />
                   <div className="flex justify-between text-xs text-gray-500"><span>6</span><span>20</span></div>
                 </div>
 
-                <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl text-xs text-orange-200 mt-4">
-                  <p className="font-bold mb-1">Lưu ý quan trọng:</p>
-                  <p>Hành động này sẽ <b>XÓA BỎ</b> toàn bộ cấu hình ghế hiện tại và tạo ra một ma trận <b>{genConfig.rows} x {genConfig.cols}</b> hoàn toàn mới với các loại ghế được xếp tự động.</p>
-                </div>
+
 
                 <button onClick={doGenerate} className="w-full py-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-95">
                   Xác Nhận Tạo Sơ Đồ
@@ -202,6 +206,36 @@ const SeatManagementModal = ({ room, onClose }) => {
           </div>
         )}
       </div>
+
+      {/* SAVE SUCCESS/ERROR POPUP */}
+      {saveMessage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSaveMessage(null)} />
+          <div className="bg-[#181818] border border-white/10 rounded-2xl p-6 w-full max-w-sm relative z-10 shadow-2xl flex flex-col items-center text-center transform scale-100 animate-in fade-in zoom-in duration-200">
+            {saveMessage.type === 'success' ? (
+              <div className="w-16 h-16 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-4">
+                <X className="w-8 h-8" />
+              </div>
+            )}
+            <h3 className="text-xl font-bold text-white mb-2">
+              {saveMessage.type === 'success' ? 'Thành công' : 'Thất bại'}
+            </h3>
+            <p className="text-gray-300 text-sm mb-6">
+              {saveMessage.text}
+            </p>
+            <button
+              onClick={() => setSaveMessage(null)}
+              className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
