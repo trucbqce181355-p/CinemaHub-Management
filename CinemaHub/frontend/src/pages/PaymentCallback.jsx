@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, ArrowRight, Printer, RefreshCw, Calendar, Clock, MapPin, Film, Home } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
-const API_BASE = 'http://127.0.0.1:5000/api';
+const API_BASE = 'http://localhost:5000/api';
 
 const PaymentCallback = () => {
   const navigate = useNavigate();
@@ -23,13 +23,18 @@ const PaymentCallback = () => {
       }
 
       try {
-        const res = await fetch(`${API_BASE}/payment/vnpay-callback${location.search}`);
+        const token = JSON.parse(localStorage.getItem('user') || '{}').token;
+        if (!token) { setError('Vui lòng đăng nhập lại để xem kết quả thanh toán.'); return; }
+        const res = await fetch(`${API_BASE}/payment/vnpay-callback${location.search}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         const data = await res.json();
 
         if (res.ok && data.status === 'SUCCESS') {
           setResult(data);
+          if (!data.ticket) setError('Đã ghi nhận thanh toán. Vé đang được xử lý; vui lòng tải lại sau ít phút.');
         } else {
-          setError(data.message || 'Giao dịch VNPAY không thành công hoặc đã bị hủy.');
+          setError(data.status === 'REVIEW_REQUIRED' ? 'Thanh toán nhận sau khi đơn đã hết hạn. Cần liên hệ hỗ trợ để đối soát; chưa phát hành vé.' : data.message || 'Giao dịch chưa thành công hoặc đã hết hạn.');
           setResult(data);
         }
       } catch (err) {
@@ -65,7 +70,7 @@ const PaymentCallback = () => {
 
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-3xl mx-auto flex flex-col items-center justify-center">
-      {isSuccess && booking ? (
+      {isSuccess && booking && ticket ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

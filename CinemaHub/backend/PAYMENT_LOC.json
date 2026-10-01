@@ -1,0 +1,53 @@
+{
+  "method": "Physical nonblank noncomment Java lines in selected payment/test files only. Added/replaced lines are diff vs origin/dev, not net growth; Booking/frontend/config edits excluded.",
+  "difficulty_points": {
+    "initiate": 120,
+    "confirm": 120,
+    "timeout": 240,
+    "total": 480
+  },
+  "files": [
+    {
+      "file": "src/main/java/com/example/cinemahub/model/Payment.java",
+      "code_lines": 20,
+      "added_or_replaced_code_lines_vs_dev": 20
+    },
+    {
+      "file": "src/main/java/com/example/cinemahub/repository/PaymentRepository.java",
+      "code_lines": 65,
+      "added_or_replaced_code_lines_vs_dev": 65
+    },
+    {
+      "file": "src/main/java/com/example/cinemahub/service/PaymentService.java",
+      "code_lines": 123,
+      "added_or_replaced_code_lines_vs_dev": 123
+    },
+    {
+      "file": "src/main/java/com/example/cinemahub/service/PaymentTimeoutScheduler.java",
+      "code_lines": 12,
+      "added_or_replaced_code_lines_vs_dev": 12
+    },
+    {
+      "file": "src/main/java/com/example/cinemahub/service/VnPayService.java",
+      "code_lines": 70,
+      "added_or_replaced_code_lines_vs_dev": 55
+    },
+    {
+      "file": "src/main/java/com/example/cinemahub/controller/PaymentController.java",
+      "code_lines": 63,
+      "added_or_replaced_code_lines_vs_dev": 44
+    },
+    {
+      "file": "src/test/java/com/example/cinemahub/controller/PaymentHttpSecurityTest.java",
+      "code_lines": 43,
+      "added_or_replaced_code_lines_vs_dev": 43
+    },
+    {
+      "file": "src/test/java/com/example/cinemahub/service/PaymentIntegrationTest.java",
+      "code_lines": 169,
+      "added_or_replaced_code_lines_vs_dev": 169
+    }
+  ],
+  "total_code_lines": 565,
+  "added_or_replaced_code_lines_vs_dev": 531
+}

@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 public class BookingService {
 
     public static final int HOLD_DURATION_MINUTES = 10;
+    @org.springframework.beans.factory.annotation.Value("${booking.hold-seconds:600}")
+    private long holdDurationSeconds = 600;
 
     @Autowired
     private BookingRepository bookingRepository;
@@ -41,6 +43,12 @@ public class BookingService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private com.example.cinemahub.repository.PaymentRepository paymentRepository;
+
+    @Autowired
+    private org.springframework.data.mongodb.core.MongoTemplate mongo;
 
     // 1. Get Seat Availability (Seat matrix with live status)
     public SeatAvailabilityDTO getSeatAvailability(String showtimeId) {
@@ -66,9 +74,7 @@ public class BookingService {
             } else if ("PENDING".equalsIgnoreCase(b.getStatus())) {
                 if (b.getHoldExpiresAt() != null && b.getHoldExpiresAt().isBefore(now)) {
                     // Expire this hold
-                    b.setStatus("EXPIRED");
-                    b.setUpdatedAt(now);
-                    bookingRepository.save(b);
+                    paymentRepository.expire(b.getId(), now);
                 } else {
                     if (b.getSeats() != null) {
                         for (Booking.BookedSeat s : b.getSeats()) {
@@ -134,6 +140,11 @@ public class BookingService {
 
     // 2. Temporarily Hold Seats
     public Booking holdSeats(HoldSeatRequest req, String userId) {
+        if (userId == null || userId.isBlank() || "anonymousUser".equals(userId))
+            throw new RuntimeException("Vui lòng đăng nhập để giữ ghế");
+        if (req.getSeatIds() == null || req.getSeatIds().isEmpty()
+                || new HashSet<>(req.getSeatIds()).size() != req.getSeatIds().size())
+            throw new RuntimeException("Danh sách ghế rỗng hoặc bị trùng");
         Showtime showtime = showtimeRepository.findById(req.getShowtimeId())
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không tồn tại"));
 
@@ -159,9 +170,7 @@ public class BookingService {
                 }
             } else if ("PENDING".equalsIgnoreCase(b.getStatus())) {
                 if (b.getHoldExpiresAt() != null && b.getHoldExpiresAt().isBefore(now)) {
-                    b.setStatus("EXPIRED");
-                    b.setUpdatedAt(now);
-                    bookingRepository.save(b);
+                    paymentRepository.expire(b.getId(), now);
                 } else {
                     for (Booking.BookedSeat s : b.getSeats()) {
                         if (req.getSeatIds().contains(s.getSeatId())) {
@@ -191,8 +200,13 @@ public class BookingService {
                     .build());
         }
 
+        for (String seatId : req.getSeatIds()) {
+            boolean available = actualSeats.stream().anyMatch(s -> seatId.equals(s.getSeatNumber())
+                    && "ACTIVE".equalsIgnoreCase(s.getStatus()));
+            if (!available) throw new RuntimeException("Ghế không tồn tại hoặc không hoạt động: " + seatId);
+        }
         String reference = generateBookingReference();
-        LocalDateTime expiresAt = now.plusMinutes(HOLD_DURATION_MINUTES);
+        LocalDateTime expiresAt = now.plusSeconds(holdDurationSeconds);
 
         Booking booking = Booking.builder()
                 .bookingReference(reference)
@@ -243,9 +257,7 @@ public class BookingService {
         }
 
         if (booking.getHoldExpiresAt() == null || booking.getHoldExpiresAt().isBefore(now)) {
-            booking.setStatus("EXPIRED");
-            booking.setUpdatedAt(now);
-            bookingRepository.save(booking);
+            paymentRepository.expire(booking.getId(), now);
 
             res.put("isExpired", true);
             res.put("remainingSeconds", 0);
@@ -311,6 +323,12 @@ public class BookingService {
 
     // 5. Apply Promo Code
     public ApplyPromoRequest.PromoResult applyPromo(ApplyPromoRequest req) {
+        Booking pricedBooking = bookingRepository.findById(req.getBookingId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn"));
+        if (!"PENDING".equals(pricedBooking.getStatus()) || pricedBooking.getPayment() != null
+                || pricedBooking.getHoldExpiresAt() == null || !pricedBooking.getHoldExpiresAt().isAfter(LocalDateTime.now()))
+            throw new RuntimeException("Không thể đổi giá khi đã khởi tạo thanh toán hoặc đơn hết hạn");
+        req.setSubtotal(pricedBooking.getSubtotal());
         Promotion promo = promotionValidationService.validateCode(req.getCode());
 
         // Check minimum spend condition if present
@@ -326,12 +344,20 @@ public class BookingService {
         double newTotal = Math.max(0.0, req.getSubtotal() - discountAmount);
 
         if (req.getBookingId() != null && !req.getBookingId().isBlank()) {
-            bookingRepository.findById(req.getBookingId()).ifPresent(b -> {
+            java.util.Optional.of(pricedBooking).ifPresent(b -> {
                 b.setPromoCode(promo.getCode());
                 b.setDiscountAmount(discountAmount);
                 b.setTotalAmount(newTotal);
                 b.setUpdatedAt(LocalDateTime.now());
-                bookingRepository.save(b);
+                var query = org.springframework.data.mongodb.core.query.Query.query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("_id").is(b.getId())
+                                .and("version").is(b.getVersion()).and("payment").is(null)
+                                .and("status").is("PENDING").and("holdExpiresAt").gt(LocalDateTime.now()));
+                var update = new org.springframework.data.mongodb.core.query.Update().set("promoCode", b.getPromoCode())
+                        .set("discountAmount", b.getDiscountAmount()).set("totalAmount", b.getTotalAmount())
+                        .set("updatedAt", b.getUpdatedAt()).inc("version", 1);
+                if (mongo.updateFirst(query, update, Booking.class).getModifiedCount() != 1)
+                    throw new RuntimeException("Đơn đã thay đổi; vui lòng tải lại trước khi áp dụng mã");
             });
         }
 
@@ -347,53 +373,20 @@ public class BookingService {
 
     // 6. Confirm Booking
     public Map<String, Object> confirmBooking(String bookingId, ConfirmBookingRequest req) {
+        throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                "Vé online chỉ được xác nhận qua kết quả thanh toán có chữ ký");
+    }
+
+    public Map<String, Object> issuePaidTicket(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt chỗ"));
-
-        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
-            Ticket ticket = ticketRepository.findByBookingId(booking.getId()).orElse(null);
-            return Map.of("message", "Đơn đặt chỗ đã được xác nhận trước đó", "booking", booking, "ticket", ticket);
-        }
-
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn"));
+        if (!"CONFIRMED".equals(booking.getStatus()) || booking.getPayment() == null
+                || !"SUCCESS".equals(booking.getPayment().getStatus()))
+            throw new RuntimeException("Chưa có thanh toán hợp lệ");
         LocalDateTime now = LocalDateTime.now();
-        if (booking.getHoldExpiresAt() != null && booking.getHoldExpiresAt().isBefore(now)) {
-            booking.setStatus("EXPIRED");
-            bookingRepository.save(booking);
-            throw new RuntimeException("Thời gian giữ ghế đã hết hạn. Vui lòng đặt lại chỗ!");
-        }
-
-        if (!"PENDING".equalsIgnoreCase(booking.getStatus())) {
-            throw new RuntimeException("Đơn đặt chỗ không ở trạng thái chờ thanh toán");
-        }
-
-        // Apply promo if provided during confirm
-        if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
-            try {
-                Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
-                double discount = computeDiscount(promo, booking.getSubtotal());
-                booking.setPromoCode(promo.getCode());
-                booking.setDiscountAmount(discount);
-                booking.setTotalAmount(Math.max(0.0, booking.getSubtotal() - discount));
-            } catch (Exception ignored) {
-            }
-        }
-
-        if (req.getCustomerName() != null && !req.getCustomerName().isBlank()) {
-            booking.setCustomerName(req.getCustomerName());
-        }
-        if (req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
-            booking.setCustomerEmail(req.getCustomerEmail());
-        }
-        if (req.getCustomerPhone() != null && !req.getCustomerPhone().isBlank()) {
-            booking.setCustomerPhone(req.getCustomerPhone());
-        }
-
-        booking.setPaymentMethod(req.getPaymentMethod());
-        booking.setStatus("CONFIRMED");
-        booking.setUpdatedAt(now);
-
         // Create Ticket document
         Ticket ticket = new Ticket();
+        ticket.setId("PAY-" + booking.getId());
         ticket.setBookingReference(booking.getBookingReference());
         ticket.setBookingId(booking.getId());
         ticket.setShowtimeId(booking.getShowtimeId());
@@ -416,12 +409,21 @@ public class BookingService {
         ticket.setSeats(seatStatuses);
         ticket.setQrCode("CINEMAHUB|" + booking.getBookingReference() + "|" + UUID.randomUUID());
 
-        Ticket savedTicket = ticketRepository.save(ticket);
-        booking.setTicketId(savedTicket.getId());
-        Booking savedBooking = bookingRepository.save(booking);
-
-        // Async email notification
-        sendConfirmationEmailSafely(savedBooking, savedTicket);
+        Ticket savedTicket;
+        boolean inserted = false;
+        try {
+            savedTicket = ticketRepository.insert(ticket);
+            inserted = true;
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            savedTicket = ticketRepository.findById(ticket.getId()).orElseThrow();
+        }
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(booking.getId())
+                        .and("payment.status").is("SUCCESS").and("status").is("CONFIRMED")),
+                new org.springframework.data.mongodb.core.query.Update().set("ticketId", savedTicket.getId())
+                        .inc("version", 1), Booking.class);
+        Booking savedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        if (inserted) sendConfirmationEmailSafely(savedBooking, savedTicket);
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Đặt vé thành công!");
@@ -435,6 +437,9 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt chỗ"));
 
+        if (booking.getPayment() != null) {
+            throw new RuntimeException("Đơn có giao dịch phải chờ kết quả hoặc dùng quy trình hoàn tiền");
+        }
         if ("CANCELLED".equalsIgnoreCase(booking.getStatus())) {
             return booking;
         }
@@ -462,7 +467,14 @@ public class BookingService {
         booking.setStatus("CANCELLED");
         booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Lý do hủy: " + (reason != null ? reason : "Khách yêu cầu"));
         booking.setUpdatedAt(now);
-        return bookingRepository.save(booking);
+        var query = org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(booking.getId())
+                        .and("payment").is(null).and("version").is(booking.getVersion()));
+        var updated = mongo.findAndModify(query, new org.springframework.data.mongodb.core.query.Update()
+                .set("status", "CANCELLED").set("notes", booking.getNotes()).set("updatedAt", now).inc("version", 1),
+                org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true), Booking.class);
+        if (updated == null) throw new RuntimeException("Đơn đã thay đổi hoặc đang thanh toán");
+        return updated;
     }
 
     // 8. Staff Create Booking At Counter

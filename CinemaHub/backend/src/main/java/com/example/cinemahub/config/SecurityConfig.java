@@ -34,10 +34,13 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/movies/**").permitAll()
                 .requestMatchers("/api/cinemas/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/showtimes/**").permitAll()
-                .requestMatchers("/api/bookings/**").permitAll()
-                .requestMatchers("/api/tickets/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/bookings/seats").permitAll()
+                .requestMatchers("/api/bookings/counter-booking").hasAnyRole("Staff", "Manager", "Admin")
+                .requestMatchers("/api/bookings/**").authenticated()
+                .requestMatchers("/api/tickets/**").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions/**").permitAll()
-                .requestMatchers("/api/payment/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/payment/vnpay-ipn").permitAll()
+                .requestMatchers("/api/payment/**").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -50,6 +53,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
         config.addAllowedOrigin("http://localhost:5173");
+        config.addAllowedOrigin("http://127.0.0.1:5173");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         

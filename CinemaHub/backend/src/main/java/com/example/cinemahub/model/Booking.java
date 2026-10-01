@@ -22,6 +22,10 @@ public class Booking {
 
     private String bookingReference;
 
+    // CAS revision for payment/quote changes; null also supports existing imported bookings.
+    private Long version;
+    private Payment payment;
+
     private String userId; // Optional for guests
     private String customerName;
     private String customerEmail;
