@@ -9,6 +9,9 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const getInitialTab = () => {
+    if (user && ['Admin', 'Manager', 'Staff'].includes(user.role)) {
+      return 'password';
+    }
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
     if (tabParam === 'booking' || tabParam === 'bookings' || tabParam === 'history') return 'booking';
@@ -36,22 +39,31 @@ const Profile = () => {
   const [passLoading, setPassLoading] = useState(false);
   // Handle tab change from navigation state or URL query
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tabParam = params.get('tab');
-    if (tabParam === 'booking' || tabParam === 'bookings' || tabParam === 'history') {
-      setActiveTab('booking');
-    } else if (tabParam) {
-      setActiveTab(tabParam);
-    } else if (location.state?.tab) {
-      setActiveTab(location.state.tab === 'bookings' ? 'booking' : location.state.tab);
+    if (user && ['Admin', 'Manager', 'Staff'].includes(user.role)) {
+      if (location.state?.tab && location.state.tab !== 'password') {
+        setActiveTab('password');
+      } else if (!location.state?.tab && activeTab !== 'password') {
+        setActiveTab('password');
+      }
+    } else {
+      const params = new URLSearchParams(location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'booking' || tabParam === 'bookings' || tabParam === 'history') {
+        setActiveTab('booking');
+      } else if (tabParam) {
+        setActiveTab(tabParam);
+      } else if (location.state?.tab) {
+        setActiveTab(location.state.tab === 'bookings' ? 'booking' : location.state.tab);
+      }
     }
-  }, [location.search, location.state]);
+  }, [location.search, location.state, user]);
   // Fetch full user profile on load to get phone and DOB
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
+
     
     const fetchProfile = async () => {
       try {
@@ -201,14 +213,16 @@ const Profile = () => {
     navigate('/');
   };
   if (!user) return null;
-  const menuItems = [
+  const allMenuItems = [
     { id: 'info', icon: <User className="w-5 h-5" />, label: 'Personal Info' },
     { id: 'password', icon: <Lock className="w-5 h-5 text-orange-400" />, label: 'Change Pass' },
     { id: 'booking', icon: <Ticket className="w-5 h-5 text-blue-400" />, label: 'Booking Hist.' },
     { id: 'favorites', icon: <Heart className="w-5 h-5 text-pink-500" />, label: 'Favorites' },
-    { id: 'notifications', icon: <Bell className="w-5 h-5 text-yellow-400" />, label: 'Notifications' },
     { id: 'membership', icon: <Star className="w-5 h-5 text-yellow-500" />, label: 'Membership' },
   ];
+  const menuItems = ['Admin', 'Manager', 'Staff'].includes(user.role) 
+    ? allMenuItems.filter(item => item.id === 'password')
+    : allMenuItems;
   const mockBookings = [
     {
       id: "TKT-892374",
@@ -673,7 +687,7 @@ const Profile = () => {
               </motion.div>
             )}
             {/* PLACEHOLDER FOR OTHER TABS */}
-            {['favorites', 'notifications', 'membership'].includes(activeTab) && (
+            {['favorites', 'membership'].includes(activeTab) && (
               <motion.div 
                 key="placeholder"
                 initial={{ opacity: 0, scale: 0.95 }} 
