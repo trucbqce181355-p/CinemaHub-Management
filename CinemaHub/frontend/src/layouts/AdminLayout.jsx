@@ -1,6 +1,17 @@
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin } from 'lucide-react';
+import { 
+  Clapperboard, 
+  Users, 
+  Film, 
+  Calendar, 
+  LogOut, 
+  LayoutDashboard, 
+  Ticket, 
+  Tag, 
+  MapPin, 
+  UtensilsCrossed 
+} from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -26,15 +37,16 @@ const AdminLayout = () => {
       items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });
     }
 
-    // Quyền Manager
-    if (user.role === 'Manager') {
+    // Quyền Manager & Admin: Quản lý phim, rạp, bắp nước, khuyến mãi
+    if (user.role === 'Manager' || user.role === 'Admin') {
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
+      items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> }); // <-- ĐÃ THÊM VÀO ĐÂY
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
     }
 
     // Manager & Staff
-    if (user.role === 'Manager' || user.role === 'Staff') {
+    if (user.role === 'Manager' || user.role === 'Staff' || user.role === 'Admin') {
       items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
@@ -45,6 +57,7 @@ const AdminLayout = () => {
       '/admin/users',
       '/admin/movies',
       '/admin/cinemas',
+      '/admin/food', // <-- ĐÃ THÊM VỊ TRÍ HIỂN THỊ
       '/admin/showtimes',
       '/admin/checkin',
       '/admin/promotions',
