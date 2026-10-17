@@ -25,7 +25,7 @@ public class UserController {
     private PasswordEncoder passwordEncoder;
 
     private boolean isProtectedAccount(User user) {
-        return "Admin".equals(user.getRole());
+        return user != null && "admin@cinemahub.com".equalsIgnoreCase(user.getEmail());
     }
 
     @GetMapping
@@ -65,7 +65,12 @@ public class UserController {
         }
 
         if (userDetails.getUsername() != null) user.setUsername(userDetails.getUsername());
-        if (userDetails.getEmail() != null) user.setEmail(userDetails.getEmail());
+        if (userDetails.getEmail() != null && !userDetails.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.findByEmail(userDetails.getEmail()).isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
+            }
+            user.setEmail(userDetails.getEmail());
+        }
         if (userDetails.getRole() != null) user.setRole(userDetails.getRole());
         if (userDetails.getStatus() != null) user.setStatus(userDetails.getStatus());
         if (userDetails.getPermissions() != null) user.setPermissions(userDetails.getPermissions());
