@@ -16,6 +16,7 @@ import TicketCheckIn from './pages/admin/TicketCheckIn';
 import CinemaManagement from './pages/admin/CinemaManagement';
 import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ShowtimeManagement from './pages/admin/ShowtimeManagement';
+import ReviewManagement from './pages/admin/ReviewManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
@@ -115,6 +116,7 @@ function App() {
           <Route path="promotions" element={<PromotionManagement />} />
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
+          <Route path="reviews" element={<ReviewManagement />} />
         </Route>
 
         {/* Customer Routes */}

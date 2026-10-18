@@ -25,6 +25,10 @@ public class Movie {
     private Double vipPrice = 120000.0;
     private Double couplePrice = 200000.0;
 
+    // Aggregated Review Metrics
+    private Double averageRating = 5.0;
+    private Integer reviewCount = 0;
+
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -56,4 +60,8 @@ public class Movie {
     public void setVipPrice(Double vipPrice) { this.vipPrice = vipPrice; }
     public Double getCouplePrice() { return couplePrice; }
     public void setCouplePrice(Double couplePrice) { this.couplePrice = couplePrice; }
+    public Double getAverageRating() { return averageRating; }
+    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
+    public Integer getReviewCount() { return reviewCount; }
+    public void setReviewCount(Integer reviewCount) { this.reviewCount = reviewCount; }
 }

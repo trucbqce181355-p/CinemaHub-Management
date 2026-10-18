@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin } from 'lucide-react';
+import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin, MessageSquare } from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -39,6 +39,11 @@ const AdminLayout = () => {
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
 
+    // Quyền Manager: Quản lý đánh giá & kiểm duyệt
+    if (user.role === 'Manager') {
+      items.push({ name: 'Đánh giá & Bình luận', path: '/admin/reviews', icon: <MessageSquare className="w-5 h-5" /> });
+    }
+
     // Thứ tự hiển thị menu chuẩn của hệ thống
     const order = [
       '/admin',
@@ -48,6 +53,7 @@ const AdminLayout = () => {
       '/admin/showtimes',
       '/admin/checkin',
       '/admin/promotions',
+      '/admin/reviews',
       '/admin/settings'
     ];
 

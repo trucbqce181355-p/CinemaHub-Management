@@ -38,6 +38,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/tickets/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions/**").permitAll()
                 .requestMatchers("/api/payment/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/movie/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/recommendations").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
