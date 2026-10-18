@@ -46,6 +46,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/membership/**").authenticated()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/payment/vnpay-ipn").permitAll()
                 .requestMatchers("/api/payment/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/movie/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/recommendations").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

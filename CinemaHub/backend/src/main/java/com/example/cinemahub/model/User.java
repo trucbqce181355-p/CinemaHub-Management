@@ -38,6 +38,12 @@ public class User {
     private String membershipTier = "BRONZE";
     private String membershipCardNumber;
     private List<String> permissions = new ArrayList<>();
+    
+    // Khóa quyền đánh giá khi vi phạm
+    private Boolean reviewRestricted = false;
+    private Date reviewRestrictedUntil;
+    private String reviewRestrictedReason;
+
     private Date createdAt = new Date();
     private Date updatedAt = new Date();
 }

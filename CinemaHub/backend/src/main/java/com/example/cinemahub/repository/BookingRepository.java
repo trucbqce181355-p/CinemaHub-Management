@@ -13,6 +13,8 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     List<Booking> findByShowtimeId(String showtimeId);
     List<Booking> findByShowtimeIdAndStatusIn(String showtimeId, List<String> statuses);
     List<Booking> findByUserIdOrderByCreatedAtDesc(String userId);
+    List<Booking> findByUserIdAndMovieId(String userId, String movieId);
+    List<Booking> findByCustomerEmailAndMovieId(String customerEmail, String movieId);
     List<Booking> findByCustomerEmailOrderByCreatedAtDesc(String customerEmail);
     List<Booking> findByCustomerPhoneOrderByCreatedAtDesc(String customerPhone);
     List<Booking> findAllByOrderByCreatedAtDesc();
