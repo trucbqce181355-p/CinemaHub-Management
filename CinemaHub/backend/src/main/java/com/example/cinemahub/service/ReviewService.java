@@ -173,8 +173,8 @@ public class ReviewService {
                 if (st != null) {
                     if (st.getEndTime() != null) {
                         showtimeEnd = st.getEndTime();
-                    } else if (st.getStartTime() != null && st.getMovieDuration() != null) {
-                        showtimeEnd = st.getStartTime().plusMinutes(st.getMovieDuration());
+                    } else if (st.getStartTime() != null) {
+                        showtimeEnd = st.getStartTime().plusMinutes(120);
                     }
                 }
             }
