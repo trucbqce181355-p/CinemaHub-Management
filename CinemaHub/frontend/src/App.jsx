@@ -18,6 +18,7 @@ import CinemaManagement from './pages/admin/CinemaManagement';
 import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ShowtimeManagement from './pages/admin/ShowtimeManagement';
 import ReviewManagement from './pages/admin/ReviewManagement';
+import FoodManagement from './pages/admin/FoodManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
@@ -89,7 +90,7 @@ function App() {
       <ScrollToTop />
       <SessionModal />
       <Routes>
-        {/* Admin Routes */}
+    
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={
             <div className="space-y-6">
@@ -119,9 +120,9 @@ function App() {
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
           <Route path="reviews" element={<ReviewManagement />} />
+          <Route path="food" element={<FoodManagement />} />
         </Route>
 
-        {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/movies" element={<Movies />} />
@@ -130,6 +131,8 @@ function App() {
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking/:id" element={<Booking />} />
+          
+          <Route path="/food-beverage" element={<FoodManagement />} />
           <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
           <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
