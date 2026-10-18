@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Play, Calendar, Star, Sparkles, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recommendations, setRecommendations] = useState([]);
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [toastMessage, setToastMessage] = useState('');
@@ -29,7 +32,7 @@ const Home = () => {
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
-  }, [location]);
+  }, [location, recommendations.length]);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -48,6 +51,31 @@ const Home = () => {
     };
     fetchMovies();
   }, []);
+
+  useEffect(() => {
+    if (!user?.token) {
+      setRecommendations([]);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchRecommendations = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/recommendations/me?limit=8', {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (!cancelled) setRecommendations(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching movie recommendations:', error);
+      }
+    };
+
+    fetchRecommendations();
+    return () => { cancelled = true; };
+  }, [user?.token]);
 
   const activeMovies = movies.filter(m => m.status === 'ACTIVE');
   const comingSoonMovies = movies.filter(m => m.status === 'COMING_SOON');
@@ -106,6 +134,53 @@ const Home = () => {
           </motion.div>
         </div>
       </section>
+
+      {user?.token && recommendations.length > 0 && (
+        <section id="goi-y-ai" className="py-16 bg-[#121212] border-t border-white/5 scroll-mt-24">
+          <div className="container mx-auto px-4 md:px-8">
+            <div className="flex items-center gap-3 mb-3">
+              <Sparkles className="w-7 h-7 text-primary" />
+              <h2 className="text-3xl md:text-4xl font-display font-bold">Gợi ý dành cho bạn</h2>
+            </div>
+            <p className="text-gray-400 mb-8">
+              {recommendations.some(item => item.personalized)
+                ? 'Được đề xuất từ thể loại, nội dung và lịch sử đặt vé đã xác nhận của bạn.'
+                : 'Một vài phim nổi bật để bạn khám phá. Gợi ý sẽ cá nhân hóa sau khi bạn có vé đã xác nhận.'}
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {recommendations.map(({ movie, matchPercent, reasons, personalized }) => (
+                <motion.div
+                  key={movie.id || movie._id}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="group relative rounded-xl overflow-hidden bg-black"
+                >
+                  <Link to={`/movie/${movie.id || movie._id}`}>
+                    <div className="aspect-[3/4] overflow-hidden">
+                      <img
+                        src={movie.posterUrl || movie.image || '/images/default-poster.jpg'}
+                        alt={movie.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pt-12">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs text-primary font-semibold">{personalized ? 'AI cá nhân hóa' : 'Gợi ý phim'}</span>
+                        {personalized && <span className="text-xs text-green-300">{matchPercent}% phù hợp</span>}
+                      </div>
+                      <h3 className="font-bold text-white line-clamp-1">{movie.title}</h3>
+                      <p className="text-xs text-gray-300 mt-1 line-clamp-1">
+                        {(reasons || []).join(' · ') || movie.genres?.join(', ')}
+                      </p>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Phim Đang Chiếu Section */}
       <section id="phim-dang-chieu" className="py-16 bg-background relative overflow-hidden">
