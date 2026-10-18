@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin } from 'lucide-react';
+import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin, Award } from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -28,6 +28,7 @@ const AdminLayout = () => {
 
     // Quyền Manager
     if (user.role === 'Manager') {
+      items.push({ name: 'Hội viên & Điểm', path: '/admin/membership', icon: <Award className="w-5 h-5" /> });
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
@@ -39,7 +40,7 @@ const AdminLayout = () => {
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
 
-    // Thứ tự hiển thị menu chuẩn của hệ thống
+    // Thứ tự hiển thị menu chuẩn của hệ thống: Đưa Hội viên & Điểm xuống dưới cùng
     const order = [
       '/admin',
       '/admin/users',
@@ -48,7 +49,8 @@ const AdminLayout = () => {
       '/admin/showtimes',
       '/admin/checkin',
       '/admin/promotions',
-      '/admin/settings'
+      '/admin/settings',
+      '/admin/membership'
     ];
 
     items.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
@@ -60,8 +62,8 @@ const AdminLayout = () => {
   return (
     <div className="flex min-h-screen bg-[#0a0a0a] text-white">
       {/* Sidebar */}
-      <aside className="w-64 bg-surface border-r border-white/5 flex flex-col hidden md:flex">
-        <div className="p-6">
+      <aside className="w-64 bg-surface border-r border-white/5 flex flex-col justify-between h-screen sticky top-0 shrink-0 hidden md:flex z-30">
+        <div className="p-6 shrink-0">
           <Link to="/" className="flex items-center gap-2 group">
             <div className="bg-primary p-2 rounded-lg group-hover:shadow-[0_0_15px_rgba(229,9,20,0.8)] transition-all duration-300">
               <Clapperboard className="w-5 h-5 text-white" />
@@ -72,7 +74,7 @@ const AdminLayout = () => {
           </Link>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto">
           {navItems.map((item, idx) => (
             <Link
               key={idx}
@@ -89,9 +91,9 @@ const AdminLayout = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
+        <div className="p-4 border-t border-white/5 shrink-0 bg-surface">
           <div className="flex items-center gap-3 mb-4 px-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-orange-500 flex items-center justify-center shadow-lg text-white font-bold">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-orange-500 flex items-center justify-center shadow-lg text-white font-bold shrink-0">
               {user.name?.charAt(0).toUpperCase() || 'A'}
             </div>
             <div className="overflow-hidden">

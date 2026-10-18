@@ -32,6 +32,10 @@ public class User {
     private Date otpExpires;
     @JsonIgnore
     private Integer failedOtpAttempts = 0;
+    private Integer rewardPoints = 0;
+    private Integer lifetimePoints = 0;
+    private String membershipTier = "BRONZE";
+    private String membershipCardNumber;
     private List<String> permissions = new ArrayList<>();
     private Date createdAt = new Date();
     private Date updatedAt = new Date();

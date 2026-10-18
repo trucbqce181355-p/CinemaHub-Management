@@ -50,6 +50,9 @@ public class BookingService {
     @Autowired
     private org.springframework.data.mongodb.core.MongoTemplate mongo;
 
+    @Autowired
+    private MembershipService membershipService;
+
     // 1. Get Seat Availability (Seat matrix with live status)
     public SeatAvailabilityDTO getSeatAvailability(String showtimeId) {
         Showtime showtime = showtimeRepository.findById(showtimeId)
@@ -427,8 +430,19 @@ public class BookingService {
                         .inc("version", 1),
                 Booking.class);
         Booking savedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
-        if (inserted)
+        if (inserted) {
             sendConfirmationEmailSafely(savedBooking, savedTicket);
+            try {
+                if (membershipService != null) {
+                    membershipService.awardPointsForBooking(savedBooking);
+                    if (savedBooking.getPromoCode() != null) {
+                        membershipService.markVoucherUsed(savedBooking.getPromoCode(), savedBooking.getId());
+                    }
+                }
+            } catch (Exception ex) {
+                System.err.println("Lỗi tích điểm hội viên: " + ex.getMessage());
+            }
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Đặt vé thành công!");
@@ -617,6 +631,17 @@ public class BookingService {
         Ticket savedTicket = ticketRepository.save(ticket);
         booking.setTicketId(savedTicket.getId());
         Booking savedBooking = bookingRepository.save(booking);
+
+        try {
+            if (membershipService != null) {
+                membershipService.awardPointsForBooking(savedBooking);
+                if (savedBooking.getPromoCode() != null) {
+                    membershipService.markVoucherUsed(savedBooking.getPromoCode(), savedBooking.getId());
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("Lỗi tích điểm hội viên tại quầy: " + ex.getMessage());
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Tạo vé tại quầy thành công!");

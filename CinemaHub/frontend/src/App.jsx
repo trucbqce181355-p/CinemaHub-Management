@@ -10,6 +10,7 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import MovieDetails from './pages/MovieDetails';
 import UserManagement from './pages/admin/UserManagement';
+import MembershipManagement from './pages/admin/MembershipManagement';
 import MovieManagement from './pages/admin/MovieManagement';
 import PromotionManagement from './pages/admin/PromotionManagement';
 import TicketCheckIn from './pages/admin/TicketCheckIn';
@@ -109,6 +110,7 @@ function App() {
             </div>
           } />
           <Route path="users" element={<UserManagement />} />
+          <Route path="membership" element={<MembershipManagement />} />
           <Route path="movies" element={<MovieManagement />} />
           <Route path="cinemas" element={<CinemaManagement />} />
           <Route path="cinemas/:cinemaId/rooms" element={<ScreenRoomManagement />} />
@@ -122,6 +124,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/movies" element={<Movies />} />
           <Route path="/cinemas" element={<Cinemas />} />
+          <Route path="/membership" element={<Navigate to="/profile?tab=membership" replace />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking/:id" element={<Booking />} />

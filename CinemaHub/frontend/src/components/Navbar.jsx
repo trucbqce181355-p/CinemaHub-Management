@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock } from 'lucide-react';
+import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -106,9 +106,9 @@ const Navbar = () => {
                     className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-2 py-1.5 pr-4 rounded-full border border-white/10 transition-all duration-300"
                   >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-500 flex items-center justify-center shadow-lg text-white font-bold">
-                    {user.name.charAt(0).toUpperCase()}
+                    {(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium hidden lg:block">{user.name}</span>
+                  <span className="text-sm font-medium hidden lg:block">{user?.name || user?.username || user?.email}</span>
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -123,10 +123,10 @@ const Navbar = () => {
                     >
                       <div className="px-4 py-3 border-b border-white/5 mb-1">
                         <p className="text-sm text-gray-400">Đăng nhập với tư cách</p>
-                        <p className="text-sm font-bold text-white truncate">{user.email}</p>
+                        <p className="text-sm font-bold text-white truncate">{user?.email}</p>
                       </div>
 
-                      {!['Admin', 'Manager', 'Staff'].includes(user.role) && (
+                      {!['Admin', 'Manager', 'Staff'].includes(user?.role) && (
                         <>
                           <Link to="/profile" state={{ tab: 'info' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                             <Settings className="w-4 h-4" /> Tài khoản của tôi
@@ -196,9 +196,9 @@ const Navbar = () => {
                 <div className="flex items-center justify-between w-full bg-white/5 p-3 rounded-lg border border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 text-primary font-bold">
-                      {user.name.charAt(0).toUpperCase()}
+                      {(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-sm font-medium">{user.name}</span>
+                    <span className="text-sm font-medium">{user?.name || user?.username || user?.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md relative" title="Thông báo">
