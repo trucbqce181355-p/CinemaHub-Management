@@ -19,7 +19,7 @@ const TicketCheckIn = () => {
   const handleCheckIn = async (e) => {
     e.preventDefault();
     if (!ticketId.trim()) return;
-
+    
     setLoading(true);
     setResult(null);
     try {
@@ -33,7 +33,7 @@ const TicketCheckIn = () => {
         }
       });
       const data = await response.json();
-
+      
       // Simulate verification delay for visual feedback (UC-85, 86, 87, 88)
       setTimeout(() => {
         if (response.ok) {
@@ -61,13 +61,13 @@ const TicketCheckIn = () => {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-display font-bold text-white">Kiểm soát vé (Check-in)</h1>
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-          <button
+          <button 
             onClick={() => setScanMode('qr')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${scanMode === 'qr' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
             <QrCode className="w-4 h-4" /> Quét mã QR
           </button>
-          <button
+          <button 
             onClick={() => setScanMode('manual')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${scanMode === 'manual' ? 'bg-white/20 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
@@ -82,13 +82,13 @@ const TicketCheckIn = () => {
           {scanMode === 'qr' ? (
             <>
               <h2 className="text-xl font-bold mb-6 text-gray-300">Đưa mã QR vào khu vực quét</h2>
-
+              
               <div className="relative w-64 h-64 border-2 border-dashed border-gray-500 rounded-2xl flex items-center justify-center overflow-hidden group">
                 <div className="absolute inset-0 bg-primary/5"></div>
                 <ScanLine className="w-20 h-20 text-primary opacity-50" />
-
+                
                 {/* Laser Animation */}
-                <motion.div
+                <motion.div 
                   animate={{ y: [-128, 128, -128] }}
                   transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
                   className="absolute left-0 right-0 h-1 bg-primary shadow-[0_0_15px_rgba(229,9,20,1)]"
@@ -100,14 +100,14 @@ const TicketCheckIn = () => {
                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
                 <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl"></div>
               </div>
-
+              
               <p className="mt-6 text-sm text-gray-400 animate-pulse">Hệ thống đang chờ dữ liệu từ máy quét...</p>
-
+              
               {/* Hidden input to capture barcode scanner hardware strokes */}
               <form onSubmit={handleCheckIn}>
-                <input
+                <input 
                   ref={inputRef}
-                  type="text"
+                  type="text" 
                   value={ticketId}
                   onChange={(e) => setTicketId(e.target.value)}
                   className="absolute opacity-0 -z-10"
@@ -120,12 +120,12 @@ const TicketCheckIn = () => {
             <div className="w-full">
               <h2 className="text-xl font-bold mb-6">Nhập Mã Vé</h2>
               <form onSubmit={handleCheckIn} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="VD: 60a1b2c3d4..."
+                <input 
+                  type="text" 
+                  placeholder="VD: 60a1b2c3d4..." 
                   value={ticketId}
                   onChange={(e) => setTicketId(e.target.value)}
-                  className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-4 text-white text-lg focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                  className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-4 text-white text-lg focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all" 
                 />
                 <button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all">
                   <Search className="w-5 h-5" /> Kiểm tra vé
@@ -136,8 +136,8 @@ const TicketCheckIn = () => {
 
           {loading && (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-10">
-              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="font-bold text-lg animate-pulse text-primary">Đang xác thực dữ liệu...</p>
+               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+               <p className="font-bold text-lg animate-pulse text-primary">Đang xác thực dữ liệu...</p>
             </div>
           )}
         </div>
@@ -150,12 +150,12 @@ const TicketCheckIn = () => {
 
           {!result ? (
             <div className="flex-grow flex flex-col items-center justify-center text-gray-500 space-y-4">
-              <QrCode className="w-16 h-16 opacity-20" />
-              <p>Chưa có dữ liệu. Vui lòng quét vé.</p>
+               <QrCode className="w-16 h-16 opacity-20" />
+               <p>Chưa có dữ liệu. Vui lòng quét vé.</p>
             </div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div
+              <motion.div 
                 key={result.type}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -170,11 +170,11 @@ const TicketCheckIn = () => {
                   {result.type === 'success' && <CheckCircle className="w-6 h-6 shrink-0" />}
                   {result.type === 'warning' && <AlertTriangle className="w-6 h-6 shrink-0" />}
                   {result.type === 'error' && <XCircle className="w-6 h-6 shrink-0" />}
-
+                  
                   <div>
                     <h3 className="font-bold text-lg">{
-                      result.type === 'success' ? 'Vé hợp lệ' :
-                        result.type === 'warning' ? 'Vé đã sử dụng' : 'Vé không hợp lệ'
+                      result.type === 'success' ? 'Hợp lệ - Check-in Thành công' :
+                      result.type === 'warning' ? 'Cảnh báo - Vé đã sử dụng' : 'Vé Không Hợp Lệ'
                     }</h3>
                     <p className="text-sm mt-1 opacity-90">{result.message}</p>
                   </div>
@@ -183,18 +183,18 @@ const TicketCheckIn = () => {
                 {/* UC Checklists */}
                 <div className="bg-black/30 rounded-xl p-5 border border-white/5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Xác thực hệ thống</span>
-                    {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                     <span className="text-sm text-gray-400">Xác thực hệ thống</span>
+                     {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                     <span className="text-sm text-gray-400">Kiểm tra Suất chiếu</span>
+                     {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Kiểm tra Suất chiếu</span>
-                    {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Trạng thái Sử dụng</span>
-                    {result.type === 'success' ? <CheckCircle className="w-4 h-4 text-green-400" /> :
+                     <span className="text-sm text-gray-400">Trạng thái Sử dụng</span>
+                     {result.type === 'success' ? <CheckCircle className="w-4 h-4 text-green-400" /> : 
                       result.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-orange-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
                   </div>
                 </div>

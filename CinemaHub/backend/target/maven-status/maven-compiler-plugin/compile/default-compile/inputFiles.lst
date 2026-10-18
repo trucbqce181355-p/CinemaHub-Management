@@ -1,59 +1,59 @@
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\CinemaHubApplication.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\DatabaseSeeder.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\SecurityConfig.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\VnpayConfig.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\AuthController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\BookingController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\CinemaController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\MovieController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PaymentController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PricingRuleController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PromotionController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\ScreenRoomController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\SeatController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\ShowtimeController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\TestController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\TicketController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\UserController.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\ApplyPromoRequest.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\CalculatePriceRequest.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\ConfirmBookingRequest.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\CounterBookingRequest.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\HoldSeatRequest.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\SeatAvailabilityDTO.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Booking.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Cinema.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Movie.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Payment.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\PricingRule.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Promotion.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\ScreenRoom.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Seat.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Showtime.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Ticket.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\User.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\BookingRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\CinemaRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\MovieRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PaymentRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PricingRuleRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PromotionRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\ScreenRoomRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\SeatRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\ShowtimeRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\TicketRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\UserRepository.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtFilter.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtUtil.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\BookingService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\CinemaService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\EmailService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\MovieService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PaymentService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PaymentTimeoutScheduler.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PromotionValidationService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ScreenRoomService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\SeatService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ShowtimeService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\TicketValidationService.java
-D:\truc\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\VnPayService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\CinemaHubApplication.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\DatabaseSeeder.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\SecurityConfig.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\config\VnpayConfig.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\AuthController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\BookingController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\CinemaController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\MovieController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PaymentController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PricingRuleController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\PromotionController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\ScreenRoomController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\SeatController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\ShowtimeController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\TestController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\TicketController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\controller\UserController.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\ApplyPromoRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\CalculatePriceRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\ConfirmBookingRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\CounterBookingRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\HoldSeatRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\SeatAvailabilityDTO.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Booking.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Cinema.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Movie.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Payment.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\PricingRule.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Promotion.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\ScreenRoom.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Seat.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Showtime.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Ticket.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\User.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\BookingRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\CinemaRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\MovieRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PaymentRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PricingRuleRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\PromotionRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\ScreenRoomRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\SeatRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\ShowtimeRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\TicketRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\UserRepository.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtFilter.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtUtil.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\BookingService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\CinemaService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\EmailService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\MovieService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PaymentService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PaymentTimeoutScheduler.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\PromotionValidationService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ScreenRoomService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\SeatService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ShowtimeService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\TicketValidationService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\VnPayService.java
