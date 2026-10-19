@@ -11,6 +11,8 @@ import java.util.List;
 public interface ShowtimeRepository extends MongoRepository<Showtime, String> {
     List<Showtime> findByRoomId(String roomId);
     List<Showtime> findByMovieId(String movieId);
+    boolean existsByMovieId(String movieId);
+    long countByMovieId(String movieId);
     List<Showtime> findByCinemaId(String cinemaId);
     List<Showtime> findByMovieIdAndCinemaId(String movieId, String cinemaId);
     List<Showtime> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);

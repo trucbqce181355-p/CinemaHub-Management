@@ -50,9 +50,13 @@ public class MovieController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('manage_movies')")
-    public ResponseEntity<Void> deleteMovie(@PathVariable String id) {
-        movieService.deleteMovie(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteMovie(@PathVariable String id) {
+        try {
+            movieService.deleteMovie(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "error", e.getMessage()));
+        }
     }
 
     @PatchMapping("/{id}/status")

@@ -31,16 +31,16 @@ const AdminLayout = () => {
       items.push({ name: 'Hội viên & Điểm', path: '/admin/membership', icon: <Award className="w-5 h-5" /> });
     }
 
-    // Quyền Manager & Admin: Quản lý phim, rạp, bắp nước, khuyến mãi
-    if (user.role === 'Manager' || user.role === 'Admin') {
+    // Quyền Manager: Quản lý phim, rạp, bắp nước, khuyến mãi
+    if (user.role === 'Manager') {
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
-      items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> }); // <-- ĐÃ THÊM VÀO ĐÂY
+      items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> });
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
     }
 
     // Manager & Staff
-    if (user.role === 'Manager' || user.role === 'Staff' || user.role === 'Admin') {
+    if (user.role === 'Manager' || user.role === 'Staff') {
       items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }

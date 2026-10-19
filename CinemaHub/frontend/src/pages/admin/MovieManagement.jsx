@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
   Edit2, Trash2, Plus, Search, Filter, Image as ImageIcon,
-  PlaySquare, X, Film, Check, AlertCircle, Eye, EyeOff
+  PlaySquare, X, Film, Check, AlertCircle, AlertTriangle, Calendar, Eye, EyeOff
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 
@@ -14,6 +14,7 @@ const MovieManagement = () => {
   // Data State
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showtimes, setShowtimes] = useState([]);
 
   // Filter & Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,6 +25,8 @@ const MovieManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [movieToDelete, setMovieToDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
 
   // Form State
@@ -32,7 +35,7 @@ const MovieManagement = () => {
     originalTitle: '',
     description: '',
     releaseDate: '',
-    duration: '',
+    duration: 120,
     ageRating: 'P',
     status: 'ACTIVE',
     trailerUrl: '',
@@ -40,10 +43,10 @@ const MovieManagement = () => {
     genres: '',
     directors: '',
     actors: '',
-      standardPrice: '',
-      vipPrice: '',
-      couplePrice: ''
-    };
+    standardPrice: 90000,
+    vipPrice: 120000,
+    couplePrice: 200000
+  };
   const [formData, setFormData] = useState(initialFormState);
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
@@ -62,9 +65,10 @@ const MovieManagement = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setMovies(data);
+        setMovies(Array.isArray(data) ? data : (data.content || []));
       } else {
         console.error('Failed to fetch movies', data);
+        setMovies([]);
         if (res.status === 401) setIsSessionExpired(true);
       }
     } catch (err) {
@@ -74,8 +78,25 @@ const MovieManagement = () => {
     }
   };
 
+  const fetchShowtimes = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/showtimes?includePast=true&allStatuses=true', {
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShowtimes(Array.isArray(data) ? data : (data.content || []));
+      }
+    } catch (err) {
+      console.error('Failed to fetch showtimes', err);
+    }
+  };
+
   useEffect(() => {
     fetchMovies();
+    fetchShowtimes();
   }, [searchTerm, filterStatus]);
 
   useEffect(() => {
@@ -144,10 +165,11 @@ const MovieManagement = () => {
 
   const openEditModal = (movie) => {
     setFormData({
+      ...initialFormState,
       ...movie,
-      genres: movie.genres?.join(', ') || '',
-      directors: movie.directors?.join(', ') || '',
-      actors: movie.actors?.join(', ') || ''
+      genres: Array.isArray(movie.genres) ? movie.genres.join(', ') : (movie.genres || ''),
+      directors: Array.isArray(movie.directors) ? movie.directors.join(', ') : (movie.directors || ''),
+      actors: Array.isArray(movie.actors) ? movie.actors.join(', ') : (movie.actors || '')
     });
     setIsEditModalOpen(true);
   };
@@ -211,12 +233,34 @@ const MovieManagement = () => {
     }
   };
 
+  const getMovieShowtimeCount = (movie) => {
+    if (!movie) return 0;
+    if (movie.showtimeCount !== undefined && movie.showtimeCount !== null) {
+      return Number(movie.showtimeCount);
+    }
+    const mId = movie.id || movie._id;
+    return showtimes.filter(s => s.movieId === mId).length;
+  };
+
+  const movieHasShowtimes = (movie) => {
+    if (!movie) return false;
+    if (movie.hasShowtimes) return true;
+    return getMovieShowtimeCount(movie) > 0;
+  };
+
   const confirmDelete = (movie) => {
+    setDeleteError('');
     setMovieToDelete(movie);
   };
 
   const executeDelete = async () => {
     if (!movieToDelete) return;
+    if (movieHasShowtimes(movieToDelete)) {
+      setDeleteError(`Không thể xóa: Phim đã có ${getMovieShowtimeCount(movieToDelete)} suất chiếu trong hệ thống!`);
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError('');
     try {
       const res = await fetch(`http://localhost:5000/api/movies/${movieToDelete.id || movieToDelete._id}`, {
         method: 'DELETE',
@@ -227,9 +271,17 @@ const MovieManagement = () => {
       if (res.ok) {
         setMovieToDelete(null);
         fetchMovies();
+        fetchShowtimes();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error || data.message || 'Không thể xóa phim này!');
+        if (res.status === 401) setIsSessionExpired(true);
       }
     } catch (err) {
       console.error(err);
+      setDeleteError('Lỗi kết nối máy chủ khi xóa phim!');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -308,40 +360,59 @@ const MovieManagement = () => {
                       Đang tải dữ liệu...
                     </td>
                   </tr>
-                ) : movies.length === 0 ? (
+                ) : (Array.isArray(movies) ? movies : []).length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-12 text-center text-gray-400">
                       Không tìm thấy phim nào.
                     </td>
                   </tr>
                 ) : (
-                  movies.map((movie) => (
+                  (Array.isArray(movies) ? movies : []).map((movie) => (
                     <tr key={movie.id || movie._id} className="hover:bg-white/5 transition-colors">
                       <td className="p-4">
-                        <div className="font-bold text-white text-base">{movie.title}</div>
+                        <div className="font-bold text-white text-base">{movie.title || 'Chưa đặt tên'}</div>
                       </td>
-                      <td className="p-4 text-gray-300">{movie.duration} phút</td>
+                      <td className="p-4 text-gray-300">{movie.duration || 0} phút</td>
                       <td className="p-4">
                         <span className="px-2.5 py-1 text-xs rounded-md font-bold bg-white/10 text-white border border-white/20">
-                          {movie.ageRating}
+                          {movie.ageRating || 'P'}
                         </span>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
-                          {movie.genres.map((g, idx) => (
-                            <span key={idx} className="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded">
-                              {g}
-                            </span>
-                          ))}
+                          {Array.isArray(movie.genres) && movie.genres.length > 0 ? (
+                            movie.genres.map((g, idx) => (
+                              <span key={idx} className="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded">
+                                {g}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">Chưa cập nhật</span>
+                          )}
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className={`inline-flex items-center px-3 py-1 text-xs rounded-full font-medium ${movie.status === 'ACTIVE' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
-                            movie.status === 'COMING_SOON' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
-                              'bg-red-500/10 text-red-500 border border-red-500/20'
-                          }`}>
-                          {movie.status === 'ACTIVE' ? 'Đang chiếu' : movie.status === 'COMING_SOON' ? 'Sắp chiếu' : 'Đã ẩn'}
-                        </span>
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <span className={`inline-flex items-center px-3 py-1 text-xs rounded-full font-medium ${movie.status === 'ACTIVE' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
+                              movie.status === 'COMING_SOON' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                                'bg-red-500/10 text-red-500 border border-red-500/20'
+                            }`}>
+                            {movie.status === 'ACTIVE' ? 'Đang chiếu' : movie.status === 'COMING_SOON' ? 'Sắp chiếu' : 'Đã ẩn'}
+                          </span>
+                          {movieHasShowtimes(movie) ? (
+                            <span 
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full" 
+                              title={`Phim này hiện đã có ${getMovieShowtimeCount(movie)} suất chiếu`}
+                            >
+                              <Calendar className="w-3 h-3" />
+                              {getMovieShowtimeCount(movie)} suất chiếu
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+                              Chưa có suất chiếu
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
@@ -362,8 +433,12 @@ const MovieManagement = () => {
                           </button>
                           <button
                             onClick={() => confirmDelete(movie)}
-                            title="Xóa phim"
-                            className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors"
+                            title={movieHasShowtimes(movie) ? `Phim đã có ${getMovieShowtimeCount(movie)} suất chiếu (Không thể xóa)` : 'Xóa phim'}
+                            className={`p-2 rounded-lg transition-colors ${
+                              movieHasShowtimes(movie)
+                                ? 'text-gray-500 hover:text-amber-400 hover:bg-amber-400/10'
+                                : 'text-red-400 hover:bg-red-400/20'
+                            }`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -439,7 +514,7 @@ const MovieManagement = () => {
                     />
                     <div className="absolute z-10 w-full mt-1 bg-[#2a2a2a] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto opacity-0 invisible peer-focus:opacity-100 peer-focus:visible hover:opacity-100 hover:visible transition-all">
                       <div className="p-3 flex flex-wrap gap-2">
-                        {Array.from(new Set([...(movies.flatMap(m => m.genres || [])), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Gia đình', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
+                        {Array.from(new Set([(Array.isArray(movies) ? movies : []).flatMap(m => Array.isArray(m?.genres) ? m.genres : []), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Gia đình', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
                           const currentGenres = formData.genres ? formData.genres.split(',').map(s=>s.trim()).filter(Boolean) : [];
                           const isSelected = currentGenres.includes(g);
                           return (
@@ -663,27 +738,87 @@ const MovieManagement = () => {
       {movieToDelete && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-all duration-300">
           <div className="w-full max-w-md bg-[#121212] rounded-3xl border border-red-500/30 relative shadow-2xl p-8 text-center">
-            <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Trash2 className="w-8 h-8" />
-            </div>
-            <h3 className="text-2xl font-display font-bold text-white mb-2">Xóa Bộ Phim?</h3>
-            <p className="text-gray-400 mb-8">
-              Bạn có chắc chắn muốn xóa phim <span className="font-bold text-white">"{movieToDelete.title}"</span> không? Hành động này không thể hoàn tác.
-            </p>
-            <div className="flex gap-4 justify-center">
-              <button 
-                onClick={() => setMovieToDelete(null)}
-                className="px-6 py-3 rounded-xl font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors flex-1"
-              >
-                Hủy bỏ
-              </button>
-              <button 
-                onClick={executeDelete}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 flex-1"
-              >
-                Xóa ngay
-              </button>
-            </div>
+            {movieHasShowtimes(movieToDelete) ? (
+              <>
+                <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-white mb-2">Không Thể Xóa Phim Này</h3>
+                <p className="text-gray-300 mb-4 leading-relaxed">
+                  Phim <span className="font-bold text-amber-400">"{movieToDelete.title}"</span> hiện đã có <span className="font-bold text-white bg-amber-500/20 px-2 py-0.5 rounded">{getMovieShowtimeCount(movieToDelete)} suất chiếu</span> trong hệ thống.
+                </p>
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left text-xs text-amber-200/90 mb-6 space-y-2">
+                  <p className="font-semibold flex items-center gap-1.5 text-amber-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" /> Không thể xóa khi đã có suất chiếu:
+                  </p>
+                  <p>Hệ thống không cho phép xóa phim đã lên lịch chiếu để đảm bảo không làm mất thông tin vé và lịch phòng của rạp.</p>
+                  <p className="text-gray-400 pt-1 border-t border-amber-500/20">
+                    💡 <em>Gợi ý: Nếu muốn ngừng chiếu phim, bạn có thể chuyển trạng thái sang <strong>"Đã ẩn"</strong> (biểu tượng con mắt), hoặc vào mục <strong>Lịch chiếu</strong> để xóa hết các suất chiếu trước.</em>
+                  </p>
+                </div>
+                {deleteError && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 text-left">
+                    {deleteError}
+                  </div>
+                )}
+                <div className="flex gap-3 justify-center">
+                  <button 
+                    onClick={() => { setMovieToDelete(null); setDeleteError(''); }}
+                    className="px-5 py-3 rounded-xl font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors flex-1"
+                  >
+                    Đóng
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setMovieToDelete(null);
+                      navigate('/admin/showtimes');
+                    }}
+                    className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex-1 flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Xem Lịch Chiếu
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-white mb-2">Xóa Bộ Phim?</h3>
+                <p className="text-gray-400 mb-6">
+                  Bạn có chắc chắn muốn xóa phim <span className="font-bold text-white">"{movieToDelete.title}"</span> không? Hành động này không thể hoàn tác.
+                </p>
+                {deleteError && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 text-left">
+                    {deleteError}
+                  </div>
+                )}
+                <div className="flex gap-4 justify-center">
+                  <button 
+                    onClick={() => { setMovieToDelete(null); setDeleteError(''); }}
+                    className="px-6 py-3 rounded-xl font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors flex-1"
+                    disabled={deleteLoading}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button 
+                    onClick={executeDelete}
+                    disabled={deleteLoading}
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 flex-1 flex items-center justify-center gap-2"
+                  >
+                    {deleteLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Đang xóa...
+                      </>
+                    ) : (
+                      'Xóa ngay'
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

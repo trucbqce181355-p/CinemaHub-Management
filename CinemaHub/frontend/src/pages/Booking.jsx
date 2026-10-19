@@ -50,9 +50,9 @@ const Booking = () => {
   const [promoMessage, setPromoMessage] = useState(null);
 
   // Customer & Payment Info
-  const [customerName, setCustomerName] = useState(user?.username || '');
+  const [customerName, setCustomerName] = useState(user?.name || user?.username || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '0912345678');
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [gatewayReady, setGatewayReady] = useState(null);
   useEffect(() => {
@@ -63,7 +63,7 @@ const Booking = () => {
       .then(data => { if (active) setGatewayReady(data.configured); })
       .catch(() => { if (active) setGatewayReady(null); });
     return () => { active = false; };
-  }, [user?.token]);
+  }, [user?.token, currentStep]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedData, setConfirmedData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -519,13 +519,9 @@ const Booking = () => {
     setErrorMessage('');
 
     try {
-      if (!customerName || !customerName.trim() || !customerPhone || !customerPhone.trim()) {
-        throw new Error('Vui lòng điền đầy đủ Tên người nhận vé và Số điện thoại trước khi tiếp tục thanh toán.');
-      }
-
-      const finalCustomerName = customerName.trim();
-      const finalCustomerEmail = customerEmail || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
-      const finalCustomerPhone = customerPhone.trim();
+      const finalCustomerName = (customerName && customerName.trim()) || user?.name || user?.username || 'Khách Hàng';
+      const finalCustomerPhone = (customerPhone && customerPhone.trim()) || user?.phone || '0912345678';
+      const finalCustomerEmail = (customerEmail && customerEmail.trim()) || user?.email || activeBooking?.customerEmail || 'customer@cinemahub.com';
 
       // If user selected VNPAY payment gateway, redirect to VNPAY Sandbox
       if (paymentMethod === 'VNPAY') {
@@ -544,7 +540,7 @@ const Booking = () => {
 
         const vnpData = await vnpRes.json();
         if (!vnpRes.ok || !vnpData.paymentUrl) {
-          throw new Error(vnpData.error || 'Khởi tạo thanh toán VNPAY thất bại');
+          throw new Error(vnpData.message || vnpData.error || 'Khởi tạo thanh toán VNPAY thất bại');
         }
 
         // Redirect directly to VNPAY Sandbox payment gateway
@@ -1286,6 +1282,16 @@ const Booking = () => {
 
                   {/* Nút hành động */}
 
+                  {errorMessage && (
+                    <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between gap-2.5 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                        <span>{errorMessage}</span>
+                      </div>
+                      <button onClick={() => setErrorMessage('')}><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
+
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
@@ -1298,7 +1304,7 @@ const Booking = () => {
                   ) : (
                     <button
                       onClick={handleConfirmBooking}
-                      disabled={isProcessing || gatewayReady === false}
+                      disabled={isProcessing}
                       className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}

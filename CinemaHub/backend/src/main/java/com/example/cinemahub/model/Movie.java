@@ -29,6 +29,13 @@ public class Movie {
     private Double averageRating = 5.0;
     private Integer reviewCount = 0;
 
+    // Transient fields for runtime check
+    @org.springframework.data.annotation.Transient
+    private Boolean hasShowtimes = false;
+
+    @org.springframework.data.annotation.Transient
+    private Long showtimeCount = 0L;
+
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -64,4 +71,8 @@ public class Movie {
     public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
     public Integer getReviewCount() { return reviewCount; }
     public void setReviewCount(Integer reviewCount) { this.reviewCount = reviewCount; }
+    public Boolean getHasShowtimes() { return hasShowtimes; }
+    public void setHasShowtimes(Boolean hasShowtimes) { this.hasShowtimes = hasShowtimes; }
+    public Long getShowtimeCount() { return showtimeCount; }
+    public void setShowtimeCount(Long showtimeCount) { this.showtimeCount = showtimeCount; }
 }

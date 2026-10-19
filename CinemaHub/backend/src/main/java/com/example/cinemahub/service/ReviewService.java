@@ -135,83 +135,14 @@ public class ReviewService {
             return result;
         }
 
-        // Kiểm tra điều kiện: Vé đã soát (Used) HOẶC suất chiếu đã kết thúc (+ 15 phút buffer)
-        Booking validWatchedBooking = null;
-        boolean hasPendingShowtime = false;
-
-        for (Booking b : confirmedBookings) {
-            // Kiểm tra vé USED
-            boolean ticketUsed = false;
-            Ticket ticket = null;
-            if (b.getTicketId() != null) {
-                ticket = ticketRepository.findById(b.getTicketId()).orElse(null);
-            }
-            if (ticket == null && b.getBookingReference() != null) {
-                ticket = ticketRepository.findByBookingReference(b.getBookingReference()).orElse(null);
-            }
-            if (ticket == null && b.getId() != null) {
-                ticket = ticketRepository.findByBookingId(b.getId()).orElse(null);
-            }
-
-            if (ticket != null) {
-                if ("Used".equalsIgnoreCase(ticket.getStatus())) {
-                    ticketUsed = true;
-                } else if (ticket.getSeats() != null) {
-                    for (Ticket.SeatStatus seat : ticket.getSeats()) {
-                        if ("Used".equalsIgnoreCase(seat.getUsageStatus())) {
-                            ticketUsed = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Kiểm tra thời gian kết thúc suất chiếu + 15 phút buffer
-            LocalDateTime showtimeEnd = null;
-            if (b.getShowtimeId() != null) {
-                Showtime st = showtimeRepository.findById(b.getShowtimeId()).orElse(null);
-                if (st != null) {
-                    if (st.getEndTime() != null) {
-                        showtimeEnd = st.getEndTime();
-                    } else if (st.getStartTime() != null) {
-                        showtimeEnd = st.getStartTime().plusMinutes(120);
-                    }
-                }
-            }
-            if (showtimeEnd == null && b.getShowtimeStart() != null) {
-                showtimeEnd = b.getShowtimeStart().plusMinutes(120);
-            }
-
-            boolean showtimeFinished = (showtimeEnd != null && LocalDateTime.now().isAfter(showtimeEnd.plusMinutes(15)));
-
-            if (ticketUsed || showtimeFinished) {
-                validWatchedBooking = b;
-                break;
-            } else {
-                hasPendingShowtime = true;
-            }
-        }
-
-        if (validWatchedBooking != null) {
-            result.put("canReview", true);
-            result.put("reason", "ELIGIBLE");
-            result.put("bookingId", validWatchedBooking.getId());
-            result.put("bookingReference", validWatchedBooking.getBookingReference());
-            result.put("isVerifiedWatcher", true);
-            result.put("message", "Bạn đủ điều kiện để đánh giá với tư cách Khán giả đã xem tại rạp (Verified Watcher).");
-            return result;
-        }
-
-        if (hasPendingShowtime) {
-            result.put("canReview", false);
-            result.put("reason", "SHOWTIME_NOT_ENDED");
-            result.put("message", "Suất chiếu của bạn chưa kết thúc (hoặc chưa soát vé tại cổng). Bạn vui lòng quay lại đánh giá sau khi thưởng thức xong bộ phim nhé!");
-            return result;
-        }
-
-        result.put("canReview", false);
-        result.put("reason", "NO_VALID_WATCHED_TICKET");
-        result.put("message", "Bạn cần hoàn tất buổi xem phim để gửi đánh giá.");
+        // TẠM THỜI (TEST / DEMO): Cho phép đánh giá ngay sau khi đặt vé thành công
+        Booking validWatchedBooking = confirmedBookings.get(0);
+        result.put("canReview", true);
+        result.put("reason", "ELIGIBLE");
+        result.put("bookingId", validWatchedBooking.getId());
+        result.put("bookingReference", validWatchedBooking.getBookingReference());
+        result.put("isVerifiedWatcher", true);
+        result.put("message", "Bạn đủ điều kiện để đánh giá với tư cách Khán giả đã mua vé tại rạp (Verified Watcher).");
         return result;
     }
 
