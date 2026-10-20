@@ -17,6 +17,13 @@ import java.util.Map;
 public class TicketController {
     private final TicketValidationService ticketValidationService;
 
+    @PostMapping("/verify")
+    public ResponseEntity<?> verify(@Valid @RequestBody TicketCheckInRequest request) {
+        return ResponseEntity.ok(Map.of("code", "TICKET_VALID", "valid", true,
+                "message", "Vé hợp lệ. Chưa thực hiện check-in.",
+                "ticket", ticketValidationService.verifyTicket(request.code())));
+    }
+
     @PostMapping("/check-in")
     public ResponseEntity<?> checkIn(@Valid @RequestBody TicketCheckInRequest request) {
         return result(request.code());
@@ -37,6 +44,7 @@ public class TicketController {
     public ResponseEntity<?> checkInFailure(TicketCheckInException ex) {
         Map<String, Object> response = new HashMap<>();
         response.put("code", ex.getCode());
+        response.put("valid", false);
         response.put("error", ex.getMessage());
         if (ex.getTicket() != null) response.put("ticket", ex.getTicket());
         return ResponseEntity.status(ex.getStatus()).body(response);

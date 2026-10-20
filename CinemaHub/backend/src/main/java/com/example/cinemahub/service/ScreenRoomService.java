@@ -9,6 +9,9 @@ import java.util.List;
 @Service
 public class ScreenRoomService {
     @Autowired
+    private AdmissionCoordinator admission;
+
+    @Autowired
     private ScreenRoomRepository screenRoomRepository;
 
     public List<ScreenRoom> getRoomsByCinema(String cinemaId) {
@@ -20,12 +23,20 @@ public class ScreenRoomService {
     }
 
     public ScreenRoom createRoom(String cinemaId, ScreenRoom room) {
+        return admission.write(() -> createRoomInternal(cinemaId, room));
+    }
+
+    private ScreenRoom createRoomInternal(String cinemaId, ScreenRoom room) {
         room.setCinemaId(cinemaId);
         room.setStatus("Active");
         return screenRoomRepository.save(room);
     }
 
     public ScreenRoom updateRoom(String roomId, ScreenRoom roomDetails) {
+        return admission.write(() -> updateRoomInternal(roomId, roomDetails));
+    }
+
+    private ScreenRoom updateRoomInternal(String roomId, ScreenRoom roomDetails) {
         ScreenRoom room = getRoomById(roomId);
         room.setName(roomDetails.getName());
         room.setCapacity(roomDetails.getCapacity());
@@ -37,12 +48,20 @@ public class ScreenRoomService {
     }
 
     public ScreenRoom disableRoom(String roomId) {
+        return admission.write(() -> disableRoomInternal(roomId));
+    }
+
+    private ScreenRoom disableRoomInternal(String roomId) {
         ScreenRoom room = getRoomById(roomId);
         room.setStatus("Disabled");
         return screenRoomRepository.save(room);
     }
 
     public void deleteRoomPermanently(String roomId) {
+        admission.write(() -> deleteRoomPermanentlyInternal(roomId));
+    }
+
+    private void deleteRoomPermanentlyInternal(String roomId) {
         screenRoomRepository.deleteById(roomId);
     }
 }

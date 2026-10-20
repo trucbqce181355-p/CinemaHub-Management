@@ -11,6 +11,9 @@ import java.util.List;
 @Service
 public class CinemaService {
     @Autowired
+    private AdmissionCoordinator admission;
+
+    @Autowired
     private CinemaRepository cinemaRepository;
     
     @Autowired
@@ -25,11 +28,19 @@ public class CinemaService {
     }
     
     public Cinema createCinema(Cinema cinema) {
+        return admission.write(() -> createCinemaInternal(cinema));
+    }
+
+    private Cinema createCinemaInternal(Cinema cinema) {
         cinema.setStatus("Active");
         return cinemaRepository.save(cinema);
     }
     
     public Cinema updateCinema(String id, Cinema cinemaDetails) {
+        return admission.write(() -> updateCinemaInternal(id, cinemaDetails));
+    }
+
+    private Cinema updateCinemaInternal(String id, Cinema cinemaDetails) {
         Cinema cinema = getCinemaById(id);
         cinema.setName(cinemaDetails.getName());
         cinema.setAddress(cinemaDetails.getAddress());
@@ -43,12 +54,20 @@ public class CinemaService {
     }
     
     public Cinema disableCinema(String id) {
+        return admission.write(() -> disableCinemaInternal(id));
+    }
+
+    private Cinema disableCinemaInternal(String id) {
         Cinema cinema = getCinemaById(id);
         cinema.setStatus("Disabled");
         return cinemaRepository.save(cinema);
     }
 
     public void deleteCinemaPermanently(String id) {
+        admission.write(() -> deleteCinemaPermanentlyInternal(id));
+    }
+
+    private void deleteCinemaPermanentlyInternal(String id) {
         // Kiểm tra xem có phòng chiếu nào thuộc rạp này còn đang hoạt động không
         List<ScreenRoom> rooms = screenRoomRepository.findByCinemaId(id);
         for (ScreenRoom room : rooms) {

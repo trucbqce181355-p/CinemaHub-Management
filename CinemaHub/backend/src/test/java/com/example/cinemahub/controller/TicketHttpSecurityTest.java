@@ -77,4 +77,34 @@ class TicketHttpSecurityTest {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_CHECKED_IN"))
                 .andExpect(jsonPath("$.ticket.id").value("ticket"));
     }
+
+    @Test void verifyEndpointRejectsAnonymousAndCustomer() throws Exception {
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(post("/api/tickets/verify").with(user("customer").roles("Customer"))
+                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"Staff", "Manager", "Admin"})
+    void staffCanVerifyWithoutInvokingCheckIn(String role) throws Exception {
+        Ticket t = new Ticket(); t.setId("ticket"); t.setStatus("Paid");
+        when(service.verifyTicket("ticket")).thenReturn(t);
+        mvc.perform(post("/api/tickets/verify").with(user("employee").roles(role))
+                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.code").value("TICKET_VALID"))
+                .andExpect(jsonPath("$.ticket.status").value("Paid"));
+        verify(service).verifyTicket("ticket"); verify(service, never()).checkInTicket(anyString());
+    }
+
+    @Test void invalidVerifyPayloadIsRejectedBeforeLookup() throws Exception {
+        for (String code : new String[]{"", "  ", "X".repeat(513)}) {
+            mvc.perform(post("/api/tickets/verify").with(user("employee").roles("Staff"))
+                    .contentType("application/json").content("{\"code\":\"" + code + "\"}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CODE"));
+        }
+        verifyNoInteractions(service);
+    }
 }

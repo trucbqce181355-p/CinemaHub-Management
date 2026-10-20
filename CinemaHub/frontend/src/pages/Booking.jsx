@@ -668,7 +668,7 @@ const Booking = () => {
           <div className="flex items-center gap-3">
             {isStaffOrAdmin && (
               <button
-                onClick={() => setIsCounterMode(!isCounterMode)}
+                onClick={() => { setIsCounterMode(!isCounterMode); setPaymentMethod(isCounterMode ? 'VNPAY' : 'CASH'); }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${isCounterMode
                     ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
                     : 'bg-white/10 text-gray-300 hover:bg-white/20 border-white/10'
@@ -1202,10 +1202,13 @@ const Booking = () => {
                     <CreditCard className="w-5 h-5 text-primary" /> Chọn Cổng Thanh Toán
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
+                    {(isCounterMode ? [
+                      { id: 'CASH', name: 'Tiền Mặt (CASH)', desc: 'Đã thu tiền trực tiếp tại quầy' },
+                      { id: 'CARD', name: 'Thẻ tại quầy', desc: 'Đã xác nhận thanh toán qua máy POS' },
+                      { id: 'TRANSFER', name: 'Chuyển khoản', desc: 'Đã xác nhận nhận đủ tiền chuyển khoản' },
+                    ] : [
                       { id: 'VNPAY', name: 'Cổng VNPAY', desc: 'Chuyển sang VNPay để chọn phương thức thanh toán' },
-                      ...(isCounterMode ? [{ id: 'CASH', name: 'Tiền Mặt (CASH)', desc: 'Thu tiền trực tiếp tại quầy' }] : [])
-                    ].map(pm => {
+                    ]).map(pm => {
                       const isSelected = paymentMethod === pm.id;
                       return (
                         <div

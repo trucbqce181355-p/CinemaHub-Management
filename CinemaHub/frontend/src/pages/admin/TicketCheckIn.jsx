@@ -30,7 +30,7 @@ export default function TicketCheckIn() {
     if (scanMode !== 'camera' && !loading) inputRef.current?.focus();
   }, [scanMode, loading, result]);
 
-  const checkIn = useCallback(async (rawCode) => {
+  const checkIn = useCallback(async (rawCode, operation = 'verify') => {
     if (inFlight.current) return;
     const code = rawCode.trim();
     if (!code || code.length > 512) {
@@ -49,7 +49,7 @@ export default function TicketCheckIn() {
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
     try {
-      const response = await fetch(API_BASE + '/tickets/check-in', {
+      const response = await fetch(API_BASE + '/tickets/' + operation, {
         method: 'POST', signal: controller.signal,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ code }),
@@ -59,7 +59,8 @@ export default function TicketCheckIn() {
       if (response.status === 401 || response.status === 403) {
         setResult({ type: 'error', message: 'Bạn không có quyền soát vé hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
       } else if (response.ok && data.ticket) {
-        setResult({ type: 'success', message: data.message || 'Check-in thành công!', ticket: data.ticket });
+        setResult({ type: 'success', verified: operation === 'verify', code,
+          message: data.message || (operation === 'verify' ? 'Vé hợp lệ. Chưa thực hiện check-in.' : 'Check-in thành công!'), ticket: data.ticket });
       } else {
         setResult({
           type: data.code === 'ALREADY_CHECKED_IN' ? 'warning' : 'error',
@@ -80,7 +81,8 @@ export default function TicketCheckIn() {
   }, [token]);
 
   const submit = (event) => { event.preventDefault(); checkIn(ticketCode); };
-  const scannedAt = result?.ticket?.seats?.find(seat => seat.scanMetadata?.scannedAt)?.scanMetadata?.scannedAt;
+  const seats = Array.isArray(result?.ticket?.seats) ? result.ticket.seats.filter(Boolean) : [];
+  const scannedAt = seats.find(seat => seat.scanMetadata?.scannedAt)?.scanMetadata?.scannedAt;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -128,13 +130,18 @@ export default function TicketCheckIn() {
                 result.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
                 result.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : 'bg-red-500/10 border-red-500/30 text-red-400')}>
                 {result.type === 'success' ? <CheckCircle className="w-6 h-6 shrink-0" /> : result.type === 'warning' ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <XCircle className="w-6 h-6 shrink-0" />}
-                <div><h3 className="font-bold text-lg">{result.type === 'success' ? 'Check-in thành công' : result.type === 'warning' ? 'Vé đã được sử dụng' : 'Không thể check-in'}</h3><p className="text-sm mt-1">{result.message}</p></div>
+                <div><h3 className="font-bold text-lg">{result.type === 'success' ? (result.verified ? 'Vé hợp lệ — chưa check-in' : 'Check-in thành công') : result.type === 'warning' ? 'Vé đã được sử dụng' : 'Không thể check-in'}</h3><p className="text-sm mt-1">{result.message}</p></div>
               </div>
+              {result.verified && <button type="button" disabled={loading}
+                onClick={() => checkIn(result.code, 'check-in')}
+                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-bold py-4 rounded-xl">
+                Xác nhận check-in
+              </button>}
               {result.ticket && <div className="p-5 bg-white/5 rounded-xl space-y-3">
                 <p className="text-gray-400 text-sm">Mã đặt chỗ <strong className="block text-white text-lg">{result.ticket.bookingReference}</strong></p>
                 <p>Phim: <strong>{result.ticket.movieTitle || 'Chưa có thông tin'}</strong></p>
                 <p>Suất chiếu: <strong>{result.ticket.showtimeStart ? new Date(result.ticket.showtimeStart).toLocaleString('vi-VN') : 'Chưa có thông tin'}</strong></p>
-                <p>Ghế: <strong className="text-primary">{result.ticket.seats?.map(seat => seat.seatNumber).join(', ')}</strong></p>
+                <p>Ghế: <strong className="text-primary">{seats.map(seat => seat.seatNumber).join(', ')}</strong></p>
                 {scannedAt && <p className="text-sm text-gray-400">Đã soát lúc: {new Date(scannedAt).toLocaleString('vi-VN')}</p>}
               </div>}
             </div>}
