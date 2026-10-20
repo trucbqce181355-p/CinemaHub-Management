@@ -90,11 +90,14 @@ class TicketHttpSecurityTest {
     @ParameterizedTest @ValueSource(strings = {"Staff", "Manager", "Admin"})
     void staffCanVerifyWithoutInvokingCheckIn(String role) throws Exception {
         Ticket t = new Ticket(); t.setId("ticket"); t.setStatus("Paid");
+        t.setSeats(java.util.List.of(new Ticket.SeatStatus("A1", "A1", "Unused")));
         when(service.verifyTicket("ticket")).thenReturn(t);
         mvc.perform(post("/api/tickets/verify").with(user("employee").roles(role))
                 .contentType("application/json").content("{\"code\":\"ticket\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.code").value("TICKET_VALID"))
+                .andExpect(jsonPath("$.usageStatus").value("UNUSED"))
+                .andExpect(jsonPath("$.canCheckIn").value(true))
                 .andExpect(jsonPath("$.ticket.status").value("Paid"));
         verify(service).verifyTicket("ticket"); verify(service, never()).checkInTicket(anyString());
     }

@@ -245,7 +245,7 @@ class TicketCheckInIntegrationTest {
         showtimes.deleteById(t.getShowtimeId());
         rejected(t.getQrCode(), "INVALID_SHOWTIME");
         t.setShowtimeId(null); tickets.save(t);
-        rejected(t.getQrCode(), "INVALID_SHOWTIME");
+        rejected(t.getQrCode(), "INVALID_TICKET");
     }
 
     @Test void emptyAndMalformedSeatDataIsNotTreatedAsAUsedTicket() {
@@ -361,16 +361,16 @@ class TicketCheckInIntegrationTest {
     @Test void duplicateInventedOrMismatchedTicketSeatsAreRejected() {
         Ticket t = ticket(false);
         t.setSeats(List.of(new Ticket.SeatStatus("A1", "A1", "Unused"), new Ticket.SeatStatus("A1", "A1", "Unused")));
-        tickets.save(t); invalidForBoth(t, "INVALID_SEATS");
+        tickets.save(t); invalidForBoth(t, "INVALID_TICKET");
         t.setSeats(List.of(new Ticket.SeatStatus("Z999", "Z999", "Unused"))); tickets.save(t);
-        invalidForBoth(t, "INVALID_SEATS");
+        invalidForBoth(t, "INVALID_TICKET");
         t.setSeats(List.of(new Ticket.SeatStatus("A1", "A2", "Unused"))); tickets.save(t);
-        invalidForBoth(t, "INVALID_SEATS");
+        invalidForBoth(t, "INVALID_TICKET");
     }
 
     @Test void ticketAndBookingMustContainExactlyTheSameSeats() {
         Ticket t = ticket(false); t.setSeats(List.of(t.getSeats().get(0))); tickets.save(t);
-        invalidForBoth(t, "INVALID_SEATS");
+        invalidForBoth(t, "INVALID_TICKET");
     }
 
     @Test void disabledOrMissingVenueIsRejected() {
@@ -511,5 +511,126 @@ class TicketCheckInIntegrationTest {
         ReflectionTestUtils.setField(service, "clock", advancing);
         rejected(t.getQrCode(), "CHECK_IN_CLOSED");
         assertEquals("Paid", tickets.findById(t.getId()).orElseThrow().getStatus());
+    }
+
+    void assertInvalidUsage(Ticket t, String code) {
+        Ticket before = tickets.findById(t.getId()).orElseThrow();
+        assertEquals(code, assertThrows(TicketCheckInException.class, () -> service.verifyTicket(t.getQrCode())).getCode());
+        rejected(t.getQrCode(), code);
+        var summary = bookings.getBookingStatus(booking(t).getBookingReference());
+        assertEquals("INVALID", summary.get("usageStatus"));
+        assertEquals(false, summary.get("isCheckedIn"));
+        assertEquals(false, summary.get("isPartiallyCheckedIn"));
+        assertEquals(before, tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void usedStatusWithUnusedEmptyNullOrDuplicateSeatsIsInvalidEverywhere() {
+        Ticket t = ticket(false); t.setStatus("Used"); tickets.save(t);
+        assertInvalidUsage(t, "INVALID_TICKET");
+        t.setSeats(List.of()); tickets.save(t); assertInvalidUsage(t, "INVALID_TICKET");
+        t.setSeats(null); tickets.save(t); assertInvalidUsage(t, "INVALID_TICKET");
+        t.setSeats(List.of(new Ticket.SeatStatus("A1", "A1", "Used"), new Ticket.SeatStatus("A1", "A1", "Used")));
+        tickets.save(t); assertInvalidUsage(t, "INVALID_TICKET");
+    }
+
+    @Test void unknownCaseInSeatStatusCannotProduceAFalseUsedSummary() {
+        Ticket t = ticket(false); t.getSeats().forEach(seat -> seat.setUsageStatus("used")); tickets.save(t);
+        assertInvalidUsage(t, "INVALID_TICKET");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"showtime", "room", "cinema", "booking", "reference", "seat-label"})
+    void usedTicketMustMatchItsBooking(String mismatch) {
+        Ticket t = service.checkInTicket(ticket(false).getQrCode()); Booking b = booking(t);
+        switch (mismatch) {
+            case "showtime" -> t.setShowtimeId("wrong-showtime");
+            case "room" -> t.setRoomId("wrong-room");
+            case "cinema" -> t.setCinemaId("wrong-cinema");
+            case "booking" -> t.setBookingId("wrong-booking");
+            case "reference" -> t.setBookingReference("CH-261020-WXYZ");
+            case "seat-label" -> t.getSeats().get(0).setSeatNumber("A999");
+            default -> throw new AssertionError();
+        }
+        tickets.save(t);
+        assertEquals(mismatch.equals("booking") ? "BOOKING_UNAVAILABLE" : "INVALID_TICKET",
+                assertThrows(TicketCheckInException.class, () -> service.verifyTicket(t.getQrCode())).getCode());
+        var summary = bookings.getBookingStatus(b.getBookingReference());
+        assertEquals("INVALID", summary.get("usageStatus")); assertEquals(false, summary.get("isCheckedIn"));
+    }
+
+    @Test void historicalUsedTicketStillReportsUsedAfterScreeningEndsWithoutChangingMetadata() {
+        Ticket t = service.checkInTicket(ticket(false).getQrCode());
+        moveShowtime(t, now.minusHours(3), now.minusHours(1));
+        Ticket before = tickets.findById(t.getId()).orElseThrow();
+        for (int i = 0; i < 3; i++) {
+            assertEquals("ALREADY_CHECKED_IN", assertThrows(TicketCheckInException.class,
+                    () -> service.verifyTicket(t.getQrCode())).getCode());
+            rejected(t.getId(), "ALREADY_CHECKED_IN");
+        }
+        assertEquals(before, tickets.findById(t.getId()).orElseThrow());
+        assertEquals(true, bookings.getBookingStatus(t.getBookingReference()).get("isCheckedIn"));
+    }
+
+    @Test void cancelledBookingWithUsedTicketIsNotReportedAsValidUsedAdmission() {
+        Ticket t = service.checkInTicket(ticket(false).getQrCode()); Booking b = booking(t);
+        b.setStatus("CANCELLED"); mongo.save(b); assertInvalidUsage(t, "BOOKING_UNAVAILABLE");
+    }
+
+    @Test void partialUsageApiRoundTripShowsRemainingSeatsAndPreservesPriorScan() throws Exception {
+        Ticket t = ticket(false); t.getSeats().get(0).setUsageStatus("Used");
+        Ticket.ScanMetadata previous = new Ticket.ScanMetadata();
+        previous.setScannedAt(now.minusMinutes(5).toString()); previous.setScannedByGate("Gate A");
+        t.getSeats().get(0).setScanMetadata(previous); tickets.save(t);
+        Ticket before = tickets.findById(t.getId()).orElseThrow();
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
+        String body = "{\"code\":\"" + t.getQrCode() + "\"}";
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("TICKET_PARTIALLY_USED"))
+                .andExpect(jsonPath("$.usageStatus").value("PARTIALLY_USED"))
+                .andExpect(jsonPath("$.canCheckIn").value(true))
+                .andExpect(jsonPath("$.ticket.seats[0].usageStatus").value("Used"))
+                .andExpect(jsonPath("$.ticket.seats[1].usageStatus").value("Unused"));
+        assertEquals(before, tickets.findById(t.getId()).orElseThrow());
+        var summary = bookings.getBookingStatus(t.getBookingReference());
+        assertEquals("PARTIALLY_USED", summary.get("usageStatus"));
+        assertEquals(true, summary.get("isPartiallyCheckedIn")); assertEquals(false, summary.get("isCheckedIn"));
+        mvc.perform(post("/api/tickets/check-in").contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.usageStatus").value("USED"))
+                .andExpect(jsonPath("$.canCheckIn").value(false));
+        Ticket after = tickets.findById(t.getId()).orElseThrow();
+        assertEquals(previous, after.getSeats().get(0).getScanMetadata());
+        assertEquals(now.toString(), after.getSeats().get(1).getScanMetadata().getScannedAt());
+        assertEquals("Main Gate 1", after.getSeats().get(1).getScanMetadata().getScannedByGate());
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(body))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_CHECKED_IN"))
+                .andExpect(jsonPath("$.usageStatus").value("USED"))
+                .andExpect(jsonPath("$.canCheckIn").value(false));
+        assertEquals(true, bookings.getBookingStatus(t.getBookingReference()).get("isCheckedIn"));
+        assertEquals(after, tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void partialTicketCannotConsumeRemainingSeatsAfterTheWindowCloses() {
+        Ticket t = ticket(false); t.getSeats().get(0).setUsageStatus("Used"); tickets.save(t);
+        moveShowtime(t, now.minusHours(3), now.minusHours(1));
+        invalidForBoth(t, "CHECK_IN_CLOSED");
+    }
+
+    @Test void independentGateCoordinatorsStillHaveExactlyOneAtomicClaimWinner() throws Exception {
+        Ticket t = ticket(false); int count = 8; CyclicBarrier start = new CyclicBarrier(count);
+        ExecutorService pool = Executors.newFixedThreadPool(count);
+        try {
+            List<Callable<String>> calls = new ArrayList<>();
+            for (int i = 0; i < count; i++) calls.add(() -> {
+                TicketValidationService gate = new TicketValidationService(tickets, showtimes, mongo, new AdmissionCoordinator());
+                ReflectionTestUtils.setField(gate, "clock", Clock.fixed(now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+                start.await(5, TimeUnit.SECONDS);
+                try { gate.checkInTicket(t.getQrCode()); return "CHECKED_IN"; }
+                catch (TicketCheckInException ex) { return ex.getCode(); }
+            });
+            List<String> results = new ArrayList<>();
+            for (Future<String> result : pool.invokeAll(calls)) results.add(result.get(10, TimeUnit.SECONDS));
+            assertEquals(1, results.stream().filter("CHECKED_IN"::equals).count());
+            assertEquals(count - 1, results.stream().filter("ALREADY_CHECKED_IN"::equals).count());
+        } finally { pool.shutdownNow(); }
     }
 }

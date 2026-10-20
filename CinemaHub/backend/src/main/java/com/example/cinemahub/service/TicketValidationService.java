@@ -60,23 +60,23 @@ public class TicketValidationService {
             throw failure(HttpStatus.BAD_REQUEST, "INVALID_CODE", "Mã vé không đúng định dạng.");
         }
 
-        if ("Used".equals(ticket.getStatus())) throw alreadyUsed(ticket);
-        if (!"Paid".equals(ticket.getStatus())) {
+        if (!"Paid".equals(ticket.getStatus()) && !"Used".equals(ticket.getStatus())) {
             throw failure(HttpStatus.CONFLICT, "TICKET_NOT_PAID", "Vé chưa được thanh toán hoặc đã bị hủy.");
         }
-        if (ticket.getSeats() == null || ticket.getSeats().isEmpty()
-                || ticket.getSeats().stream().anyMatch(seat -> seat == null
-                    || seat.getSeatId() == null || seat.getSeatId().isBlank()
-                    || (!"Unused".equals(seat.getUsageStatus()) && !"Used".equals(seat.getUsageStatus())))) {
-            throw failure(HttpStatus.CONFLICT, "INVALID_TICKET", "Vé không có danh sách ghế hợp lệ. Vui lòng kiểm tra lại.");
+        TicketUsage.State usage = TicketUsage.state(ticket);
+        if (usage == TicketUsage.State.INVALID) {
+            throw failure(HttpStatus.CONFLICT, "INVALID_TICKET", "Trạng thái vé hoặc danh sách ghế không nhất quán. Vui lòng kiểm tra dữ liệu.");
         }
-        if (ticket.getSeats().stream().allMatch(seat -> "Used".equals(seat.getUsageStatus()))) {
-            throw alreadyUsed(ticket); // Also handles older tickets that kept status=Paid.
+        Booking booking = resolveBooking(ticket);
+        if (!TicketUsage.matchesBooking(booking, ticket)) {
+            throw failure(HttpStatus.CONFLICT, "INVALID_TICKET", "Thông tin vé không khớp đơn đặt chỗ.");
         }
+        // Historical usage remains visible after the admission window has closed.
+        if (usage == TicketUsage.State.USED) throw alreadyUsed(ticket);
 
         LocalDateTime now = LocalDateTime.now(clock);
         Showtime showtime = validateShowtime(ticket, now);
-        validateBookingAndSeats(ticket, showtime);
+        validateBookingAndSeats(ticket, showtime, booking);
         return ticket;
     }
 
@@ -103,8 +103,8 @@ public class TicketValidationService {
         if (checkedIn != null) return checkedIn;
 
         Ticket latest = tickets.findById(ticket.getId()).orElseThrow(this::notFound);
-        if ("Used".equals(latest.getStatus()) || (latest.getSeats() != null && !latest.getSeats().isEmpty()
-                && latest.getSeats().stream().allMatch(seat -> seat != null && "Used".equals(seat.getUsageStatus())))) {
+        if (TicketUsage.state(latest) == TicketUsage.State.USED
+                && TicketUsage.matchesBooking(resolveBooking(latest), latest)) {
             throw alreadyUsed(latest);
         }
         throw failure(HttpStatus.CONFLICT, "TICKET_CHANGED", "Trạng thái vé vừa thay đổi. Vui lòng kiểm tra lại.");
@@ -142,7 +142,7 @@ public class TicketValidationService {
         return matches.get(0);
     }
 
-    private void validateBookingAndSeats(Ticket ticket, Showtime showtime) {
+    private Booking resolveBooking(Ticket ticket) {
         Booking booking;
         if (present(ticket.getBookingId())) {
             booking = mongo.findById(ticket.getBookingId(), Booking.class);
@@ -154,6 +154,10 @@ public class TicketValidationService {
         if (booking == null || !"CONFIRMED".equals(booking.getStatus())) {
             throw failure(HttpStatus.CONFLICT, "BOOKING_UNAVAILABLE", "Đơn đặt vé không tồn tại, chưa xác nhận hoặc đã bị hủy.");
         }
+        return booking;
+    }
+
+    private void validateBookingAndSeats(Ticket ticket, Showtime showtime, Booking booking) {
         if (!same(ticket.getId(), booking.getTicketId())
                 || !same(ticket.getBookingReference(), booking.getBookingReference())
                 || !same(ticket.getShowtimeId(), booking.getShowtimeId())

@@ -701,7 +701,7 @@ public class BookingService {
 
         Ticket ticket = booking.getTicketId() != null ? ticketRepository.findById(booking.getTicketId()).orElse(null)
                 : uniqueReference(bookingReference, Ticket.class).orElse(null);
-        boolean isCheckedIn = isCheckedIn(booking, ticket);
+        TicketUsage.State usage = TicketUsage.state(booking, ticket);
 
         Map<String, Object> res = new HashMap<>();
         res.put("bookingReference", booking.getBookingReference());
@@ -713,30 +713,12 @@ public class BookingService {
         res.put("seats",
                 booking.getSeats() == null ? List.of() : booking.getSeats().stream().filter(Objects::nonNull).map(Booking.BookedSeat::getSeatNumber).collect(Collectors.toList()));
         res.put("totalAmount", booking.getTotalAmount());
-        res.put("isCheckedIn", isCheckedIn);
+        res.put("isCheckedIn", usage == TicketUsage.State.USED);
+        res.put("isPartiallyCheckedIn", usage == TicketUsage.State.PARTIALLY_USED);
+        res.put("usageStatus", usage.name());
         res.put("bookingType", booking.getBookingType());
         res.put("ticketId", booking.getTicketId());
         return res;
-    }
-
-    private boolean isCheckedIn(Booking booking, Ticket ticket) {
-        if (!"CONFIRMED".equals(booking.getStatus()) || ticket == null
-                || !("Used".equals(ticket.getStatus()) || "Paid".equals(ticket.getStatus()))
-                || !Objects.equals(booking.getTicketId(), ticket.getId())
-                || !Objects.equals(booking.getBookingReference(), ticket.getBookingReference())
-                || ticket.getSeats() == null || ticket.getSeats().isEmpty()
-                || booking.getSeats() == null || booking.getSeats().isEmpty()) return false;
-        Set<String> used = new HashSet<>();
-        for (Ticket.SeatStatus seat : ticket.getSeats()) {
-            if (seat == null || seat.getSeatId() == null || seat.getSeatId().isBlank()
-                    || !"Used".equalsIgnoreCase(seat.getUsageStatus()) || !used.add(seat.getSeatId())) return false;
-        }
-        Set<String> booked = new HashSet<>();
-        for (Booking.BookedSeat seat : booking.getSeats()) {
-            if (seat == null || seat.getSeatId() == null || seat.getSeatId().isBlank()
-                    || !booked.add(seat.getSeatId())) return false;
-        }
-        return used.equals(booked);
     }
 
     private <T> Optional<T> uniqueReference(String reference, Class<T> type) {

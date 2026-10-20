@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Ticket, Camera, ScanLine, Search, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import CameraQrScanner from '../../components/CameraQrScanner';
 import { useAuth } from '../../context/AuthContext';
+import { formatScanTime, getTicketScanDetails } from '../../utils/ticketUsage';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 const modes = [
@@ -59,8 +60,10 @@ export default function TicketCheckIn() {
       if (response.status === 401 || response.status === 403) {
         setResult({ type: 'error', message: 'Bạn không có quyền soát vé hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
       } else if (response.ok && data.ticket) {
-        setResult({ type: 'success', verified: operation === 'verify', code,
-          message: data.message || (operation === 'verify' ? 'Vé hợp lệ. Chưa thực hiện check-in.' : 'Check-in thành công!'), ticket: data.ticket });
+        const partial = operation === 'verify' && data.usageStatus === 'PARTIALLY_USED';
+        setResult({ type: partial ? 'partial' : 'success', verified: operation === 'verify' && data.canCheckIn !== false, code,
+          message: data.message || (partial ? 'Chỉ check-in các ghế chưa sử dụng.'
+            : operation === 'verify' ? 'Vé hợp lệ. Chưa thực hiện check-in.' : 'Check-in thành công!'), ticket: data.ticket });
       } else {
         setResult({
           type: data.code === 'ALREADY_CHECKED_IN' ? 'warning' : 'error',
@@ -81,8 +84,8 @@ export default function TicketCheckIn() {
   }, [token]);
 
   const submit = (event) => { event.preventDefault(); checkIn(ticketCode); };
-  const seats = Array.isArray(result?.ticket?.seats) ? result.ticket.seats.filter(Boolean) : [];
-  const scannedAt = seats.find(seat => seat.scanMetadata?.scannedAt)?.scanMetadata?.scannedAt;
+  const { seats, latestScan } = getTicketScanDetails(result?.ticket);
+  const usedCount = seats.filter(seat => seat.usageStatus === 'Used').length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -128,21 +131,37 @@ export default function TicketCheckIn() {
             {!result ? <p className="text-gray-400 py-16 text-center">Chưa có dữ liệu. Vui lòng quét hoặc nhập mã vé.</p> : <div className="space-y-5">
               <div role={result.type === 'error' ? 'alert' : 'status'} className={'p-4 rounded-xl border flex items-start gap-3 ' + (
                 result.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                result.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : 'bg-red-500/10 border-red-500/30 text-red-400')}>
-                {result.type === 'success' ? <CheckCircle className="w-6 h-6 shrink-0" /> : result.type === 'warning' ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <XCircle className="w-6 h-6 shrink-0" />}
-                <div><h3 className="font-bold text-lg">{result.type === 'success' ? (result.verified ? 'Vé hợp lệ — chưa check-in' : 'Check-in thành công') : result.type === 'warning' ? 'Vé đã được sử dụng' : 'Không thể check-in'}</h3><p className="text-sm mt-1">{result.message}</p></div>
+                ['warning', 'partial'].includes(result.type) ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : 'bg-red-500/10 border-red-500/30 text-red-400')}>
+                {result.type === 'success' ? <CheckCircle className="w-6 h-6 shrink-0" /> : ['warning', 'partial'].includes(result.type) ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <XCircle className="w-6 h-6 shrink-0" />}
+                <div><h3 className="font-bold text-lg">{result.type === 'success' ? (result.verified ? 'Vé hợp lệ — chưa check-in' : 'Check-in thành công') : result.type === 'partial' ? 'Vé đã dùng một phần' : result.type === 'warning' ? 'Vé đã được sử dụng' : 'Không thể check-in'}</h3><p className="text-sm mt-1">{result.message}</p></div>
               </div>
               {result.verified && <button type="button" disabled={loading}
                 onClick={() => checkIn(result.code, 'check-in')}
                 className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-bold py-4 rounded-xl">
-                Xác nhận check-in
+                {result.type === 'partial' ? 'Xác nhận check-in ghế còn lại' : 'Xác nhận check-in'}
               </button>}
               {result.ticket && <div className="p-5 bg-white/5 rounded-xl space-y-3">
                 <p className="text-gray-400 text-sm">Mã đặt chỗ <strong className="block text-white text-lg">{result.ticket.bookingReference}</strong></p>
                 <p>Phim: <strong>{result.ticket.movieTitle || 'Chưa có thông tin'}</strong></p>
                 <p>Suất chiếu: <strong>{result.ticket.showtimeStart ? new Date(result.ticket.showtimeStart).toLocaleString('vi-VN') : 'Chưa có thông tin'}</strong></p>
                 <p>Ghế: <strong className="text-primary">{seats.map(seat => seat.seatNumber).join(', ')}</strong></p>
-                {scannedAt && <p className="text-sm text-gray-400">Đã soát lúc: {new Date(scannedAt).toLocaleString('vi-VN')}</p>}
+                <p className="text-sm text-gray-300">Đã dùng: {usedCount}/{seats.length} ghế</p>
+                {latestScan ? <p className="text-sm text-gray-300" data-testid="latest-scan">
+                  Lần soát gần nhất: {formatScanTime(latestScan.scannedAt)} · Cổng: {latestScan.scannedByGate || 'Chưa có thông tin'}
+                </p> : usedCount > 0 && <p className="text-sm text-gray-400">Chưa có thông tin lần soát trước.</p>}
+                <ul className="space-y-3 border-t border-white/10 pt-3" aria-label="Trạng thái từng ghế">
+                  {seats.map((seat, index) => <li key={`${seat.seatId || 'seat'}-${index}`} className="text-sm" data-seat-id={seat.seatId}>
+                    <p className="flex flex-wrap justify-between gap-2">
+                      <strong>Ghế {seat.seatNumber || seat.seatId || 'Không xác định'}</strong>
+                      <span className={seat.usageStatus === 'Used' ? 'text-orange-400' : 'text-gray-300'}>
+                        {seat.usageStatus === 'Used' ? 'Đã sử dụng' : seat.usageStatus === 'Unused' ? 'Chưa sử dụng' : 'Không xác định'}
+                      </span>
+                    </p>
+                    {seat.usageStatus === 'Used' && <p className="text-xs text-gray-400 mt-1">
+                      Lần soát: {formatScanTime(seat.scanMetadata?.scannedAt)} · Cổng: {seat.scanMetadata?.scannedByGate || 'Chưa có thông tin'}
+                    </p>}
+                  </li>)}
+                </ul>
               </div>}
             </div>}
           </div>

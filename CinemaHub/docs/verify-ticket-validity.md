@@ -4,8 +4,10 @@
 
 Camera, external scanner and manual entry first call `POST /api/tickets/verify`
 with JSON `{ "code": "<complete QR, ticket ID or booking reference>" }`.
-Successful verification returns `TICKET_VALID`, `valid: true` and the ticket.
-It does not change ticket status, seat usage or scan metadata.
+Successful verification returns `TICKET_VALID` for an unused ticket or
+`TICKET_PARTIALLY_USED` for a partially used ticket, with `valid: true`,
+`canCheckIn: true`, `usageStatus` and the ticket. It does not change ticket
+status, seat usage or scan metadata.
 
 The staff member selects **Xác nhận check-in** to call
 `POST /api/tickets/check-in` with the same code. The server repeats every
@@ -51,9 +53,37 @@ Old counter tickets without `bookingId` can resolve their booking through its
 explicit `ticketId`. Orphaned/inconsistent records are rejected; verification
 does not repair payment or seat data automatically.
 
-`getBookingStatus` reports checked-in only for a confirmed booking with a linked
-Paid/Used ticket whose nonempty, distinct seat set matches the booking and is
-entirely Used. Empty/malformed seats and cancelled records report false.
+## Check Used Ticket
+
+Admission and booking summaries share the read-only `TicketUsage` rules:
+
+| Ticket and seat data | Usage state | Result |
+| --- | --- | --- |
+| Paid, every seat Unused | UNUSED | Verify, then explicitly confirm check-in |
+| Paid, a mix of Used and Unused | PARTIALLY_USED | Show each seat; confirm only remaining seats |
+| Paid or Used, every seat Used | USED | ALREADY_CHECKED_IN; cannot consume again |
+| Used with any Unused seat; empty, duplicate or malformed seats | INVALID | Reject the inconsistent record |
+| Missing/cancelled booking or mismatched booking, showtime, room, cinema or seat links | INVALID | Reject; never report a trusted used ticket |
+
+Persisted status values remain case-sensitive (`Used`/`Unused`). Unknown values
+such as `used` are invalid in both APIs; checking a ticket does not silently
+normalize historical records or overwrite their scan history. Malformed ticket
+structure and booking-link mismatches return `INVALID_TICKET`; unavailable real
+room seats continue to return `INVALID_SEATS`.
+
+`getBookingStatus` retains `isCheckedIn` and adds `isPartiallyCheckedIn` plus
+`usageStatus`. Only the fully USED state reports `isCheckedIn: true`. Historical
+used tickets with consistent booking links still return ALREADY_CHECKED_IN
+when the showtime has ended; this does not reopen admission for remaining seats.
+
+The staff result displays Used/Unused for each seat, its recorded scan time
+and gate, and the latest valid scan across Used seats by timestamp. Seat order
+does not determine the latest scan. Finishing a partial ticket preserves the
+old metadata and stamps only the remaining seats. Missing/invalid metadata
+shows an explicit fallback rather than an invalid date.
+
+The admission window, full QR matching, authorization and atomic MongoDB ticket
+claim continue to apply to both unused and partially used tickets.
 
 ## Concurrency and deployment boundary
 
@@ -90,3 +120,12 @@ payload, non-consuming verification, explicit confirmation, repeated frames,
 duplicate warning, scanner Enter, double-submit protection, stale verification,
 network recovery and camera cleanup. Physical camera/scanner hardware and a
 live VNPay checkout were not exercised by this test.
+
+Check Used Ticket regression verification: 86 backend tests and 7 frontend
+unit tests passed. Seven targeted browser cases also passed for the used
+warning, partial-seat display, remaining-seat confirmation, newest scan/gate,
+rescan blocking, inconsistent-data rejection, metadata fallback and seat-order
+independence (some cases cover multiple assertions). The 12 camera/scanner
+cases above were rerun successfully against the updated UI, for 19 browser
+cases total. Browser API responses and camera input were simulated; backend
+integration tests exercised the real controller/service with isolated MongoDB.

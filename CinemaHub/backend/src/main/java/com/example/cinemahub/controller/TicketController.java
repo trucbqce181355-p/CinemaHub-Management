@@ -3,6 +3,8 @@ package com.example.cinemahub.controller;
 import com.example.cinemahub.dto.TicketCheckInRequest;
 import com.example.cinemahub.exception.TicketCheckInException;
 import com.example.cinemahub.service.TicketValidationService;
+import com.example.cinemahub.service.TicketUsage;
+import com.example.cinemahub.model.Ticket;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +21,12 @@ public class TicketController {
 
     @PostMapping("/verify")
     public ResponseEntity<?> verify(@Valid @RequestBody TicketCheckInRequest request) {
-        return ResponseEntity.ok(Map.of("code", "TICKET_VALID", "valid", true,
-                "message", "Vé hợp lệ. Chưa thực hiện check-in.",
-                "ticket", ticketValidationService.verifyTicket(request.code())));
+        Ticket ticket = ticketValidationService.verifyTicket(request.code());
+        boolean partial = TicketUsage.state(ticket) == TicketUsage.State.PARTIALLY_USED;
+        return ResponseEntity.ok(Map.of("code", partial ? "TICKET_PARTIALLY_USED" : "TICKET_VALID",
+                "valid", true, "canCheckIn", true, "usageStatus", TicketUsage.state(ticket).name(),
+                "message", partial ? "Vé đã dùng một phần. Chỉ các ghế chưa sử dụng sẽ được check-in."
+                        : "Vé hợp lệ. Chưa thực hiện check-in.", "ticket", ticket));
     }
 
     @PostMapping("/check-in")
@@ -36,7 +41,7 @@ public class TicketController {
     }
 
     private ResponseEntity<?> result(String code) {
-        return ResponseEntity.ok(Map.of("code", "CHECKED_IN", "message", "Check-in thành công!",
+        return ResponseEntity.ok(Map.of("code", "CHECKED_IN", "usageStatus", "USED", "canCheckIn", false, "message", "Check-in thành công!",
                 "ticket", ticketValidationService.checkInTicket(code)));
     }
 
@@ -45,8 +50,12 @@ public class TicketController {
         Map<String, Object> response = new HashMap<>();
         response.put("code", ex.getCode());
         response.put("valid", false);
+        response.put("canCheckIn", false);
         response.put("error", ex.getMessage());
-        if (ex.getTicket() != null) response.put("ticket", ex.getTicket());
+        if (ex.getTicket() != null) {
+            response.put("ticket", ex.getTicket());
+            response.put("usageStatus", TicketUsage.state(ex.getTicket()).name());
+        }
         return ResponseEntity.status(ex.getStatus()).body(response);
     }
 
