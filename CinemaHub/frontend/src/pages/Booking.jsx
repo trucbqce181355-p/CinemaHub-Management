@@ -7,6 +7,7 @@ import {
   RefreshCw, X, Sparkles, CreditCard, Heart, ArrowLeft, Printer
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTicketQrValue } from '../utils/ticketQr';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -1353,7 +1354,7 @@ const Booking = () => {
                 {/* QR Code Section */}
                 <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner text-black">
                   <QRCodeSVG
-                    value={confirmedData.ticket?.qrCode || confirmedData.qrCode || `CINEMAHUB|${confirmedData.bookingReference || confirmedData.booking?.bookingReference}`}
+                    value={getTicketQrValue(confirmedData.ticket)}
                     size={190}
                     level="H"
                     includeMargin={true}

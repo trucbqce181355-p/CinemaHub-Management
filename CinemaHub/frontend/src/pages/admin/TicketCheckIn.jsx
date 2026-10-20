@@ -1,231 +1,146 @@
-import { useState, useEffect, useRef } from 'react';
-import { Ticket, Search, CheckCircle, XCircle, AlertTriangle, QrCode, ScanLine } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Ticket, Camera, ScanLine, Search, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import CameraQrScanner from '../../components/CameraQrScanner';
+import { useAuth } from '../../context/AuthContext';
 
-const TicketCheckIn = () => {
-  const [ticketId, setTicketId] = useState('');
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const modes = [
+  { id: 'camera', label: 'Camera', Icon: Camera },
+  { id: 'scanner', label: 'Máy quét QR', Icon: ScanLine },
+  { id: 'manual', label: 'Nhập thủ công', Icon: Search },
+];
+
+export default function TicketCheckIn() {
+  const { user } = useAuth();
+  const token = user?.token;
+  const [ticketCode, setTicketCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [scanMode, setScanMode] = useState('qr'); // 'qr' or 'manual'
+  const [scanMode, setScanMode] = useState('camera');
   const inputRef = useRef(null);
+  const inFlight = useRef(false);
+  const requestRef = useRef(null);
+  const mounted = useRef(true);
 
-  // Auto-focus input for hardware scanner integration
   useEffect(() => {
-    if (scanMode === 'qr' && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [scanMode, result]);
+    mounted.current = true;
+    return () => { mounted.current = false; requestRef.current?.abort(); };
+  }, []);
+  useEffect(() => {
+    if (scanMode !== 'camera' && !loading) inputRef.current?.focus();
+  }, [scanMode, loading, result]);
 
-  const handleCheckIn = async (e) => {
-    e.preventDefault();
-    if (!ticketId.trim()) return;
-    
+  const checkIn = useCallback(async (rawCode) => {
+    if (inFlight.current) return;
+    const code = rawCode.trim();
+    if (!code || code.length > 512) {
+      setResult({ type: 'error', message: 'Vui lòng nhập hoặc quét mã vé hợp lệ.' });
+      return;
+    }
+    if (!token) {
+      setResult({ type: 'error', message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+      return;
+    }
+    inFlight.current = true;
     setLoading(true);
     setResult(null);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
     try {
-      const userStr = localStorage.getItem('user');
-      const token = userStr ? JSON.parse(userStr).token : '';
-
-      const response = await fetch(`http://localhost:5000/api/tickets/check-in/${ticketId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetch(API_BASE + '/tickets/check-in', {
+        method: 'POST', signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ code }),
       });
-      const data = await response.json();
-      
-      // Simulate verification delay for visual feedback (UC-85, 86, 87, 88)
-      setTimeout(() => {
-        if (response.ok) {
-          setResult({ type: 'success', message: data.message, ticket: data.ticket });
-        } else {
-          const errorMsg = data.error || 'Có lỗi xảy ra!';
-          if (errorMsg.includes('đã được Check-in')) {
-            setResult({ type: 'warning', message: errorMsg, ticket: data.ticket });
-          } else {
-            setResult({ type: 'error', message: errorMsg });
-          }
-        }
-        setLoading(false);
-        setTicketId(''); // Clear for next scan
-      }, 800);
-
-    } catch (err) {
-      setResult({ type: 'error', message: 'Lỗi kết nối đến máy chủ!' });
-      setLoading(false);
+      const data = await response.json().catch(() => ({}));
+      if (!mounted.current) return;
+      if (response.status === 401 || response.status === 403) {
+        setResult({ type: 'error', message: 'Bạn không có quyền soát vé hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+      } else if (response.ok && data.ticket) {
+        setResult({ type: 'success', message: data.message || 'Check-in thành công!', ticket: data.ticket });
+      } else {
+        setResult({
+          type: data.code === 'ALREADY_CHECKED_IN' ? 'warning' : 'error',
+          message: data.error || 'Không kiểm tra được vé. Vui lòng thử lại.',
+          ticket: data.ticket,
+        });
+      }
+    } catch {
+      if (mounted.current) setResult({ type: 'error', message: timedOut
+        ? 'Máy chủ phản hồi quá lâu. Hãy kiểm tra lại vé trước khi tiếp tục.'
+        : 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.' });
+    } finally {
+      clearTimeout(timeout);
+      inFlight.current = false;
+      requestRef.current = null;
+      if (mounted.current) { setLoading(false); setTicketCode(''); }
     }
-  };
+  }, [token]);
+
+  const submit = (event) => { event.preventDefault(); checkIn(ticketCode); };
+  const scannedAt = result?.ticket?.seats?.find(seat => seat.scanMetadata?.scannedAt)?.scanMetadata?.scannedAt;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-3xl font-display font-bold text-white">Kiểm soát vé (Check-in)</h1>
-        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-          <button 
-            onClick={() => setScanMode('qr')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${scanMode === 'qr' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-          >
-            <QrCode className="w-4 h-4" /> Quét mã QR
-          </button>
-          <button 
-            onClick={() => setScanMode('manual')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${scanMode === 'manual' ? 'bg-white/20 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Search className="w-4 h-4" /> Nhập thủ công
-          </button>
+        <div className="flex flex-wrap bg-white/5 p-1 rounded-xl border border-white/10">
+          {modes.map(({ id, label, Icon }) => (
+            <button key={id} type="button" disabled={loading} onClick={() => { setScanMode(id); setTicketCode(''); setResult(null); }}
+              className={'px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 ' + (scanMode === id ? 'bg-primary text-white' : 'text-gray-400 hover:text-white')}>
+              <Icon className="w-4 h-4" />{label}
+            </button>
+          ))}
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Scanner Panel */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden min-h-[450px]">
-          {scanMode === 'qr' ? (
-            <>
-              <h2 className="text-xl font-bold mb-6 text-gray-300">Đưa mã QR vào khu vực quét</h2>
-              
-              <div className="relative w-64 h-64 border-2 border-dashed border-gray-500 rounded-2xl flex items-center justify-center overflow-hidden group">
-                <div className="absolute inset-0 bg-primary/5"></div>
-                <ScanLine className="w-20 h-20 text-primary opacity-50" />
-                
-                {/* Laser Animation */}
-                <motion.div 
-                  animate={{ y: [-128, 128, -128] }}
-                  transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
-                  className="absolute left-0 right-0 h-1 bg-primary shadow-[0_0_15px_rgba(229,9,20,1)]"
-                ></motion.div>
-
-                {/* Corners */}
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl"></div>
-              </div>
-              
-              <p className="mt-6 text-sm text-gray-400 animate-pulse">Hệ thống đang chờ dữ liệu từ máy quét...</p>
-              
-              {/* Hidden input to capture barcode scanner hardware strokes */}
-              <form onSubmit={handleCheckIn}>
-                <input 
-                  ref={inputRef}
-                  type="text" 
-                  value={ticketId}
-                  onChange={(e) => setTicketId(e.target.value)}
-                  className="absolute opacity-0 -z-10"
-                  autoFocus
-                  autoComplete="off"
-                />
-              </form>
-            </>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-panel p-7 rounded-3xl border border-white/10 flex items-center justify-center relative min-h-[440px]">
+          {scanMode === 'camera' ? (
+            <CameraQrScanner onScan={checkIn} paused={loading || Boolean(result)} onRestart={() => setResult(null)} />
           ) : (
-            <div className="w-full">
-              <h2 className="text-xl font-bold mb-6">Nhập Mã Vé</h2>
-              <form onSubmit={handleCheckIn} className="space-y-4">
-                <input 
-                  type="text" 
-                  placeholder="VD: 60a1b2c3d4..." 
-                  value={ticketId}
-                  onChange={(e) => setTicketId(e.target.value)}
-                  className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-4 text-white text-lg focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all" 
-                />
-                <button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all">
-                  <Search className="w-5 h-5" /> Kiểm tra vé
-                </button>
-              </form>
-            </div>
+            <form onSubmit={submit} className="w-full space-y-5">
+              <h2 className="text-xl font-bold">{scanMode === 'scanner' ? 'Quét QR bằng máy quét ngoài' : 'Nhập mã vé hoặc mã đặt chỗ'}</h2>
+              <p className="text-sm text-gray-400">{scanMode === 'scanner'
+                ? 'Đặt con trỏ trong ô bên dưới, quét mã và để máy quét gửi phím Enter.'
+                : 'Nhập ID vé, mã đặt chỗ CH-... hoặc dán đầy đủ nội dung QR.'}</p>
+              <label htmlFor="ticket-code" className="block text-sm text-gray-300">Mã vé / nội dung QR</label>
+              <input ref={inputRef} id="ticket-code" type="text" value={ticketCode} maxLength={512} disabled={loading}
+                onChange={event => setTicketCode(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false}
+                placeholder="CH-261020-ABCD hoặc CINEMAHUB|..."
+                className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-4 text-white focus:border-primary focus:outline-none" />
+              <button type="submit" disabled={loading || !ticketCode.trim()} className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+                <Search className="w-5 h-5" /> Kiểm tra vé
+              </button>
+            </form>
           )}
-
-          {loading && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-10">
-               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-               <p className="font-bold text-lg animate-pulse text-primary">Đang xác thực dữ liệu...</p>
-            </div>
-          )}
+          {loading && <div role="status" className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center z-10">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="font-bold text-lg text-primary">Đang xác thực vé...</p>
+          </div>}
         </div>
-
-        {/* Validation Results Panel */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 min-h-[450px] flex flex-col">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Ticket className="w-6 h-6 text-primary" /> Kết quả Xác thực
-          </h2>
-
-          {!result ? (
-            <div className="flex-grow flex flex-col items-center justify-center text-gray-500 space-y-4">
-               <QrCode className="w-16 h-16 opacity-20" />
-               <p>Chưa có dữ liệu. Vui lòng quét vé.</p>
-            </div>
-          ) : (
-            <AnimatePresence mode="wait">
-              <motion.div 
-                key={result.type}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex-grow space-y-6"
-              >
-                {/* Result Banner */}
-                <div className={`p-4 rounded-xl border flex items-start gap-3 shadow-lg
-                  ${result.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : ''}
-                  ${result.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : ''}
-                  ${result.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : ''}
-                `}>
-                  {result.type === 'success' && <CheckCircle className="w-6 h-6 shrink-0" />}
-                  {result.type === 'warning' && <AlertTriangle className="w-6 h-6 shrink-0" />}
-                  {result.type === 'error' && <XCircle className="w-6 h-6 shrink-0" />}
-                  
-                  <div>
-                    <h3 className="font-bold text-lg">{
-                      result.type === 'success' ? 'Hợp lệ - Check-in Thành công' :
-                      result.type === 'warning' ? 'Cảnh báo - Vé đã sử dụng' : 'Vé Không Hợp Lệ'
-                    }</h3>
-                    <p className="text-sm mt-1 opacity-90">{result.message}</p>
-                  </div>
-                </div>
-
-                {/* UC Checklists */}
-                <div className="bg-black/30 rounded-xl p-5 border border-white/5 space-y-4">
-                  <div className="flex items-center justify-between">
-                     <span className="text-sm text-gray-400">Xác thực hệ thống</span>
-                     {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                     <span className="text-sm text-gray-400">Kiểm tra Suất chiếu</span>
-                     {result.type !== 'error' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                     <span className="text-sm text-gray-400">Trạng thái Sử dụng</span>
-                     {result.type === 'success' ? <CheckCircle className="w-4 h-4 text-green-400" /> : 
-                      result.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-orange-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
-                  </div>
-                </div>
-
-                {result.ticket && (
-                  <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                    <div className="text-center mb-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-widest">Mã Đặt Chỗ</p>
-                      <p className="font-bold text-lg text-white">{result.ticket.bookingReference}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-center border-t border-white/10 pt-4 mt-2">
-                      <div>
-                        <p className="text-xs text-gray-400">Mã Suất Chiếu</p>
-                        <p className="font-bold text-white text-sm truncate px-2" title={result.ticket.showtimeId}>{result.ticket.showtimeId}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">Ghế ngồi</p>
-                        <p className="font-bold text-primary text-lg">
-                          {result.ticket.seats ? result.ticket.seats.map(s => s.seatNumber).join(', ') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          )}
+        <div className="glass-panel p-7 rounded-3xl border border-white/10 min-h-[440px]">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Ticket className="w-6 h-6 text-primary" />Kết quả xác thực</h2>
+          <div aria-live="polite" aria-atomic="true">
+            {!result ? <p className="text-gray-400 py-16 text-center">Chưa có dữ liệu. Vui lòng quét hoặc nhập mã vé.</p> : <div className="space-y-5">
+              <div role={result.type === 'error' ? 'alert' : 'status'} className={'p-4 rounded-xl border flex items-start gap-3 ' + (
+                result.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                result.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : 'bg-red-500/10 border-red-500/30 text-red-400')}>
+                {result.type === 'success' ? <CheckCircle className="w-6 h-6 shrink-0" /> : result.type === 'warning' ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <XCircle className="w-6 h-6 shrink-0" />}
+                <div><h3 className="font-bold text-lg">{result.type === 'success' ? 'Check-in thành công' : result.type === 'warning' ? 'Vé đã được sử dụng' : 'Không thể check-in'}</h3><p className="text-sm mt-1">{result.message}</p></div>
+              </div>
+              {result.ticket && <div className="p-5 bg-white/5 rounded-xl space-y-3">
+                <p className="text-gray-400 text-sm">Mã đặt chỗ <strong className="block text-white text-lg">{result.ticket.bookingReference}</strong></p>
+                <p>Phim: <strong>{result.ticket.movieTitle || 'Chưa có thông tin'}</strong></p>
+                <p>Suất chiếu: <strong>{result.ticket.showtimeStart ? new Date(result.ticket.showtimeStart).toLocaleString('vi-VN') : 'Chưa có thông tin'}</strong></p>
+                <p>Ghế: <strong className="text-primary">{result.ticket.seats?.map(seat => seat.seatNumber).join(', ')}</strong></p>
+                {scannedAt && <p className="text-sm text-gray-400">Đã soát lúc: {new Date(scannedAt).toLocaleString('vi-VN')}</p>}
+              </div>}
+            </div>}
+          </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default TicketCheckIn;
+}
