@@ -19,7 +19,7 @@ const UserManagement = () => {
   };
 
   const isProtectedAccount = (email) => {
-    return ['admin@cinemahub.com', 'manager@cinemahub.com', 'staff@cinemahub.com'].includes(email);
+    return email === 'admin@cinemahub.com';
   };
 
   // Advanced Filters & Stats

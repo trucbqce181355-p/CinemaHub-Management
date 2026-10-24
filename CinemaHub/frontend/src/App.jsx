@@ -10,12 +10,15 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import MovieDetails from './pages/MovieDetails';
 import UserManagement from './pages/admin/UserManagement';
+import MembershipManagement from './pages/admin/MembershipManagement';
 import MovieManagement from './pages/admin/MovieManagement';
 import PromotionManagement from './pages/admin/PromotionManagement';
 import TicketCheckIn from './pages/admin/TicketCheckIn';
 import CinemaManagement from './pages/admin/CinemaManagement';
 import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ShowtimeManagement from './pages/admin/ShowtimeManagement';
+import ReviewManagement from './pages/admin/ReviewManagement';
+import FoodManagement from './pages/admin/FoodManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
@@ -87,7 +90,7 @@ function App() {
       <ScrollToTop />
       <SessionModal />
       <Routes>
-        {/* Admin Routes */}
+    
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={
             <div className="space-y-6">
@@ -109,22 +112,27 @@ function App() {
             </div>
           } />
           <Route path="users" element={<UserManagement />} />
+          <Route path="membership" element={<MembershipManagement />} />
           <Route path="movies" element={<MovieManagement />} />
           <Route path="cinemas" element={<CinemaManagement />} />
           <Route path="cinemas/:cinemaId/rooms" element={<ScreenRoomManagement />} />
           <Route path="promotions" element={<PromotionManagement />} />
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
+          <Route path="reviews" element={<ReviewManagement />} />
+          <Route path="food" element={<FoodManagement />} />
         </Route>
 
-        {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/movies" element={<Movies />} />
           <Route path="/cinemas" element={<Cinemas />} />
+          <Route path="/membership" element={<Navigate to="/profile?tab=membership" replace />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking/:id" element={<Booking />} />
+          
+          <Route path="/food-beverage" element={<FoodManagement />} />
           <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
           <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

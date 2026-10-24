@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.ArrayList;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Document(collection = "users")
@@ -15,7 +16,7 @@ public class User {
     private String id;
     private String username;
     private String email;
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String phoneNumber = "";
     private Date dateOfBirth;
@@ -32,7 +33,17 @@ public class User {
     private Date otpExpires;
     @JsonIgnore
     private Integer failedOtpAttempts = 0;
+    private Integer rewardPoints = 0;
+    private Integer lifetimePoints = 0;
+    private String membershipTier = "BRONZE";
+    private String membershipCardNumber;
     private List<String> permissions = new ArrayList<>();
+    
+    // Khóa quyền đánh giá khi vi phạm
+    private Boolean reviewRestricted = false;
+    private Date reviewRestrictedUntil;
+    private String reviewRestrictedReason;
+
     private Date createdAt = new Date();
     private Date updatedAt = new Date();
 }

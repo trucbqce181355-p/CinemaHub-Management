@@ -51,9 +51,9 @@ const Booking = () => {
   const [promoMessage, setPromoMessage] = useState(null);
 
   // Customer & Payment Info
-  const [customerName, setCustomerName] = useState(user?.username || '');
+  const [customerName, setCustomerName] = useState(user?.name || user?.username || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   const [contactErrors, setContactErrors] = useState({});
   const customerNameInput = useRef(null);
   const customerPhoneInput = useRef(null);
@@ -68,7 +68,7 @@ const Booking = () => {
       .then(data => { if (active) setGatewayReady(data.configured); })
       .catch(() => { if (active) setGatewayReady(null); });
     return () => { active = false; };
-  }, [user?.token]);
+  }, [user?.token, currentStep]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedData, setConfirmedData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -543,7 +543,7 @@ const Booking = () => {
       if (!user?.token) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
 
       const finalCustomerName = customerName.trim();
-      const finalCustomerEmail = customerEmail || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
+      const finalCustomerEmail = customerEmail.trim() || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
       const finalCustomerPhone = customerPhone.trim();
 
       // If user selected VNPAY payment gateway, redirect to VNPAY Sandbox
