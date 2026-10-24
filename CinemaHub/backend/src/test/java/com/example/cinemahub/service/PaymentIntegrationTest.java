@@ -173,6 +173,7 @@ class PaymentIntegrationTest {
         service.confirm(callback(p,true));
         var factory=new org.springframework.data.mongodb.repository.support.MongoRepositoryFactory(mongo);
         BookingService real=new BookingService();
+        ReflectionTestUtils.setField(real,"admission",new AdmissionCoordinator());
         ReflectionTestUtils.setField(real,"mongo",mongo);
         ReflectionTestUtils.setField(real,"bookingRepository",factory.getRepository(com.example.cinemahub.repository.BookingRepository.class));
         ReflectionTestUtils.setField(real,"ticketRepository",factory.getRepository(com.example.cinemahub.repository.TicketRepository.class));

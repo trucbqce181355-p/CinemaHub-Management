@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -8,6 +8,7 @@ import {
   Info, ExternalLink, ArrowUpRight, ArrowDownRight, Tag, TrendingUp 
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTicketQrValue } from '../utils/ticketQr';
 import { useAuth } from '../context/AuthContext';
 const Profile = () => {
   const { user, login, logout } = useAuth();
@@ -26,6 +27,10 @@ const Profile = () => {
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedTicketModal, setSelectedTicketModal] = useState(null);
+  const [ticketDetailLoading, setTicketDetailLoading] = useState(false);
+  const [ticketDetailError, setTicketDetailError] = useState('');
+  const ticketRequestRef = useRef(null);
+  useEffect(() => () => ticketRequestRef.current?.abort(), []);
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null);
   const [cancelModalMessage, setCancelModalMessage] = useState({ text: '', type: '' });
   // Info state
@@ -209,18 +214,32 @@ const Profile = () => {
     }
   };
   const handleOpenTicketDetail = async (bookingItem) => {
+    ticketRequestRef.current?.abort();
+    const controller = new AbortController();
+    ticketRequestRef.current = controller;
     setSelectedTicketModal(bookingItem);
+    setTicketDetailLoading(true);
+    setTicketDetailError('');
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/bookings/${bookingItem.id || bookingItem.bookingReference}`);
-      const data = await res.json();
+      const res = await fetch(`http://127.0.0.1:5000/api/bookings/${bookingItem.id || bookingItem.bookingReference}`, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (controller.signal.aborted) return;
+      if (!res.ok) throw new Error(data.error || 'Không tải được thông tin vé. Vui lòng thử lại.');
       if (res.ok && data.booking) {
-        setSelectedTicketModal({
+        setSelectedTicketModal(current => current && current.id === bookingItem.id ? {
           ...data.booking,
           ticket: data.ticket
-        });
+        } : current);
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error("Error fetching ticket detail:", err);
+      setTicketDetailError(err.message);
+    } finally {
+      if (!controller.signal.aborted) setTicketDetailLoading(false);
     }
   };
   const handleContinuePayment = (booking) => {
@@ -1460,7 +1479,7 @@ const Profile = () => {
               <div className="bg-primary p-6 text-center text-white relative">
                 <button
                   type="button"
-                  onClick={() => setSelectedTicketModal(null)}
+                  onClick={() => { ticketRequestRef.current?.abort(); setSelectedTicketModal(null); }}
                   className="absolute top-4 right-4 p-1.5 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -1477,12 +1496,14 @@ const Profile = () => {
               <div className="p-6 space-y-5">
                 {/* QR Code Container */}
                 <div className="flex flex-col items-center justify-center p-5 bg-white rounded-2xl shadow-inner text-black">
-                  <QRCodeSVG
-                    value={selectedTicketModal.ticket?.qrCode || selectedTicketModal.qrCode || `CINEMAHUB|${selectedTicketModal.bookingReference}`}
+                  {ticketDetailLoading ? <p className="text-sm text-gray-600">Đang tải mã QR của vé...</p> : ticketDetailError ? (
+                    <p role="alert" className="text-sm text-red-600">{ticketDetailError}</p>
+                  ) : getTicketQrValue(selectedTicketModal.ticket) ? <QRCodeSVG
+                    value={getTicketQrValue(selectedTicketModal.ticket)}
                     size={185}
                     level="H"
                     includeMargin={true}
-                  />
+                  /> : <p className="text-sm text-gray-600">Chưa có vé điện tử được phát hành cho đơn này.</p>}
                   <p className="text-xs font-mono font-bold tracking-widest mt-2 uppercase text-gray-800">
                     MÃ ĐẶT VÉ: {selectedTicketModal.bookingReference}
                   </p>
@@ -1538,7 +1559,7 @@ const Profile = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedTicketModal(null)}
+                  onClick={() => { ticketRequestRef.current?.abort(); setSelectedTicketModal(null); }}
                   className="px-6 py-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl transition-colors"
                 >
                   Đóng

@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, ArrowRight, Printer, RefreshCw, Calendar, Clock, MapPin, Film, Home } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTicketQrValue } from '../utils/ticketQr';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -103,7 +104,7 @@ const PaymentCallback = () => {
               {/* QR Code Section */}
               <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner text-black">
                 <QRCodeSVG
-                  value={ticket?.qrCode || `CINEMAHUB|${booking.bookingReference}`}
+                  value={getTicketQrValue(ticket)}
                   size={190}
                   level="H"
                   includeMargin={true}

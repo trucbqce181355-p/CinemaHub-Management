@@ -13,6 +13,9 @@ import java.util.List;
 @Service
 public class SeatService {
     @Autowired
+    private AdmissionCoordinator admission;
+
+    @Autowired
     private SeatRepository seatRepository;
 
     @Autowired
@@ -31,6 +34,10 @@ public class SeatService {
     }
 
     public List<Seat> generateDefaultSeats(String roomId, int rowsCount, int colsCount) {
+        return admission.write(() -> generateDefaultSeatsInternal(roomId, rowsCount, colsCount));
+    }
+
+    private List<Seat> generateDefaultSeatsInternal(String roomId, int rowsCount, int colsCount) {
         seatRepository.deleteByRoomId(roomId); // Xóa ghế cũ
 
         String[] rowLabels = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"};
@@ -64,6 +71,10 @@ public class SeatService {
     }
 
     public List<Seat> saveSeats(String roomId, List<Seat> seats) {
+        return admission.write(() -> saveSeatsInternal(roomId, seats));
+    }
+
+    private List<Seat> saveSeatsInternal(String roomId, List<Seat> seats) {
         seatRepository.deleteByRoomId(roomId);
         for (Seat s : seats) {
             s.setRoomId(roomId);

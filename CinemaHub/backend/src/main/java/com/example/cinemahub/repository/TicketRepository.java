@@ -9,6 +9,7 @@ import java.util.Optional;
 
 @Repository
 public interface TicketRepository extends MongoRepository<Ticket, String> {
+    Optional<Ticket> findByQrCode(String qrCode);
     Optional<Ticket> findByBookingReference(String bookingReference);
     Optional<Ticket> findByBookingId(String bookingId);
     List<Ticket> findByShowtimeId(String showtimeId);

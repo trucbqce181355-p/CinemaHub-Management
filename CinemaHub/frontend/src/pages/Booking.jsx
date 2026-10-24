@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -7,9 +7,10 @@ import {
   RefreshCw, X, Sparkles, CreditCard, Heart, ArrowLeft, Printer
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTicketQrValue } from '../utils/ticketQr';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
 const Booking = () => {
   const [searchParams] = useSearchParams();
@@ -52,7 +53,11 @@ const Booking = () => {
   // Customer & Payment Info
   const [customerName, setCustomerName] = useState(user?.name || user?.username || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [customerPhone, setCustomerPhone] = useState(user?.phone || '0912345678');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
+  const [contactErrors, setContactErrors] = useState({});
+  const customerNameInput = useRef(null);
+  const customerPhoneInput = useRef(null);
+  const paymentInFlight = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [gatewayReady, setGatewayReady] = useState(null);
   useEffect(() => {
@@ -514,19 +519,37 @@ const Booking = () => {
 
   // Step 3: Confirm Booking (Customer Online)
   const handleConfirmBooking = async () => {
-    if (!activeBooking) return;
-    setIsProcessing(true);
+    if (paymentInFlight.current) return;
     setErrorMessage('');
-
+    if (!activeBooking) {
+      setErrorMessage('Không tìm thấy phiên giữ ghế. Vui lòng chọn lại ghế.');
+      return;
+    }
+    const errors = {};
+    if (!customerName.trim()) errors.customerName = 'Vui lòng nhập tên người nhận vé.';
+    if (!customerPhone.trim()) errors.customerPhone = 'Vui lòng nhập số điện thoại nhận vé trước khi chuyển tới VNPAY.';
+    setContactErrors(errors);
+    if (Object.keys(errors).length) {
+      const input = errors.customerName ? customerNameInput.current : customerPhoneInput.current;
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    paymentInFlight.current = true;
+    setIsProcessing(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const finalCustomerName = (customerName && customerName.trim()) || user?.name || user?.username || 'Khách Hàng';
-      const finalCustomerPhone = (customerPhone && customerPhone.trim()) || user?.phone || '0912345678';
-      const finalCustomerEmail = (customerEmail && customerEmail.trim()) || user?.email || activeBooking?.customerEmail || 'customer@cinemahub.com';
+      if (!user?.token) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+
+      const finalCustomerName = customerName.trim();
+      const finalCustomerEmail = customerEmail.trim() || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
+      const finalCustomerPhone = customerPhone.trim();
 
       // If user selected VNPAY payment gateway, redirect to VNPAY Sandbox
       if (paymentMethod === 'VNPAY') {
         const vnpRes = await fetch(`${API_BASE}/payment/create-vnpay-url`, {
-          method: 'POST',
+          method: 'POST', signal: controller.signal,
           headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({
             bookingId: activeBooking.id,
@@ -538,9 +561,12 @@ const Booking = () => {
           })
         });
 
-        const vnpData = await vnpRes.json();
+        const vnpData = await vnpRes.json().catch(() => ({}));
+        if (vnpRes.status === 401 || vnpRes.status === 403) {
+          throw new Error(vnpData.error || 'Phiên đăng nhập không hợp lệ hoặc bạn không có quyền thanh toán đơn này. Vui lòng đăng nhập lại.');
+        }
         if (!vnpRes.ok || !vnpData.paymentUrl) {
-          throw new Error(vnpData.message || vnpData.error || 'Khởi tạo thanh toán VNPAY thất bại');
+          throw new Error(vnpData.error || vnpData.message || 'Không tạo được liên kết VNPAY. Vui lòng thử lại.');
         }
 
         // Redirect directly to VNPAY Sandbox payment gateway
@@ -550,8 +576,12 @@ const Booking = () => {
 
       throw new Error('Phương thức này chưa được tích hợp. Vui lòng chọn VNPay.');
     } catch (err) {
-      setErrorMessage(err.message);
+      setErrorMessage(err.name === 'AbortError'
+        ? 'Máy chủ phản hồi quá lâu. Vui lòng thử chuyển VNPAY lại.'
+        : err instanceof TypeError ? 'Không kết nối được máy chủ thanh toán. Vui lòng kiểm tra kết nối và thử lại.' : err.message);
     } finally {
+      clearTimeout(timeout);
+      paymentInFlight.current = false;
       setIsProcessing(false);
     }
   };
@@ -663,7 +693,7 @@ const Booking = () => {
           <div className="flex items-center gap-3">
             {isStaffOrAdmin && (
               <button
-                onClick={() => setIsCounterMode(!isCounterMode)}
+                onClick={() => { setIsCounterMode(!isCounterMode); setPaymentMethod(isCounterMode ? 'VNPAY' : 'CASH'); }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${isCounterMode
                     ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
                     : 'bg-white/10 text-gray-300 hover:bg-white/20 border-white/10'
@@ -699,7 +729,7 @@ const Booking = () => {
         </div>
 
         {/* Error Notification */}
-        {errorMessage && (
+        {errorMessage && currentStep !== 3 && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-between text-sm animate-fade-in">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 shrink-0" />
@@ -1140,24 +1170,30 @@ const Booking = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Tên người nhận vé:</label>
+                      <label htmlFor="booking-customer-name" className="text-xs text-gray-400 mb-1 block">Tên người nhận vé: <span className="text-primary">*</span></label>
                       <input
+                        ref={customerNameInput} id="booking-customer-name" required maxLength={120}
+                        aria-invalid={Boolean(contactErrors.customerName)} aria-describedby={contactErrors.customerName ? 'booking-customer-name-error' : undefined}
                         type="text"
                         placeholder="Họ tên người nhận"
                         value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        onChange={(e) => { setCustomerName(e.target.value); setContactErrors(prev => ({ ...prev, customerName: '' })); }}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-primary"
                       />
+                      {contactErrors.customerName && <p id="booking-customer-name-error" role="alert" className="text-xs text-red-400 mt-2">{contactErrors.customerName}</p>}
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Số điện thoại nhận SMS:</label>
+                      <label htmlFor="booking-customer-phone" className="text-xs text-gray-400 mb-1 block">Số điện thoại nhận SMS: {!isCounterMode && <span className="text-primary">*</span>}</label>
                       <input
+                        ref={customerPhoneInput} id="booking-customer-phone" required={!isCounterMode} maxLength={32}
+                        aria-invalid={Boolean(contactErrors.customerPhone)} aria-describedby={contactErrors.customerPhone ? 'booking-customer-phone-error' : undefined}
                         type="tel"
                         placeholder="VD: 0912345678"
                         value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        onChange={(e) => { setCustomerPhone(e.target.value); setContactErrors(prev => ({ ...prev, customerPhone: '' })); }}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-primary"
                       />
+                      {contactErrors.customerPhone && <p id="booking-customer-phone-error" role="alert" className="text-xs text-red-400 mt-2">{contactErrors.customerPhone}</p>}
                     </div>
                   </div>
                 </div>
@@ -1197,10 +1233,13 @@ const Booking = () => {
                     <CreditCard className="w-5 h-5 text-primary" /> Chọn Cổng Thanh Toán
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
+                    {(isCounterMode ? [
+                      { id: 'CASH', name: 'Tiền Mặt (CASH)', desc: 'Đã thu tiền trực tiếp tại quầy' },
+                      { id: 'CARD', name: 'Thẻ tại quầy', desc: 'Đã xác nhận thanh toán qua máy POS' },
+                      { id: 'TRANSFER', name: 'Chuyển khoản', desc: 'Đã xác nhận nhận đủ tiền chuyển khoản' },
+                    ] : [
                       { id: 'VNPAY', name: 'Cổng VNPAY', desc: 'Chuyển sang VNPay để chọn phương thức thanh toán' },
-                      ...(isCounterMode ? [{ id: 'CASH', name: 'Tiền Mặt (CASH)', desc: 'Thu tiền trực tiếp tại quầy' }] : [])
-                    ].map(pm => {
+                    ]).map(pm => {
                       const isSelected = paymentMethod === pm.id;
                       return (
                         <div
@@ -1280,17 +1319,13 @@ const Booking = () => {
                     </div>
                   </div>
 
-                  {/* Nút hành động */}
+                  {errorMessage && <p role="alert" className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">{errorMessage}</p>}
+                  {!isCounterMode && (contactErrors.customerName || contactErrors.customerPhone) &&
+                    <p role="alert" className="text-sm text-red-400">Vui lòng bổ sung thông tin người nhận được đánh dấu trước khi thanh toán.</p>}
+                  {!isCounterMode && gatewayReady === false &&
+                    <p role="alert" className="text-sm text-amber-400">Cổng VNPAY chưa được cấu hình. Vui lòng liên hệ quản trị viên.</p>}
 
-                  {errorMessage && (
-                    <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between gap-2.5 animate-fade-in">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
-                        <span>{errorMessage}</span>
-                      </div>
-                      <button onClick={() => setErrorMessage('')}><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  )}
+                  {/* Nút hành động */}
 
                   {isCounterMode ? (
                     <button
@@ -1304,7 +1339,7 @@ const Booking = () => {
                   ) : (
                     <button
                       onClick={handleConfirmBooking}
-                      disabled={isProcessing}
+                      disabled={isProcessing || gatewayReady === false}
                       className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
@@ -1359,7 +1394,7 @@ const Booking = () => {
                 {/* QR Code Section */}
                 <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner text-black">
                   <QRCodeSVG
-                    value={confirmedData.ticket?.qrCode || confirmedData.qrCode || `CINEMAHUB|${confirmedData.bookingReference || confirmedData.booking?.bookingReference}`}
+                    value={getTicketQrValue(confirmedData.ticket)}
                     size={190}
                     level="H"
                     includeMargin={true}

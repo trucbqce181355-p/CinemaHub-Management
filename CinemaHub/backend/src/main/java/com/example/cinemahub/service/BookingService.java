@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
+    @Autowired
+    private AdmissionCoordinator admission;
 
     public static final int HOLD_DURATION_MINUTES = 10;
     @org.springframework.beans.factory.annotation.Value("${booking.hold-seconds:600}")
@@ -143,6 +145,10 @@ public class BookingService {
 
     // 2. Temporarily Hold Seats
     public Booking holdSeats(HoldSeatRequest req, String userId) {
+        return admission.write(() -> holdSeatsInternal(req, userId));
+    }
+
+    private Booking holdSeatsInternal(HoldSeatRequest req, String userId) {
         if (userId == null || userId.isBlank() || "anonymousUser".equals(userId))
             throw new RuntimeException("Vui lòng đăng nhập để giữ ghế");
         if (req.getSeatIds() == null || req.getSeatIds().isEmpty()
@@ -384,6 +390,10 @@ public class BookingService {
     }
 
     public Map<String, Object> issuePaidTicket(String bookingId) {
+        return admission.write(() -> issuePaidTicketInternal(bookingId));
+    }
+
+    private Map<String, Object> issuePaidTicketInternal(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn"));
         if (!"CONFIRMED".equals(booking.getStatus()) || booking.getPayment() == null
@@ -453,6 +463,10 @@ public class BookingService {
 
     // 7. Cancel Booking
     public Booking cancelBooking(String bookingId, String reason) {
+        return admission.write(() -> cancelBookingInternal(bookingId, reason));
+    }
+
+    private Booking cancelBookingInternal(String bookingId, String reason) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt chỗ"));
 
@@ -517,10 +531,29 @@ public class BookingService {
 
     // 8. Staff Create Booking At Counter
     public Map<String, Object> createCounterBooking(CounterBookingRequest req, String staffId) {
+        return admission.write(() -> createCounterBookingInternal(req, staffId));
+    }
+
+    private Map<String, Object> createCounterBookingInternal(CounterBookingRequest req, String staffId) {
         Showtime showtime = showtimeRepository.findById(req.getShowtimeId())
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không tồn tại"));
 
         LocalDateTime now = LocalDateTime.now();
+
+        if (!"Active".equalsIgnoreCase(showtime.getStatus()) || showtime.getStartTime() == null
+                || showtime.getEndTime() == null || !showtime.getEndTime().isAfter(showtime.getStartTime())
+                || !now.isBefore(showtime.getEndTime())) throw new RuntimeException("Suất chiếu không còn bán vé");
+        if (req.getSeatIds() == null || req.getSeatIds().isEmpty()
+                || req.getSeatIds().stream().anyMatch(id -> id == null || id.isBlank())
+                || new HashSet<>(req.getSeatIds()).size() != req.getSeatIds().size())
+            throw new RuntimeException("Danh sách ghế rỗng, không hợp lệ hoặc bị trùng");
+        if (!Set.of("CASH", "CARD", "TRANSFER").contains(Objects.toString(req.getPaymentMethod(), "")))
+            throw new RuntimeException("Vé tại quầy phải có thanh toán CASH, CARD hoặc TRANSFER đã xác nhận");
+        ScreenRoom room = showtime.getRoomId() == null ? null : mongo.findById(showtime.getRoomId(), ScreenRoom.class);
+        Cinema cinema = showtime.getCinemaId() == null ? null : mongo.findById(showtime.getCinemaId(), Cinema.class);
+        if (room == null || cinema == null || !"Active".equalsIgnoreCase(room.getStatus())
+                || !"Active".equalsIgnoreCase(cinema.getStatus()) || !Objects.equals(room.getCinemaId(), cinema.getId()))
+            throw new RuntimeException("Rạp hoặc phòng chiếu không hoạt động");
 
         // Check seat conflicts
         List<Booking> activeBookings = bookingRepository.findByShowtimeIdAndStatusIn(
@@ -551,8 +584,11 @@ public class BookingService {
         List<Booking.BookedSeat> seatList = new ArrayList<>();
         double subtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
-            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
-            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
+            List<Seat> matches = actualSeats.stream().filter(s -> seatId.equals(s.getSeatNumber())).toList();
+            if (matches.size() != 1 || !"ACTIVE".equalsIgnoreCase(matches.get(0).getStatus()))
+                throw new RuntimeException("Ghế " + seatId + " không tồn tại hoặc không hoạt động");
+            Seat seat = matches.get(0);
+            String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType);
             subtotal += price;
 
@@ -577,6 +613,7 @@ public class BookingService {
         String reference = generateBookingReference();
 
         Booking booking = Booking.builder()
+                .id(UUID.randomUUID().toString())
                 .bookingReference(reference)
                 .customerName(req.getCustomerName())
                 .customerPhone(req.getCustomerPhone())
@@ -608,6 +645,7 @@ public class BookingService {
         // Create Ticket immediately
         Ticket ticket = new Ticket();
         ticket.setBookingReference(reference);
+        ticket.setBookingId(booking.getId());
         ticket.setShowtimeId(showtime.getId());
         ticket.setCinemaId(showtime.getCinemaId());
         ticket.setRoomId(showtime.getRoomId());
@@ -665,14 +703,14 @@ public class BookingService {
     // 10. View Booking Details
     public Map<String, Object> getBookingDetails(String idOrRef) {
         Booking booking = bookingRepository.findById(idOrRef)
-                .or(() -> bookingRepository.findByBookingReference(idOrRef))
+                .or(() -> uniqueReference(idOrRef, Booking.class))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt vé: " + idOrRef));
 
         Ticket ticket = null;
         if (booking.getTicketId() != null) {
             ticket = ticketRepository.findById(booking.getTicketId()).orElse(null);
         } else {
-            ticket = ticketRepository.findByBookingReference(booking.getBookingReference()).orElse(null);
+            ticket = uniqueReference(booking.getBookingReference(), Ticket.class).orElse(null);
         }
 
         Map<String, Object> res = new HashMap<>();
@@ -683,14 +721,12 @@ public class BookingService {
 
     // 11. Check Booking Status
     public Map<String, Object> getBookingStatus(String bookingReference) {
-        Booking booking = bookingRepository.findByBookingReference(bookingReference)
+        Booking booking = uniqueReference(bookingReference, Booking.class)
                 .orElseThrow(() -> new RuntimeException("Mã đặt vé không tồn tại: " + bookingReference));
 
-        Ticket ticket = ticketRepository.findByBookingReference(bookingReference).orElse(null);
-        boolean isCheckedIn = false;
-        if (ticket != null && ticket.getSeats() != null) {
-            isCheckedIn = ticket.getSeats().stream().allMatch(s -> "Used".equalsIgnoreCase(s.getUsageStatus()));
-        }
+        Ticket ticket = booking.getTicketId() != null ? ticketRepository.findById(booking.getTicketId()).orElse(null)
+                : uniqueReference(bookingReference, Ticket.class).orElse(null);
+        TicketUsage.State usage = TicketUsage.state(booking, ticket);
 
         Map<String, Object> res = new HashMap<>();
         res.put("bookingReference", booking.getBookingReference());
@@ -700,12 +736,23 @@ public class BookingService {
         res.put("roomName", booking.getRoomName());
         res.put("showtimeStart", booking.getShowtimeStart());
         res.put("seats",
-                booking.getSeats().stream().map(Booking.BookedSeat::getSeatNumber).collect(Collectors.toList()));
+                booking.getSeats() == null ? List.of() : booking.getSeats().stream().filter(Objects::nonNull).map(Booking.BookedSeat::getSeatNumber).collect(Collectors.toList()));
         res.put("totalAmount", booking.getTotalAmount());
-        res.put("isCheckedIn", isCheckedIn);
+        res.put("isCheckedIn", usage == TicketUsage.State.USED);
+        res.put("isPartiallyCheckedIn", usage == TicketUsage.State.PARTIALLY_USED);
+        res.put("usageStatus", usage.name());
         res.put("bookingType", booking.getBookingType());
         res.put("ticketId", booking.getTicketId());
         return res;
+    }
+
+    private <T> Optional<T> uniqueReference(String reference, Class<T> type) {
+        var query = org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("bookingReference").is(reference)).limit(2);
+        List<T> matches = mongo.find(query, type);
+        if (matches.size() > 1) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "Mã đặt chỗ bị trùng. Vui lòng tra cứu bằng ID.");
+        return matches.stream().findFirst();
     }
 
     // --- Helper Methods ---
@@ -754,7 +801,7 @@ public class BookingService {
 
     private String generateBookingReference() {
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
-        String randomStr = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        String randomStr = UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT);
         return "CH-" + dateStr + "-" + randomStr;
     }
 

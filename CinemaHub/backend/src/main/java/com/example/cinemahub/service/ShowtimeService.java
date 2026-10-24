@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class ShowtimeService {
+    @Autowired
+    private AdmissionCoordinator admission;
 
     @Autowired
     private ShowtimeRepository showtimeRepository;
@@ -77,6 +79,10 @@ public class ShowtimeService {
     }
 
     public Showtime createShowtime(Showtime showtime) throws Exception {
+        return admission.writeChecked(() -> createShowtimeInternal(showtime));
+    }
+
+    private Showtime createShowtimeInternal(Showtime showtime) throws Exception {
         validateShowtime(showtime, null);
         if (showtime.getStatus() == null) {
             showtime.setStatus("Active");
@@ -85,6 +91,10 @@ public class ShowtimeService {
     }
 
     public Showtime updateShowtime(String id, Showtime updated) throws Exception {
+        return admission.writeChecked(() -> updateShowtimeInternal(id, updated));
+    }
+
+    private Showtime updateShowtimeInternal(String id, Showtime updated) throws Exception {
         Showtime existing = getShowtimeById(id);
         
         validateShowtime(updated, id);
@@ -108,12 +118,20 @@ public class ShowtimeService {
     }
 
     public Showtime updateStatus(String id, String status) throws Exception {
+        return admission.writeChecked(() -> updateStatusInternal(id, status));
+    }
+
+    private Showtime updateStatusInternal(String id, String status) throws Exception {
         Showtime existing = getShowtimeById(id);
         existing.setStatus(status);
         return showtimeRepository.save(existing);
     }
 
     public void deleteShowtime(String id) {
+        admission.write(() -> deleteShowtimeInternal(id));
+    }
+
+    private void deleteShowtimeInternal(String id) {
         showtimeRepository.deleteById(id);
     }
 
