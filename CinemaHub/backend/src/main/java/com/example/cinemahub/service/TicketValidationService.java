@@ -34,14 +34,44 @@ public class TicketValidationService {
     private Clock clock = Clock.systemDefaultZone();
 
     public Ticket verifyTicket(String rawCode) {
-        return admission.read(() -> validateTicket(rawCode));
+        return admission.read(() -> validateTicket(rawCode, null));
     }
 
     public Ticket checkInTicket(String rawCode) {
-        return admission.write(() -> checkInValidated(rawCode));
+        return admission.write(() -> checkInValidated(rawCode, null).ticket());
     }
 
-    private Ticket validateTicket(String rawCode) {
+    public record CheckedTicket(Ticket ticket, Showtime showtime) {}
+
+    /** HTTP admission must always bind the scanned ticket to an explicit screening. */
+    public CheckedTicket verifyForShowtime(String rawCode, String expectedShowtimeId) {
+        return admission.read(() -> {
+            String expected = requireShowtimeContext(expectedShowtimeId);
+            Ticket ticket = validateTicket(rawCode, expected);
+            return new CheckedTicket(ticket, currentShowtime(ticket));
+        });
+    }
+
+    public CheckedTicket checkInForShowtime(String rawCode, String expectedShowtimeId) {
+        return admission.write(() -> {
+            String expected = requireShowtimeContext(expectedShowtimeId);
+            return checkInValidated(rawCode, expected);
+        });
+    }
+
+    public Showtime currentShowtime(Ticket ticket) {
+        return admission.read(() -> showtimes.findById(ticket.getShowtimeId()).orElse(null));
+    }
+
+    private String requireShowtimeContext(String id) {
+        if (id == null || id.isBlank()) throw failure(HttpStatus.BAD_REQUEST, "SHOWTIME_REQUIRED", "Vui lòng chọn suất chiếu đang soát vé.");
+        String expected = id.trim();
+        if (expected.length() > 128 || expected.chars().anyMatch(Character::isISOControl))
+            throw failure(HttpStatus.BAD_REQUEST, "INVALID_SHOWTIME_CONTEXT", "Mã suất chiếu đang soát không hợp lệ.");
+        return expected;
+    }
+
+    private Ticket validateTicket(String rawCode, String expectedShowtimeId) {
         String code = rawCode == null ? "" : rawCode.trim();
         if (code.isEmpty() || code.length() > 512 || code.chars().anyMatch(Character::isISOControl)) {
             throw failure(HttpStatus.BAD_REQUEST, "INVALID_CODE", "Vui lòng nhập hoặc quét mã vé hợp lệ.");
@@ -58,6 +88,10 @@ public class TicketValidationService {
             ticket = tickets.findById(code).orElseThrow(this::notFound);
         } else {
             throw failure(HttpStatus.BAD_REQUEST, "INVALID_CODE", "Mã vé không đúng định dạng.");
+        }
+
+        if (expectedShowtimeId != null && !expectedShowtimeId.equals(ticket.getShowtimeId())) {
+            throw failure(HttpStatus.CONFLICT, "SHOWTIME_MISMATCH", "Vé không thuộc suất chiếu đang soát. Vui lòng kiểm tra lại suất chiếu, phòng và rạp.");
         }
 
         if (!"Paid".equals(ticket.getStatus()) && !"Used".equals(ticket.getStatus())) {
@@ -80,11 +114,11 @@ public class TicketValidationService {
         return ticket;
     }
 
-    private Ticket checkInValidated(String rawCode) {
-        Ticket ticket = validateTicket(rawCode);
+    private CheckedTicket checkInValidated(String rawCode, String expectedShowtimeId) {
+        Ticket ticket = validateTicket(rawCode, expectedShowtimeId);
         LocalDateTime now = LocalDateTime.now(clock);
         // Dependency checks can take time; enforce the closing boundary again at claim time.
-        validateShowtime(ticket, now);
+        Showtime showtime = validateShowtime(ticket, now);
         Ticket.ScanMetadata scan = new Ticket.ScanMetadata();
         scan.setScannedAt(now.toString());
         scan.setScannedByGate(gate);
@@ -100,7 +134,8 @@ public class TicketValidationService {
                 .filterArray(Criteria.where("unused.usageStatus").is("Unused"));
         Ticket checkedIn = mongo.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), Ticket.class);
-        if (checkedIn != null) return checkedIn;
+        // Build the response from the validated snapshot; no fallible read after committing admission.
+        if (checkedIn != null) return new CheckedTicket(checkedIn, showtime);
 
         Ticket latest = tickets.findById(ticket.getId()).orElseThrow(this::notFound);
         if (TicketUsage.state(latest) == TicketUsage.State.USED

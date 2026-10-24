@@ -21,6 +21,8 @@ C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\s
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\CounterBookingRequest.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\HoldSeatRequest.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\SeatAvailabilityDTO.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\dto\TicketCheckInRequest.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\exception\TicketCheckInException.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Booking.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Cinema.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\model\Movie.java
@@ -45,6 +47,7 @@ C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\s
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\repository\UserRepository.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtFilter.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\security\JwtUtil.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\AdmissionCoordinator.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\BookingService.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\CinemaService.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\EmailService.java
@@ -55,5 +58,6 @@ C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\s
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ScreenRoomService.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\SeatService.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\ShowtimeService.java
+C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\TicketUsage.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\TicketValidationService.java
 C:\Users\Chill An\Documents\FA26\WDP301\CinemaHub-Management\CinemaHub\backend\src\main\java\com\example\cinemahub\service\VnPayService.java

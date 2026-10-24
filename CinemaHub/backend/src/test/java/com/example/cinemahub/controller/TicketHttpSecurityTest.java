@@ -25,15 +25,24 @@ class TicketHttpSecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean TicketValidationService service;
 
+    private String body(String code) {
+        return "{\"code\":\"" + code + "\",\"expectedShowtimeId\":\"showtime\"}";
+    }
+
+    private TicketValidationService.CheckedTicket checked(Ticket ticket) {
+        var showtime = new com.example.cinemahub.model.Showtime(); showtime.setId("showtime");
+        return new TicketValidationService.CheckedTicket(ticket, showtime);
+    }
+
     @Test void anonymousCannotCheckIn() throws Exception {
-        mvc.perform(post("/api/tickets/check-in").contentType("application/json").content("{\"code\":\"ticket\"}"))
+        mvc.perform(post("/api/tickets/check-in").contentType("application/json").content(body("ticket")))
                 .andExpect(status().is4xxClientError());
         verifyNoInteractions(service);
     }
 
     @Test void customerCannotUseEitherCheckInEndpoint() throws Exception {
         mvc.perform(post("/api/tickets/check-in").with(user("customer").roles("Customer"))
-                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .contentType("application/json").content(body("ticket")))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/tickets/check-in/ticket").with(user("customer").roles("Customer")))
                 .andExpect(status().isForbidden());
@@ -44,25 +53,25 @@ class TicketHttpSecurityTest {
     void staffRolesCanSubmitTheCompleteQr(String role) throws Exception {
         String qr = "CINEMAHUB|COUNTER|CH-261020-ABCD|random-token";
         Ticket t = new Ticket(); t.setId("ticket"); t.setStatus("Used");
-        when(service.checkInTicket(qr)).thenReturn(t);
+        when(service.checkInForShowtime(qr, "showtime")).thenReturn(checked(t));
         mvc.perform(post("/api/tickets/check-in").with(user("employee").roles(role))
-                .contentType("application/json").content("{\"code\":\"" + qr + "\"}"))
+                .contentType("application/json").content(body(qr)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("CHECKED_IN"))
                 .andExpect(jsonPath("$.ticket.status").value("Used"));
-        verify(service).checkInTicket(qr);
+        verify(service).checkInForShowtime(qr, "showtime");
     }
 
     @Test void legacyIdEndpointStillWorks() throws Exception {
         Ticket t = new Ticket(); t.setId("PAY-ticket");
-        when(service.checkInTicket("PAY-ticket")).thenReturn(t);
-        mvc.perform(post("/api/tickets/check-in/PAY-ticket").with(user("employee").roles("Staff")))
+        when(service.checkInForShowtime("PAY-ticket", "showtime")).thenReturn(checked(t));
+        mvc.perform(post("/api/tickets/check-in/PAY-ticket").param("expectedShowtimeId", "showtime").with(user("employee").roles("Staff")))
                 .andExpect(status().isOk());
     }
 
     @Test void blankAndOversizedCodesAreRejectedBeforeLookup() throws Exception {
         for (String code : new String[]{"", "  ", "X".repeat(513)}) {
             mvc.perform(post("/api/tickets/check-in").with(user("employee").roles("Staff"))
-                    .contentType("application/json").content("{\"code\":\"" + code + "\"}"))
+                    .contentType("application/json").content(body(code)))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CODE"));
         }
         verifyNoInteractions(service);
@@ -70,19 +79,19 @@ class TicketHttpSecurityTest {
 
     @Test void duplicateScanHasAStableErrorCodeAndExistingTicket() throws Exception {
         Ticket t = new Ticket(); t.setId("ticket"); t.setStatus("Used");
-        when(service.checkInTicket("ticket")).thenThrow(new TicketCheckInException(
+        when(service.checkInForShowtime("ticket", "showtime")).thenThrow(new TicketCheckInException(
                 HttpStatus.CONFLICT, "ALREADY_CHECKED_IN", "Already checked in", t));
         mvc.perform(post("/api/tickets/check-in").with(user("employee").roles("Staff"))
-                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .contentType("application/json").content(body("ticket")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_CHECKED_IN"))
                 .andExpect(jsonPath("$.ticket.id").value("ticket"));
     }
 
     @Test void verifyEndpointRejectsAnonymousAndCustomer() throws Exception {
-        mvc.perform(post("/api/tickets/verify").contentType("application/json").content("{\"code\":\"ticket\"}"))
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(body("ticket")))
                 .andExpect(status().is4xxClientError());
         mvc.perform(post("/api/tickets/verify").with(user("customer").roles("Customer"))
-                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .contentType("application/json").content(body("ticket")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(service);
     }
@@ -91,23 +100,42 @@ class TicketHttpSecurityTest {
     void staffCanVerifyWithoutInvokingCheckIn(String role) throws Exception {
         Ticket t = new Ticket(); t.setId("ticket"); t.setStatus("Paid");
         t.setSeats(java.util.List.of(new Ticket.SeatStatus("A1", "A1", "Unused")));
-        when(service.verifyTicket("ticket")).thenReturn(t);
+        when(service.verifyForShowtime("ticket", "showtime")).thenReturn(checked(t));
         mvc.perform(post("/api/tickets/verify").with(user("employee").roles(role))
-                .contentType("application/json").content("{\"code\":\"ticket\"}"))
+                .contentType("application/json").content(body("ticket")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.code").value("TICKET_VALID"))
                 .andExpect(jsonPath("$.usageStatus").value("UNUSED"))
                 .andExpect(jsonPath("$.canCheckIn").value(true))
                 .andExpect(jsonPath("$.ticket.status").value("Paid"));
-        verify(service).verifyTicket("ticket"); verify(service, never()).checkInTicket(anyString());
+        verify(service).verifyForShowtime("ticket", "showtime");
+        verify(service, never()).checkInForShowtime(anyString(), anyString());
     }
 
     @Test void invalidVerifyPayloadIsRejectedBeforeLookup() throws Exception {
         for (String code : new String[]{"", "  ", "X".repeat(513)}) {
             mvc.perform(post("/api/tickets/verify").with(user("employee").roles("Staff"))
-                    .contentType("application/json").content("{\"code\":\"" + code + "\"}"))
+                    .contentType("application/json").content(body(code)))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CODE"));
         }
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"verify", "check-in"})
+    void missingBlankOrOversizedScreeningContextIsRejectedBeforeLookup(String endpoint) throws Exception {
+        for (String content : new String[]{"{\"code\":\"ticket\"}",
+                "{\"code\":\"ticket\",\"expectedShowtimeId\":\"  \"}",
+                "{\"code\":\"ticket\",\"expectedShowtimeId\":\"" + "X".repeat(129) + "\"}"}) {
+            mvc.perform(post("/api/tickets/" + endpoint).with(user("employee").roles("Staff"))
+                    .contentType("application/json").content(content)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.canCheckIn").value(false));
+        }
+        verifyNoInteractions(service);
+    }
+
+    @Test void legacyEndpointCannotBypassMissingScreeningContext() throws Exception {
+        mvc.perform(post("/api/tickets/check-in/ticket").with(user("employee").roles("Staff")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SHOWTIME_REQUIRED"));
         verifyNoInteractions(service);
     }
 }

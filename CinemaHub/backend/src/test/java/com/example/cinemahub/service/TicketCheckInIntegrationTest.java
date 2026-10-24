@@ -77,6 +77,7 @@ class TicketCheckInIntegrationTest {
         s.setStatus("Active");
         s = showtimes.save(s);
         Ticket t = new Ticket();
+        t.setCreatedAt(now); // MongoDB persists millisecond precision; keep round-trip fixtures deterministic.
         if (!counter) t.setId("PAY-" + UUID.randomUUID());
         t.setBookingReference("CH-261020-ABCD");
         t.setShowtimeId(s.getId());
@@ -120,7 +121,7 @@ class TicketCheckInIntegrationTest {
         Ticket t = ticket(false);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
                 .standaloneSetup(new TicketController(service)).build();
-        String body = "{\"code\":\"" + t.getQrCode() + "\"}";
+        String body = ticketBody(t, t.getShowtimeId());
         mvc.perform(post("/api/tickets/check-in").contentType("application/json").content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("CHECKED_IN"))
                 .andExpect(jsonPath("$.ticket.status").value("Used"));
@@ -132,6 +133,49 @@ class TicketCheckInIntegrationTest {
 
     @Test void counterQrChecksInObjectIdTicket() {
         assertCheckedIn(service.checkInTicket(ticket(true).getQrCode()));
+    }
+
+    @Test void confirmationDoesNotReadShowtimeAfterTheAdmissionWrite() throws Exception {
+        Ticket t = ticket(false);
+        var repository = org.mockito.Mockito.mock(ShowtimeRepository.class);
+        var committed = new java.util.concurrent.atomic.AtomicBoolean();
+        org.mockito.Mockito.when(repository.findById(t.getShowtimeId())).thenAnswer(invocation -> {
+            if (committed.get()) throw new org.springframework.dao.DataAccessResourceFailureException("read unavailable after commit");
+            return showtimes.findById(t.getShowtimeId());
+        });
+        MongoTemplate observed = org.mockito.Mockito.spy(mongo);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Object result = invocation.callRealMethod(); committed.set(true); return result;
+        }).when(observed).findAndModify(org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.query.Query.class),
+                org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.query.UpdateDefinition.class),
+                org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), org.mockito.ArgumentMatchers.eq(Ticket.class));
+        var checking = new TicketValidationService(tickets, repository, observed, admission);
+        ReflectionTestUtils.setField(checking, "clock", Clock.fixed(now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(checking)).build();
+        mvc.perform(post("/api/tickets/check-in").contentType("application/json").content(ticketBody(t, t.getShowtimeId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("CHECKED_IN"))
+                .andExpect(jsonPath("$.showtime.id").value(t.getShowtimeId()));
+        assertTrue(committed.get()); assertCheckedIn(tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void lostWriteReplyCanBeRecoveredByVerificationWithoutOverwritingAdmission() {
+        Ticket t = ticket(false);
+        MongoTemplate observed = org.mockito.Mockito.spy(mongo);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertNotNull(invocation.callRealMethod());
+            throw new org.springframework.dao.DataAccessResourceFailureException("reply lost after real write");
+        }).when(observed).findAndModify(org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.query.Query.class),
+                org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.query.UpdateDefinition.class),
+                org.mockito.ArgumentMatchers.any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), org.mockito.ArgumentMatchers.eq(Ticket.class));
+        var checking = new TicketValidationService(tickets, showtimes, observed, admission);
+        ReflectionTestUtils.setField(checking, "clock", Clock.fixed(now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
+                () -> checking.checkInForShowtime(t.getQrCode(), t.getShowtimeId()));
+        Ticket committed = tickets.findById(t.getId()).orElseThrow(); assertCheckedIn(committed);
+        var recovered = assertThrows(TicketCheckInException.class, () -> service.verifyForShowtime(t.getQrCode(), t.getShowtimeId()));
+        assertEquals("ALREADY_CHECKED_IN", recovered.getCode());
+        assertEquals(committed, tickets.findById(t.getId()).orElseThrow());
+        assertEquals(committed.getSeats(), recovered.getTicket().getSeats());
     }
 
     @Test void legacyDocumentIdIsAccepted() {
@@ -299,7 +343,7 @@ class TicketCheckInIntegrationTest {
     @Test void verifyEndpointDoesNotCheckInAndConfirmationRevalidates() throws Exception {
         Ticket t = ticket(false);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
-        String body = "{\"code\":\"" + t.getQrCode() + "\"}";
+        String body = ticketBody(t, t.getShowtimeId());
         mvc.perform(post("/api/tickets/verify").contentType("application/json").content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.code").value("TICKET_VALID")).andExpect(jsonPath("$.ticket.status").value("Paid"));
@@ -583,7 +627,7 @@ class TicketCheckInIntegrationTest {
         t.getSeats().get(0).setScanMetadata(previous); tickets.save(t);
         Ticket before = tickets.findById(t.getId()).orElseThrow();
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
-        String body = "{\"code\":\"" + t.getQrCode() + "\"}";
+        String body = ticketBody(t, t.getShowtimeId());
         mvc.perform(post("/api/tickets/verify").contentType("application/json").content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("TICKET_PARTIALLY_USED"))
                 .andExpect(jsonPath("$.usageStatus").value("PARTIALLY_USED"))
@@ -624,7 +668,7 @@ class TicketCheckInIntegrationTest {
                 TicketValidationService gate = new TicketValidationService(tickets, showtimes, mongo, new AdmissionCoordinator());
                 ReflectionTestUtils.setField(gate, "clock", Clock.fixed(now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
                 start.await(5, TimeUnit.SECONDS);
-                try { gate.checkInTicket(t.getQrCode()); return "CHECKED_IN"; }
+                try { gate.checkInForShowtime(t.getQrCode(), t.getShowtimeId()); return "CHECKED_IN"; }
                 catch (TicketCheckInException ex) { return ex.getCode(); }
             });
             List<String> results = new ArrayList<>();
@@ -632,5 +676,102 @@ class TicketCheckInIntegrationTest {
             assertEquals(1, results.stream().filter("CHECKED_IN"::equals).count());
             assertEquals(count - 1, results.stream().filter("ALREADY_CHECKED_IN"::equals).count());
         } finally { pool.shutdownNow(); }
+    }
+
+    String ticketBody(Ticket ticket, String expectedShowtimeId) {
+        return "{\"code\":\"" + ticket.getQrCode() + "\",\"expectedShowtimeId\":\"" + expectedShowtimeId + "\"}";
+    }
+
+    @Test void twoScreeningsOfTheSameMovieCannotBeInterchangedAtEitherEndpoint() throws Exception {
+        Ticket expected = ticket(false); Ticket other = ticket(true);
+        Showtime first = showtimes.findById(expected.getShowtimeId()).orElseThrow();
+        Showtime second = showtimes.findById(other.getShowtimeId()).orElseThrow();
+        second.setMovieId(first.getMovieId()); showtimes.save(second);
+        Booking secondBooking = booking(other); secondBooking.setMovieId(first.getMovieId()); mongo.save(secondBooking);
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
+        for (String endpoint : List.of("verify", "check-in")) {
+            mvc.perform(post("/api/tickets/" + endpoint).contentType("application/json")
+                    .content(ticketBody(other, expected.getShowtimeId())))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SHOWTIME_MISMATCH"))
+                    .andExpect(jsonPath("$.canCheckIn").value(false));
+        }
+        mvc.perform(post("/api/tickets/check-in/" + other.getId()).param("expectedShowtimeId", expected.getShowtimeId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SHOWTIME_MISMATCH"));
+        assertEquals(other, tickets.findById(other.getId()).orElseThrow());
+        assertEquals(expected, tickets.findById(expected.getId()).orElseThrow());
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(ticketBody(other, other.getShowtimeId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.showtime.id").value(other.getShowtimeId()));
+        mvc.perform(post("/api/tickets/check-in").contentType("application/json").content(ticketBody(other, other.getShowtimeId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("Used"));
+    }
+
+    @Test void queryParameterCannotReplaceTheMandatoryJsonScreeningContext() throws Exception {
+        Ticket t = ticket(false);
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
+        for (String endpoint : List.of("verify", "check-in")) {
+            mvc.perform(post("/api/tickets/" + endpoint).param("expectedShowtimeId", t.getShowtimeId())
+                    .contentType("application/json").content("{\"code\":\"" + t.getQrCode() + "\"}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SHOWTIME_REQUIRED"));
+        }
+        assertEquals(t, tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void rescheduledVerificationReturnsCurrentTimesWithoutRewritingTicketSnapshot() throws Exception {
+        Ticket t = ticket(false); LocalDateTime issuedStart = t.getShowtimeStart();
+        moveShowtime(t, now.plusMinutes(25), now.plusHours(3));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(ticketBody(t, t.getShowtimeId())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.showtime.startTime").value("2026-10-20T19:25:00"))
+                .andExpect(jsonPath("$.showtime.endTime").value("2026-10-20T22:00:00"))
+                .andExpect(jsonPath("$.ticket.showtimeStart").value("2026-10-20T19:10:00"));
+        assertEquals(t, tickets.findById(t.getId()).orElseThrow());
+        var admitted = service.checkInForShowtime(t.getQrCode(), t.getShowtimeId());
+        assertEquals(now.plusMinutes(25), admitted.showtime().getStartTime());
+        assertEquals(issuedStart, admitted.ticket().getShowtimeStart());
+        assertEquals(issuedStart, tickets.findById(t.getId()).orElseThrow().getShowtimeStart());
+    }
+
+    @Test void showtimeChangeAfterVerificationIsCheckedAgainAtConfirmation() {
+        Ticket t = ticket(false);
+        service.verifyForShowtime(t.getQrCode(), t.getShowtimeId());
+        moveShowtime(t, now.plusMinutes(31), now.plusHours(3));
+        assertEquals("CHECK_IN_NOT_OPEN", assertThrows(TicketCheckInException.class,
+                () -> service.checkInForShowtime(t.getQrCode(), t.getShowtimeId())).getCode());
+        assertEquals(t, tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void changingExpectedScreeningAfterVerificationCannotConsumeTheTicket() {
+        Ticket t = ticket(false); Ticket other = ticket(true);
+        service.verifyForShowtime(t.getQrCode(), t.getShowtimeId());
+        assertEquals("SHOWTIME_MISMATCH", assertThrows(TicketCheckInException.class,
+                () -> service.checkInForShowtime(t.getQrCode(), other.getShowtimeId())).getCode());
+        assertEquals(t, tickets.findById(t.getId()).orElseThrow());
+    }
+
+    @Test void usedTicketFromAnotherScreeningReturnsMismatchRatherThanUsedWarning() {
+        Ticket t = ticket(false); Ticket other = ticket(true); service.checkInForShowtime(t.getQrCode(), t.getShowtimeId());
+        assertEquals("SHOWTIME_MISMATCH", assertThrows(TicketCheckInException.class,
+                () -> service.verifyForShowtime(t.getQrCode(), other.getShowtimeId())).getCode());
+        assertEquals("ALREADY_CHECKED_IN", assertThrows(TicketCheckInException.class,
+                () -> service.verifyForShowtime(t.getQrCode(), t.getShowtimeId())).getCode());
+    }
+
+    @Test void historicalUsedTicketCanStillBeInspectedIfItsScreeningWasDeleted() throws Exception {
+        Ticket t = ticket(false); service.checkInForShowtime(t.getQrCode(), t.getShowtimeId()); showtimes.deleteById(t.getShowtimeId());
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new TicketController(service)).build();
+        mvc.perform(post("/api/tickets/verify").contentType("application/json").content(ticketBody(t, t.getShowtimeId())))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_CHECKED_IN"))
+                .andExpect(jsonPath("$.showtime").doesNotExist());
+    }
+
+    @Test void contextValidationRejectsMissingControlCharactersAndOversizedIds() {
+        Ticket t = ticket(false);
+        assertEquals("SHOWTIME_REQUIRED", assertThrows(TicketCheckInException.class,
+                () -> service.verifyForShowtime(t.getQrCode(), null)).getCode());
+        for (String id : List.of("bad\ncontext", "X".repeat(129))) {
+            assertEquals("INVALID_SHOWTIME_CONTEXT", assertThrows(TicketCheckInException.class,
+                    () -> service.checkInForShowtime(t.getQrCode(), id)).getCode());
+        }
+        assertEquals(t, tickets.findById(t.getId()).orElseThrow());
     }
 }
