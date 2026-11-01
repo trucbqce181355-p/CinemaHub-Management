@@ -1,87 +1,46 @@
 package com.example.cinemahub.controller;
-
 import com.example.cinemahub.model.Promotion;
+import com.example.cinemahub.dto.PromotionRequest;
 import com.example.cinemahub.repository.PromotionRepository;
-import com.example.cinemahub.service.PromotionValidationService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.cinemahub.service.*;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-
-@RestController
-@RequestMapping("/api/promotions")
-@CrossOrigin(origins = "*")
+import java.util.*;
+@RestController @RequestMapping("/api/promotions") @RequiredArgsConstructor
 public class PromotionController {
-    @Autowired
-    private PromotionRepository promotionRepository;
-    
-    @Autowired
-    private PromotionValidationService validationService;
-
-    @GetMapping
-    public ResponseEntity<List<Promotion>> getAllPromotions() {
-        return ResponseEntity.ok(promotionRepository.findAll());
+    private final PromotionRepository promotionRepository;
+    private final PromotionValidationService validationService;
+    private final PromotionManagementService management;
+    @GetMapping public List<Promotion> getAllPromotions() { return promotionRepository.findAll(); }
+    public record PublicPromotion(String code, String title, String description, String discountType,
+            Double discountValue, LocalDateTime startDate, LocalDateTime endDate, String bannerImage,
+            Object minSpend, Object maxDiscount) {}
+    @GetMapping("/active") public List<PublicPromotion> getActivePromotions() {
+        return promotionRepository.findActivePromotions(LocalDateTime.now()).stream()
+                .filter(p -> p.getConditions() == null || !p.getConditions().containsKey("redeemedByUserId"))
+                .map(p -> { var c = p.getConditions() == null ? Map.<String,Object>of() : p.getConditions();
+                    return new PublicPromotion(p.getCode(), p.getTitle(), p.getDescription(), p.getDiscountType(),
+                            p.getDiscountValue(), p.getStartDate(), p.getEndDate(), p.getBannerImage(), c.get("minSpend"), c.get("maxDiscount"));
+                }).toList();
     }
-
-    @GetMapping("/active")
-    public ResponseEntity<List<Promotion>> getActivePromotions() {
-        return ResponseEntity.ok(promotionRepository.findActivePromotions(LocalDateTime.now()));
+    @PostMapping public ResponseEntity<Promotion> createPromotion(@Valid @RequestBody PromotionRequest request) {
+        return ResponseEntity.status(201).body(management.create(request.promotion()));
     }
-    
-    @PostMapping
-    public ResponseEntity<?> createPromotion(@RequestBody Promotion promotion) {
-        try {
-            if (promotion.getStatus() == null) promotion.setStatus("Active");
-            Promotion saved = promotionRepository.save(promotion);
-            return ResponseEntity.ok(saved);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+    @PutMapping("/{id}") public Promotion updatePromotion(@PathVariable String id, @Valid @RequestBody PromotionRequest request) {
+        return management.update(id, request.promotion());
     }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updatePromotion(@PathVariable String id, @RequestBody Promotion promotion) {
-        try {
-            return promotionRepository.findById(id).map(existing -> {
-                existing.setCode(promotion.getCode());
-                existing.setTitle(promotion.getTitle());
-                existing.setDescription(promotion.getDescription());
-                existing.setDiscountType(promotion.getDiscountType());
-                existing.setDiscountValue(promotion.getDiscountValue());
-                existing.setStartDate(promotion.getStartDate());
-                existing.setEndDate(promotion.getEndDate());
-                existing.setStatus(promotion.getStatus());
-                existing.setConditions(promotion.getConditions());
-                existing.setBannerImage(promotion.getBannerImage());
-                return ResponseEntity.ok(promotionRepository.save(existing));
-            }).orElse(ResponseEntity.notFound().build());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+    @DeleteMapping("/{id}") public Promotion deletePromotion(@PathVariable String id, @RequestParam(required=false) Long version) {
+        return management.disable(id, version);
     }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePromotion(@PathVariable String id) {
-        try {
-            return promotionRepository.findById(id).map(existing -> {
-                existing.setStatus("Disabled");
-                promotionRepository.save(existing);
-                return ResponseEntity.ok(Map.of("message", "Promotion disabled successfully"));
-            }).orElse(ResponseEntity.notFound().build());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-    
-    @PostMapping("/validate")
-    public ResponseEntity<?> validatePromotion(@RequestBody Map<String, String> body) {
-        try {
-            Promotion promo = validationService.validateCode(body.get("code"));
-            return ResponseEntity.ok(promo);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+    public record CheckRequest(String code, Double subtotal) {}
+    @PostMapping("/validate") public Map<String, Object> validatePromotion(@RequestBody CheckRequest request, Authentication auth) {
+        if (request.subtotal() == null) throw new IllegalArgumentException("Thiếu giá trị đơn hàng");
+        Promotion p = validationService.validateCode(request.code());
+        double discount = validationService.discount(p, request.subtotal(), auth.getName(), null);
+        return Map.of("code", p.getCode(), "discountAmount", discount, "newTotal", Money.vnd(request.subtotal()-discount));
     }
 }

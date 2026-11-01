@@ -52,6 +52,7 @@ class TicketCheckInIntegrationTest {
         ReflectionTestUtils.setField(bookings, "ticketRepository", tickets);
         ReflectionTestUtils.setField(bookings, "showtimeRepository", showtimes);
         ReflectionTestUtils.setField(bookings, "seatRepository", factory.getRepository(SeatRepository.class));
+        ReflectionTestUtils.setField(bookings, "dynamicPricingService", new DynamicPricingService(factory.getRepository(com.example.cinemahub.repository.PricingRuleRepository.class)));
         ReflectionTestUtils.setField(bookings, "movieRepository", factory.getRepository(MovieRepository.class));
         ReflectionTestUtils.setField(service, "clock", Clock.fixed(
                 now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));

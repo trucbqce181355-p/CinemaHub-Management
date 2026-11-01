@@ -14,6 +14,7 @@ import java.util.Map;
 public class Promotion {
     @Id
     private String id;
+    private Long version;
     
     @NotBlank(message = "Mã khuyến mãi không được để trống")
     private String code;

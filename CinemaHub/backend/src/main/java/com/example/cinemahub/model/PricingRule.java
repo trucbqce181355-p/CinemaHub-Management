@@ -12,6 +12,7 @@ import java.util.Map;
 public class PricingRule {
     @Id
     private String id;
+    private Long version;
     
     @NotBlank(message = "Biến kích hoạt không được để trống")
     private String triggerVariable;

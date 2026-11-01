@@ -1,3 +1,4 @@
+import { requestPromoChange } from '../utils/promotionPricing';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,12 +42,19 @@ const Booking = () => {
 
   // Hold & Timer (Step 3)
   const [activeBooking, setActiveBooking] = useState(null);
+  const activeBookingRef=useRef(null);
+  useEffect(()=>{activeBookingRef.current=activeBooking;},[activeBooking]);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
 
   // Pricing & Promo
   const [pricing, setPricing] = useState({ subtotal: 0, discount: 0, total: 0 });
   const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceError, setPriceError] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoUncertain, setPromoUncertain] = useState(false);
+  const promoInFlight = useRef(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoMessage, setPromoMessage] = useState(null);
 
@@ -228,39 +236,27 @@ const Booking = () => {
     return () => clearInterval(interval);
   }, [currentStep, selectedShowtime]);
 
-  // 4. Calculate Price dynamically when selected seats change
+  // A held booking owns its price; only explicit promo writes may change that snapshot.
   useEffect(() => {
-    if (!selectedShowtime || selectedSeats.length === 0) {
-      setPricing({ subtotal: 0, discount: 0, total: 0 });
-      return;
+    if (activeBooking && !isCounterMode) {
+      setPricing({subtotal:activeBooking.subtotal, discount:activeBooking.discountAmount||0, total:activeBooking.totalAmount});
+      setPriceError(''); setPriceLoading(false); return;
     }
-
-    const calcPrice = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/bookings/calculate-price`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
-          body: JSON.stringify({
-            showtimeId: selectedShowtime.id,
-            seatIds: selectedSeats,
-            promoCode: appliedPromo?.code || null
-          })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setPricing({
-            subtotal: data.subtotal || 0,
-            discount: data.discountAmount || 0,
-            total: data.totalAmount || 0
-          });
-        }
-      } catch (err) {
-        console.error('Calculate price error:', err);
-      }
-    };
-
-    calcPrice();
-  }, [selectedSeats, selectedShowtime, appliedPromo]);
+    if (!selectedShowtime || selectedSeats.length===0) {
+      setPricing({subtotal:0,discount:0,total:0});setPriceError('');setPriceLoading(false);return;
+    }
+    const controller=new AbortController();setPriceLoading(true);setPriceError('');
+    const timeout=setTimeout(()=>controller.abort('timeout'),15000);
+    fetch(API_BASE+'/bookings/'+(isCounterMode?'counter-price':'calculate-price'), {
+      method:'POST',signal:controller.signal,
+      headers:{'Content-Type':'application/json',...(user?.token?{Authorization:'Bearer '+user.token}:{})},
+      body:JSON.stringify({showtimeId:selectedShowtime.id,seatIds:selectedSeats,promoCode:appliedPromo?.code||null,customerEmail:customerEmail||undefined})
+    }).then(async res=>{const data=await res.json();if(!res.ok)throw new Error(data.error||'Không tính được giá vé.');return data;})
+      .then(data=>{if(!controller.signal.aborted)setPricing({subtotal:data.subtotal,discount:data.discountAmount,total:data.totalAmount});})
+      .catch(e=>{if(!controller.signal.aborted||controller.signal.reason==='timeout'){setPriceError(e.message||'Hết thời gian tính giá.');setPricing({subtotal:0,discount:0,total:0});}})
+      .finally(()=>{clearTimeout(timeout);if(!controller.signal.aborted||controller.signal.reason==='timeout')setPriceLoading(false);});
+    return ()=>{clearTimeout(timeout);controller.abort();};
+  },[selectedSeats,selectedShowtime,appliedPromo,activeBooking,isCounterMode,user?.token,customerEmail]);
 
   // 5. 10-Minute Hold Countdown Timer
   useEffect(() => {
@@ -281,6 +277,7 @@ const Booking = () => {
   }, [activeBooking, remainingSeconds]);
 
   const handleHoldExpired = () => {
+    setAppliedPromo(null);setPromoUncertain(false);setPromoMessage(null);
     setIsHolding(false);
     setActiveBooking(null);
     setSelectedSeats([]);
@@ -305,6 +302,7 @@ const Booking = () => {
           if (expiresAt && expiresAt > now) {
             const diffSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
             setActiveBooking(b);
+            if(b.promoCode)setAppliedPromo({code:b.promoCode,discountAmount:b.discountAmount,newTotal:b.totalAmount});
             setIsHolding(true);
             setRemainingSeconds(diffSeconds);
             if (b.seats && b.seats.length > 0) {
@@ -435,6 +433,7 @@ const Booking = () => {
 
   // Step 2 -> Step 3: Hold seats and proceed to payment
   const handleProceedToPayment = async () => {
+    if (priceLoading || priceError) {setErrorMessage(priceError || 'Đang tính giá, vui lòng chờ.');return;}
     if (!selectedShowtime || selectedSeats.length === 0) {
       setErrorMessage('Vui lòng chọn ít nhất 1 ghế.');
       return;
@@ -473,6 +472,7 @@ const Booking = () => {
       }
 
       setActiveBooking(data);
+      setAppliedPromo(null); setPromoMessage(null);
       setIsHolding(true);
       setRemainingSeconds(600); // 10 minutes
       setCurrentStep(3);
@@ -485,41 +485,48 @@ const Booking = () => {
   };
 
   // Step 3: Apply Promo Code
+  const savedPromo = (data, recovered = false) => {
+    setAppliedPromo(data.code?data:null);setPromoUncertain(false);
+    setActiveBooking(prev=>({...prev,promoCode:data.code,discountAmount:data.discountAmount,totalAmount:data.newTotal,subtotal:data.subtotal}));
+    setPricing({subtotal:data.subtotal,discount:data.discountAmount,total:data.newTotal});
+    setPromoMessage({type:'success',text:recovered?'Đã đọc lại giá và mã đang lưu trên đơn.':data.code?'Đã áp dụng mã '+data.code:'Đã bỏ mã khuyến mãi.'});
+  };
+  const changeSavedPromo = async operation => {
+    const bookingId=activeBooking.id;
+    const result=await requestPromoChange({base:API_BASE,token:user?.token,bookingId,operation,code:promoCodeInput.trim().toUpperCase(),subtotal:activeBooking.subtotal});
+    if(activeBookingRef.current?.id!==bookingId)return;
+    if(result.uncertain){setPromoUncertain(true);setPromoMessage({type:'error',text:'Chưa xác định được kết quả thay đổi mã. Hãy kiểm tra lại giá đã lưu trước khi thanh toán.'});return;}
+    savedPromo(result.data,result.reconciled);if(operation==='clear')setPromoCodeInput('');
+  };
   const handleApplyPromo = async () => {
-    if (!promoCodeInput.trim()) return;
-    setPromoMessage(null);
-
+    if(!promoCodeInput.trim()||promoInFlight.current||promoUncertain)return;
+    promoInFlight.current=true;setPromoBusy(true);setPromoMessage(null);
     try {
-      const res = await fetch(`${API_BASE}/bookings/apply-promo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
-        body: JSON.stringify({
-          code: promoCodeInput.trim().toUpperCase(),
-          subtotal: pricing.subtotal,
-          bookingId: activeBooking?.id || null
-        })
+      if(!isCounterMode){await changeSavedPromo('apply');return;}
+      const res=await fetch(API_BASE+'/bookings/counter-price',{
+        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+user?.token},
+        body:JSON.stringify({showtimeId:selectedShowtime.id,seatIds:selectedSeats,promoCode:promoCodeInput.trim().toUpperCase(),customerEmail:customerEmail||undefined})
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Mã giảm giá không hợp lệ hoặc hết lượt dùng');
-      }
-
-      setAppliedPromo(data);
-      setPricing(prev => ({
-        ...prev,
-        discount: data.discountAmount,
-        total: data.newTotal
-      }));
-      setPromoMessage({ type: 'success', text: `Áp dụng thành công mã ${data.code}: -${data.discountAmount.toLocaleString()}đ` });
-    } catch (err) {
-      setPromoMessage({ type: 'error', text: err.message });
-      setAppliedPromo(null);
-    }
+      const raw=await res.json();if(!res.ok)throw new Error(raw.error||'Không áp dụng được mã.');
+      const data={...raw,code:raw.promoCode,newTotal:raw.totalAmount};setAppliedPromo(data);
+      setPricing({subtotal:raw.subtotal,discount:raw.discountAmount,total:raw.totalAmount});
+      setPromoMessage({type:'success',text:'Đã kiểm tra mã '+data.code});
+    }catch(e){setPromoMessage({type:'error',text:e.message});}
+    finally{promoInFlight.current=false;setPromoBusy(false);}
+  };
+  const handleRemovePromo = async () => {
+    if(promoInFlight.current||promoUncertain)return;promoInFlight.current=true;setPromoBusy(true);
+    try {if(!isCounterMode)await changeSavedPromo('clear');else{setAppliedPromo(null);setPromoCodeInput('');setPromoMessage(null);}}
+    catch(e){setPromoMessage({type:'error',text:e.message});}finally{promoInFlight.current=false;setPromoBusy(false);}
+  };
+  const recoverPromo = async () => {
+    if(promoInFlight.current)return;promoInFlight.current=true;setPromoBusy(true);
+    try{await changeSavedPromo('recover');}catch(e){setPromoMessage({type:'error',text:e.message});}finally{promoInFlight.current=false;setPromoBusy(false);}
   };
 
   // Step 3: Confirm Booking (Customer Online)
   const handleConfirmBooking = async () => {
-    if (paymentInFlight.current) return;
+    if (paymentInFlight.current || promoInFlight.current || promoUncertain || priceLoading || priceError) return;
     setErrorMessage('');
     if (!activeBooking) {
       setErrorMessage('Không tìm thấy phiên giữ ghế. Vui lòng chọn lại ghế.');
@@ -589,6 +596,7 @@ const Booking = () => {
 
   // Step 3 (Staff): Counter Booking at counter
   const handleCounterBooking = async () => {
+    if (promoInFlight.current || promoUncertain || priceLoading || priceError) return;
     if (!selectedShowtime || selectedSeats.length === 0) return;
     if (!customerName.trim()) {
       setErrorMessage('Vui lòng nhập tên khách hàng tại quầy');
@@ -636,20 +644,22 @@ const Booking = () => {
 
   // Cancel hold session
   const handleCancelHold = async () => {
+    if(promoInFlight.current)return;
     if (activeBooking) {
       try {
-        await fetch(`${API_BASE}/bookings/${activeBooking.id}/cancel`, {
+        const cancelRes = await fetch(`${API_BASE}/bookings/${activeBooking.id}/cancel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}) },
           body: JSON.stringify({ reason: 'Khách hàng hủy phiên giữ chỗ' })
         });
-      } catch (ignored) { }
+        if(!cancelRes.ok)throw new Error('Không hủy được phiên giữ chỗ. Vui lòng tải lại trạng thái đơn.');
+      } catch (error) {setErrorMessage(error.message);return;}
     }
 
     setIsHolding(false);
     setActiveBooking(null);
     setSelectedSeats([]);
-    setAppliedPromo(null);
+    setAppliedPromo(null);setPromoUncertain(false);
     setCurrentStep(2);
     fetchSeatAvailability();
   };
@@ -679,6 +689,8 @@ const Booking = () => {
   return (
     <div className="min-h-screen pt-24 pb-24 bg-[#0a0a0a] text-white">
       <div className="container mx-auto px-4 max-w-7xl">
+        {priceLoading && <p role="status" className="text-yellow-400">Đang cập nhật giá vé…</p>}
+        {priceError && <p role="alert" className="text-red-400">{priceError} Vui lòng chọn lại ghế để thử lại.</p>}
 
         {/* TOP BAR: CGV Header & Staff Counter Switch */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-6 mb-6 border-b border-white/10 gap-4">
@@ -1084,7 +1096,7 @@ const Booking = () => {
                   Quay lại
                 </button>
                 <button
-                  disabled={selectedSeats.length === 0 || isProcessing}
+                  disabled={selectedSeats.length === 0 || isProcessing || priceLoading || !!priceError}
                   onClick={handleProceedToPayment}
                   className="flex-1 sm:flex-none px-8 py-3.5 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
@@ -1214,12 +1226,14 @@ const Booking = () => {
                     />
                     <button
                       onClick={handleApplyPromo}
-                      disabled={!promoCodeInput.trim() || pricing.subtotal === 0}
+                      disabled={promoBusy || promoUncertain || priceLoading || !promoCodeInput.trim() || pricing.subtotal === 0}
                       className="px-6 py-3 bg-secondary hover:bg-secondary-hover text-white font-bold rounded-xl text-sm shrink-0 disabled:opacity-40 transition-all"
                     >
                       Áp dụng
                     </button>
                   </div>
+                  {promoUncertain && <button disabled={promoBusy} onClick={recoverPromo} className="mt-3 text-sm text-yellow-400">Kiểm tra lại giá đã lưu</button>}
+                  {(appliedPromo || activeBooking?.promoCode) && <button disabled={promoBusy} onClick={handleRemovePromo} className="mt-3 text-sm text-primary">Bỏ mã khuyến mãi</button>}
                   {promoMessage && (
                     <p className={`text-xs mt-2.5 font-semibold ${promoMessage.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
                       {promoMessage.text}
@@ -1330,7 +1344,7 @@ const Booking = () => {
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
-                      disabled={isProcessing}
+                      disabled={isProcessing || promoBusy || promoUncertain || priceLoading || !!priceError}
                       className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
@@ -1339,7 +1353,7 @@ const Booking = () => {
                   ) : (
                     <button
                       onClick={handleConfirmBooking}
-                      disabled={isProcessing || gatewayReady === false}
+                      disabled={isProcessing || promoBusy || promoUncertain || priceLoading || !!priceError || gatewayReady === false}
                       className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}

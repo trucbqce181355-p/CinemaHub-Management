@@ -38,7 +38,13 @@ public class PaymentService {
         if (contact.containsKey("customerName")) booking.setCustomerName(contactField(contact, "customerName", 120));
         if (contact.containsKey("customerEmail")) booking.setCustomerEmail(contactField(contact, "customerEmail", 254));
         if (contact.containsKey("customerPhone")) booking.setCustomerPhone(contactField(contact, "customerPhone", 32));
-        if (booking.getTotalAmount() == null || !Double.isFinite(booking.getTotalAmount()) || booking.getTotalAmount() <= 0)
+        try {
+            if (booking.getPromoCode() != null && !booking.getPromoCode().isBlank()) bookings.validatePaymentPromotion(booking);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+        }
+        if (booking.getTotalAmount() == null || !Double.isFinite(booking.getTotalAmount()) || booking.getTotalAmount() <= 0
+                || booking.getTotalAmount() != Math.rint(booking.getTotalAmount()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền đơn hàng không hợp lệ");
         Payment payment = new Payment();
         payment.setTransactionId(UUID.randomUUID().toString().replace("-", ""));

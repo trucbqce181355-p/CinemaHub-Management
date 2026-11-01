@@ -17,6 +17,7 @@ public class ApplyPromoRequest {
     @Min(value = 0, message = "Tạm tính phải >= 0")
     private Double subtotal;
 
+    @NotBlank
     private String bookingId;
 
     @Data
