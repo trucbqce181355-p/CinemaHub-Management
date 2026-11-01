@@ -47,6 +47,16 @@ const MembershipManagement = () => {
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
 
+  // Fetch initial data
+  useEffect(() => {
+    if (user && user.role !== 'Manager') return;
+    fetchTiers();
+    fetchRules();
+    fetchCustomers();
+    fetchTransactions();
+    fetchRewards();
+  }, [user]);
+
   // Guard: Only Manager can manage this page
   if (user && user.role !== 'Manager') {
     return (
@@ -64,15 +74,6 @@ const MembershipManagement = () => {
       </div>
     );
   }
-
-  // Fetch initial data
-  useEffect(() => {
-    fetchTiers();
-    fetchRules();
-    fetchCustomers();
-    fetchTransactions();
-    fetchRewards();
-  }, [user]);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });

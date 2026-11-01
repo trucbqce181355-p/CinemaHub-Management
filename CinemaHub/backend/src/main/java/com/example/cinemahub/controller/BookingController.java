@@ -64,7 +64,7 @@ public class BookingController {
     @PostMapping("/calculate-price")
     public ResponseEntity<?> calculatePrice(@Valid @RequestBody CalculatePriceRequest req, Authentication authentication) {
         try {
-            return ResponseEntity.ok(bookingService.calculatePrice(req, authentication.getName()));
+            return ResponseEntity.ok(bookingService.calculatePrice(req, authentication == null || "anonymousUser".equals(authentication.getName()) ? null : authentication.getName()));
         } catch (RuntimeException e) {
             if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

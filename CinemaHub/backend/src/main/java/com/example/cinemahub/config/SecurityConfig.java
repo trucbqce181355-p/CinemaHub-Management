@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/cinemas/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/showtimes/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/bookings/seats").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/bookings/calculate-price").permitAll()
                 .requestMatchers("/api/bookings/counter-booking", "/api/bookings/counter-price").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers("/api/bookings/**").authenticated()
                 .requestMatchers("/api/tickets/**").hasAnyRole("Staff", "Manager", "Admin")

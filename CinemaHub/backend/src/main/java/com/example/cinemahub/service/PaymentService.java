@@ -48,7 +48,7 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền đơn hàng không hợp lệ");
         Payment payment = new Payment();
         payment.setTransactionId(UUID.randomUUID().toString().replace("-", ""));
-        payment.setAmount(BigDecimal.valueOf(booking.getTotalAmount()).setScale(0, java.math.RoundingMode.UNNECESSARY));
+        payment.setAmount(BigDecimal.valueOf(booking.getTotalAmount()).setScale(0, java.math.RoundingMode.HALF_UP));
         payment.setCreatedAt(now);
         payment.setUpdatedAt(now);
         payment.setExpiresAt(booking.getHoldExpiresAt());

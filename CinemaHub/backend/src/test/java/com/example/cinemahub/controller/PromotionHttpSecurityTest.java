@@ -69,6 +69,21 @@ class PromotionHttpSecurityTest {
         verify(context.getBean(PromotionManagementService.class)).create(capture.capture());
         org.junit.jupiter.api.Assertions.assertNull(capture.getValue().getId());
     }
+    @Test void anonymousCanPreviewPriceWithoutAnAuthenticationPrincipal() throws Exception {
+        var result=com.example.cinemahub.dto.CalculatePriceRequest.PriceResult.builder().subtotal(100000d).discountAmount(0d).totalAmount(100000d).build();
+        when(context.getBean(BookingService.class).calculatePrice(any(com.example.cinemahub.dto.CalculatePriceRequest.class),isNull())).thenReturn(result);
+        mvc.perform(post("/api/bookings/calculate-price").contentType("application/json")
+                .content("{\"showtimeId\":\"s\",\"seatIds\":[\"A1\"]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalAmount").value(100000));
+        verify(context.getBean(BookingService.class)).calculatePrice(any(com.example.cinemahub.dto.CalculatePriceRequest.class),isNull());
+    }
+    @Test void signedInPricePreviewStillUsesTheCurrentCustomerIdentity() throws Exception {
+        var result=com.example.cinemahub.dto.CalculatePriceRequest.PriceResult.builder().subtotal(100000d).discountAmount(10000d).totalAmount(90000d).build();
+        when(context.getBean(BookingService.class).calculatePrice(any(com.example.cinemahub.dto.CalculatePriceRequest.class),eq("owner"))).thenReturn(result);
+        mvc.perform(post("/api/bookings/calculate-price").with(user("owner").roles("Customer")).contentType("application/json")
+                .content("{\"showtimeId\":\"s\",\"seatIds\":[\"A1\"],\"promoCode\":\"TEST\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalAmount").value(90000));
+    }
     @Test void publicResponseOmitsPersonalVouchersAndInternalFields() throws Exception {
         Promotion pub = new Promotion(); pub.setId("internal"); pub.setCode("PUBLIC"); pub.setTitle("Public"); pub.setConditions(Map.of("minSpend", 100000));
         Promotion privateVoucher = new Promotion(); privateVoucher.setCode("SECRET"); privateVoucher.setConditions(Map.of("redeemedByUserId", "owner"));
@@ -80,6 +95,11 @@ class PromotionHttpSecurityTest {
     @Configuration @EnableWebMvc @EnableWebSecurity @Import({SecurityConfig.class,PromotionErrorHandler.class})
     static class Config {
         @Bean org.springframework.data.mongodb.core.MongoTemplate mongo() { return mock(org.springframework.data.mongodb.core.MongoTemplate.class); }
+        @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor previewMocks() {
+            return factory -> factory.registerSingleton("bookingService", mock(BookingService.class));
+        }
+        @Bean PaymentService paymentService() { return mock(PaymentService.class); }
+        @Bean BookingController bookingController() { return new BookingController(); }
         @Bean PromotionRepository promotions() { return mock(PromotionRepository.class); }
         @Bean PricingRuleRepository pricing() { return mock(PricingRuleRepository.class); }
         @Bean UserRepository users() { return mock(UserRepository.class); }
