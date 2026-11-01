@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star, 
-  LogOut, Clock, MapPin, Film, QrCode, Printer, X, CheckCircle2, CreditCard, 
-  Eye, EyeOff, Award, Gift, Coins, Copy, Check, Sparkles, ChevronRight, 
-  Info, ExternalLink, ArrowUpRight, ArrowDownRight, Tag, TrendingUp 
+import {
+  User, Mail, Lock, Shield, Save, Phone, Calendar, Ticket, Heart, Bell, Star,
+  LogOut, Clock, MapPin, Film, QrCode, Printer, X, CheckCircle2, CreditCard,
+  Eye, EyeOff, Award, Gift, Coins, Copy, Check, Sparkles, ChevronRight,
+  Info, ExternalLink, ArrowUpRight, ArrowDownRight, Tag, TrendingUp
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getTicketQrValue } from '../utils/ticketQr';
@@ -46,6 +46,7 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passMessage, setPassMessage] = useState({ text: '', type: '' });
   const [passLoading, setPassLoading] = useState(false);
 
@@ -256,7 +257,7 @@ const Profile = () => {
     try {
       const res = await fetch(`http://127.0.0.1:5000/api/bookings/${cancelModalBookingId}/cancel`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {})
         },
@@ -786,7 +787,7 @@ const Profile = () => {
                 {/* 1. VIP DIGITAL MEMBERSHIP CARD */}
                 <div className="relative rounded-3xl overflow-hidden p-6 sm:p-8 bg-gradient-to-br from-zinc-900 via-neutral-900 to-black border border-white/20 shadow-2xl">
                   {/* Holographic background sheen */}
-                  <div 
+                  <div
                     className="absolute -right-20 -top-20 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none"
                     style={{ backgroundColor: membershipData?.currentTier?.badgeColor || '#EAB308' }}
                   />
@@ -809,7 +810,7 @@ const Profile = () => {
                         </div>
                       </div>
 
-                      <div 
+                      <div
                         className="flex items-center gap-2 px-4 py-1.5 rounded-full font-black text-xs text-black shadow-lg"
                         style={{ backgroundColor: membershipData?.currentTier?.badgeColor || '#EAB308' }}
                       >
@@ -949,44 +950,40 @@ const Profile = () => {
                 <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-4">
                   <button
                     onClick={() => setMemberSubTab('benefits')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      memberSubTab === 'benefits'
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'benefits'
                         ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
                         : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     <Award className="w-4 h-4" /> Đặc quyền hội viên
                   </button>
 
                   <button
                     onClick={() => setMemberSubTab('redeem')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      memberSubTab === 'redeem'
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'redeem'
                         ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
                         : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     <Gift className="w-4 h-4" /> Đổi điểm nhận quà ({redeemableRewards.length})
                   </button>
 
                   <button
                     onClick={() => setMemberSubTab('my_vouchers')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      memberSubTab === 'my_vouchers'
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'my_vouchers'
                         ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
                         : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     <Tag className="w-4 h-4" /> Mã ưu đãi của tôi ({myVouchers.filter(v => v.status === 'UNUSED').length})
                   </button>
 
                   <button
                     onClick={() => setMemberSubTab('history')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      memberSubTab === 'history'
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'history'
                         ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
                         : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     <Clock className="w-4 h-4" /> Lịch sử điểm thưởng
                   </button>
@@ -1008,15 +1005,14 @@ const Profile = () => {
                         return (
                           <div
                             key={tier.id || tier.code}
-                            className={`rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden transition-all ${
-                              isCurrent
+                            className={`rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden transition-all ${isCurrent
                                 ? 'bg-surface border-2 shadow-2xl shadow-primary/20 scale-[1.02]'
                                 : 'bg-surface/70 border border-white/10 hover:border-white/20'
-                            }`}
+                              }`}
                             style={{ borderColor: isCurrent ? (tier.badgeColor || '#EAB308') : undefined }}
                           >
                             {isCurrent && (
-                              <div 
+                              <div
                                 className="absolute top-0 right-0 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-black rounded-bl-xl shadow-md"
                                 style={{ backgroundColor: tier.badgeColor || '#EAB308' }}
                               >
@@ -1026,7 +1022,7 @@ const Profile = () => {
 
                             <div>
                               <div className="flex items-center gap-2 mb-3">
-                                <div 
+                                <div
                                   className="w-8 h-8 rounded-full flex items-center justify-center text-black font-black text-xs"
                                   style={{ backgroundColor: tier.badgeColor || '#EAB308' }}
                                 >
@@ -1129,8 +1125,8 @@ const Profile = () => {
                                 <div className="flex justify-between">
                                   <span className="text-gray-400">Mức giảm:</span>
                                   <span className="font-black text-primary text-sm">
-                                    {reward.discountType === 'PERCENTAGE' 
-                                      ? `Giảm ${reward.discountValue}%` 
+                                    {reward.discountType === 'PERCENTAGE'
+                                      ? `Giảm ${reward.discountValue}%`
                                       : `Giảm ${reward.discountValue?.toLocaleString()} đ`}
                                   </span>
                                 </div>
@@ -1147,11 +1143,10 @@ const Profile = () => {
                               type="button"
                               onClick={() => setSelectedRewardToRedeem(reward)}
                               disabled={!canAfford}
-                              className={`w-full py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                canAfford
+                              className={`w-full py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${canAfford
                                   ? 'bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/25 cursor-pointer'
                                   : 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed'
-                              }`}
+                                }`}
                             >
                               <Gift className="w-4 h-4" />
                               {canAfford ? 'Đổi voucher ngay' : `Cần thêm ${needed?.toLocaleString()} điểm`}
@@ -1182,21 +1177,19 @@ const Profile = () => {
                           return (
                             <div
                               key={v.id}
-                              className={`rounded-3xl p-6 border flex flex-col justify-between relative overflow-hidden ${
-                                isUnused && !isExpired
+                              className={`rounded-3xl p-6 border flex flex-col justify-between relative overflow-hidden ${isUnused && !isExpired
                                   ? 'bg-surface border-white/15 shadow-xl'
                                   : 'bg-surface/50 border-white/5 opacity-60'
-                              }`}
+                                }`}
                             >
                               <div>
                                 <div className="flex items-center justify-between mb-3">
-                                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                                    isUnused && !isExpired
+                                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isUnused && !isExpired
                                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                       : v.status === 'USED'
-                                      ? 'bg-blue-500/20 text-blue-400'
-                                      : 'bg-gray-500/20 text-gray-400'
-                                  }`}>
+                                        ? 'bg-blue-500/20 text-blue-400'
+                                        : 'bg-gray-500/20 text-gray-400'
+                                    }`}>
                                     {isUnused && !isExpired ? 'Chưa sử dụng' : v.status === 'USED' ? 'Đã sử dụng' : 'Hết hạn'}
                                   </span>
                                   <span className="text-[11px] text-gray-400 font-mono">
@@ -1296,13 +1289,12 @@ const Profile = () => {
                                     {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : '--'}
                                   </td>
                                   <td className="py-4 px-6">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                      tx.type === 'EARN'
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${tx.type === 'EARN'
                                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                         : tx.type === 'REDEEM'
-                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-blue-500/20 text-blue-400'
-                                    }`}>
+                                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                          : 'bg-blue-500/20 text-blue-400'
+                                      }`}>
                                       {tx.type === 'EARN' ? 'Tích điểm vé' : tx.type === 'REDEEM' ? 'Đổi voucher' : 'Điều chỉnh điểm'}
                                     </span>
                                   </td>
@@ -1396,7 +1388,7 @@ const Profile = () => {
               className="bg-[#141414] border border-amber-500/30 rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-primary to-orange-500" />
-              
+
               <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
                 <Sparkles className="w-8 h-8" />
               </div>
@@ -1593,11 +1585,10 @@ const Profile = () => {
               <p className="text-gray-300 text-sm mb-6">
                 Bạn có chắc chắn muốn hủy vé này? Ghế sẽ được giải phóng cho người khác và bạn sẽ phải đặt lại từ đầu.
               </p>
-              
+
               {cancelModalMessage.text && (
-                <div className={`p-3 rounded-lg text-sm mb-6 font-semibold border ${
-                  cancelModalMessage.type === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm mb-6 font-semibold border ${cancelModalMessage.type === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'
+                  }`}>
                   {cancelModalMessage.text}
                 </div>
               )}
