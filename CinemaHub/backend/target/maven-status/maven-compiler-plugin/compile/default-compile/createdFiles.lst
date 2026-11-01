@@ -16,6 +16,7 @@ com\example\cinemahub\security\JwtFilter.class
 com\example\cinemahub\repository\MovieRepository.class
 com\example\cinemahub\repository\SeatRepository.class
 com\example\cinemahub\model\Booking.class
+com\example\cinemahub\service\AdmissionCoordinator.class
 com\example\cinemahub\service\ReviewService.class
 com\example\cinemahub\dto\ApplyPromoRequest$PromoResult$PromoResultBuilder.class
 com\example\cinemahub\service\ReviewService$PreModerationResult.class
@@ -39,11 +40,13 @@ com\example\cinemahub\dto\ApplyPromoRequest.class
 com\example\cinemahub\dto\HoldSeatRequest.class
 com\example\cinemahub\controller\AuthController.class
 com\example\cinemahub\config\VnpayConfig.class
+com\example\cinemahub\dto\TicketCheckInRequest.class
 com\example\cinemahub\model\Review$EditAuditLog.class
 com\example\cinemahub\dto\SeatAvailabilityDTO$SeatAvailabilityDTOBuilder.class
 com\example\cinemahub\dto\CounterBookingRequest.class
 com\example\cinemahub\dto\SeatAvailabilityDTO$SeatItem.class
 com\example\cinemahub\dto\FoodItemRequest.class
+com\example\cinemahub\exception\TicketCheckInException.class
 com\example\cinemahub\dto\CalculatePriceRequest$PriceResult$PriceResultBuilder.class
 com\example\cinemahub\security\JwtUtil.class
 com\example\cinemahub\controller\PaymentController.class
@@ -52,8 +55,10 @@ com\example\cinemahub\model\Booking$BookingBuilder.class
 com\example\cinemahub\controller\TicketController.class
 com\example\cinemahub\repository\ShowtimeRepository.class
 com\example\cinemahub\model\Ticket$SeatStatus.class
+com\example\cinemahub\service\TicketUsage$State.class
 com\example\cinemahub\controller\PricingRuleController.class
 com\example\cinemahub\model\FoodItem.class
+com\example\cinemahub\service\TicketUsage.class
 com\example\cinemahub\service\TicketValidationService.class
 com\example\cinemahub\model\Promotion.class
 com\example\cinemahub\controller\MovieRecommendationController.class
@@ -87,6 +92,7 @@ com\example\cinemahub\service\BookingService.class
 com\example\cinemahub\CinemaHubApplication.class
 com\example\cinemahub\model\ReviewReport$ReviewReportBuilder.class
 com\example\cinemahub\service\PromotionValidationService.class
+com\example\cinemahub\service\TicketValidationService$CheckedTicket.class
 com\example\cinemahub\service\ScreenRoomService.class
 com\example\cinemahub\model\Ticket.class
 com\example\cinemahub\dto\SeatAvailabilityDTO$SeatItem$SeatItemBuilder.class

@@ -791,11 +791,11 @@ public class BookingService {
     private double computeDiscount(Promotion promo, double subtotal) {
         if ("PERCENTAGE".equalsIgnoreCase(promo.getDiscountType())) {
             double percent = promo.getDiscountValue() != null ? promo.getDiscountValue() : 0.0;
-            return Math.min(subtotal, subtotal * (percent / 100.0));
+            return Math.min(subtotal, (double) Math.round(subtotal * (percent / 100.0)));
         } else {
             // FIXED_AMOUNT
             double fixed = promo.getDiscountValue() != null ? promo.getDiscountValue() : 0.0;
-            return Math.min(subtotal, fixed);
+            return Math.min(subtotal, (double) Math.round(fixed));
         }
     }
 
