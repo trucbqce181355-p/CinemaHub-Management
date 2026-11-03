@@ -42,6 +42,48 @@ class PromotionHttpSecurityTest {
         }
         verifyNoInteractions(context.getBean(PromotionManagementService.class));
     }
+    @ParameterizedTest @ValueSource(strings={"Customer", "Staff"})
+    void nonManagersCannotSoftDeletePromotions(String role) throws Exception {
+        for(String path:List.of("/api/promotions/p/archive","/api/pricing-rules/p/archive"))
+            mvc.perform(delete(path).param("version", "1").with(user("actor").roles(role)))
+                    .andExpect(status().isForbidden());
+        verifyNoInteractions(context.getBean(PromotionManagementService.class));
+    }
+    @ParameterizedTest @ValueSource(strings={"Manager", "Admin"})
+    void managersCanReachSoftDeleteEndpoint(String role) throws Exception {
+        Promotion archived = new Promotion(); archived.setId("p"); archived.setStatus("Disabled"); archived.setArchived(true);
+        when(context.getBean(PromotionManagementService.class).archive("p", 1L)).thenReturn(archived);
+        mvc.perform(delete("/api/promotions/p/archive").param("version", "1").with(user("manager").roles(role)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.archived").value(true));
+        verify(context.getBean(PromotionManagementService.class)).archive("p", 1L);
+    }
+    @ParameterizedTest @ValueSource(strings={"Manager", "Admin"})
+    void managersCanUseTheCompletePricingCrud(String role) throws Exception {
+        var management=context.getBean(PromotionManagementService.class);
+        PricingRule created=new PricingRule(); created.setId("rule"); created.setStatus("Active"); created.setVersion(0L);
+        when(management.create(any(PricingRule.class))).thenReturn(created);
+        String body="{\"triggerVariable\":\"WEEKEND\",\"adjustmentValue\":20000,\"status\":\"Active\",\"version\":0}";
+        mvc.perform(post("/api/pricing-rules").with(user("manager").roles(role)).contentType("application/json").content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value("rule"));
+        when(context.getBean(PricingRuleRepository.class).findVisibleRules()).thenReturn(List.of(created));
+        mvc.perform(get("/api/pricing-rules").with(user("manager").roles(role))).andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value("rule"));
+        when(management.update(eq("rule"),any(PricingRule.class))).thenReturn(created);
+        mvc.perform(put("/api/pricing-rules/rule").with(user("manager").roles(role)).contentType("application/json").content(body))
+                .andExpect(status().isOk());
+        PricingRule disabled=new PricingRule(); disabled.setId("rule"); disabled.setStatus("Disabled");
+        when(management.disableRule("rule",0L)).thenReturn(disabled);
+        mvc.perform(delete("/api/pricing-rules/rule").param("version","0").with(user("manager").roles(role)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("Disabled"));
+        disabled.setArchived(true); when(management.archiveRule("rule",1L)).thenReturn(disabled);
+        mvc.perform(delete("/api/pricing-rules/rule/archive").param("version","1").with(user("manager").roles(role)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.archived").value(true));
+        verify(management).archiveRule("rule",1L);
+    }
+    @Test void errorDispatchDoesNotBecomeAPermissionError() throws Exception {
+        mvc.perform(get("/error").with(request -> { request.setDispatcherType(jakarta.servlet.DispatcherType.ERROR); return request; }))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/error")).andExpect(status().is4xxClientError());
+    }
     @Test void anonymousCannotWriteButCanReadPublicPromotions() throws Exception {
         mvc.perform(post("/api/promotions").contentType("application/json").content("{}"))
                 .andExpect(status().is4xxClientError());

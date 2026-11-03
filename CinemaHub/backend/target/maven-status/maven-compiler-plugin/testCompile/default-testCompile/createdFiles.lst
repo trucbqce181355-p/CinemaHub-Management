@@ -1,3 +1,6 @@
 com\example\cinemahub\CinemaHubApplicationTests.class
 com\example\cinemahub\controller\PaymentHttpSecurityTest.class
 com\example\cinemahub\service\PaymentIntegrationTest.class
+com\example\cinemahub\controller\PromotionHttpSecurityTest.class
+com\example\cinemahub\controller\PromotionHttpSecurityTest$Config.class
+com\example\cinemahub\service\PromotionPricingIntegrationTest.class

@@ -3,9 +3,12 @@
 ## Implemented behavior
 
 - Manager and Admin can manage promotions and pricing rules. Customer and Staff cannot call management APIs. The active public promotion list is available without login; it excludes personal redeemed vouchers and internal document fields.
-- Create uses a request DTO, generates the document ID on the server and returns 201. Codes are trimmed, uppercased and limited to letters, digits, underscores and hyphens (64 characters).
+- Create uses a request DTO, generates the document ID on the server and returns 201. Codes are trimmed, uppercased and limited to letters, digits, underscores, hyphens and percent signs (64 characters), for example `GIAM10%`.
 - Update and disable use the returned `version`. Concurrent/stale edits return 409. Imported documents without a version are supported. Disable retains the document and booking history.
-- Active codes and codes referenced by bookings cannot be renamed. Disable an unused code before renaming it.
+- Disabled promotions expose a red trash icon for soft deletion: `DELETE /api/promotions/{id}/archive?version=...`. This sets `archived=true`, hides the row from management and public lists, and blocks further application/editing. Only Disabled rows can be archived. The document, booking references and unique code reservation remain; the same code cannot be recreated. Imported rows without `archived` remain visible.
+
+The promotion editor uses a wide dialog with grouped program details, percentage/fixed discount cards, quick amounts, date-time range and quick durations, spend and usage conditions, optional banner preview, status choices, and an order-total example. The example applies the minimum spend and discount cap only; final booking validation also checks time, state, quota, and account ownership. Member-voucher ownership fields remain preserved and read-only while editing.
+- Active codes can be renamed without disabling them first. Codes already referenced by bookings remain protected to preserve payment lookup and usage history; the title and other fields can still be edited.
 - Discounts must be finite and nonnegative. Percentages are 0–100. Fixed discounts and numeric conditions are whole VND. Start must precede end; the validity interval includes start and excludes end.
 - Supported conditions are `minSpend`, `maxDiscount`, `usageLimit`, `perUserLimit`, and membership-generated `redeemedByUserId` / `rewardVoucherId`. Unknown conditions are rejected instead of silently ignored.
 - Price previews are available to Guest without an authentication principal. Personal vouchers and per-account limits still require the authenticated customer identity.
@@ -16,6 +19,10 @@
 
 ## Dynamic pricing policy
 
+The pricing editor uses a wide dialog with category cards, a multi-date calendar with quick date choices, an hour selector, and a searchable showtime table filtered by movie/cinema/date. Showtime IDs are carried by checkbox selections rather than typed by users. Existing selections remain visible when editing, including past screenings; removed screenings must be deselected before saving. Increase/decrease is chosen separately from a positive whole-VND amount. A summary and a single-rule sample price are shown before submission; this example excludes other rules and promotions.
+
+Pricing rules follow the same management lifecycle as promotions: create (201), list visible rows, edit with `version`, disable, then soft-delete only a Disabled row. `DELETE /api/pricing-rules/{id}/archive?version=...` sets `archived=true`; it retains the document but removes it from the list and from price calculation. Archived rules cannot be edited, reactivated or disabled again. Existing rows without an `archived` field remain visible. Manager/Admin can manage these rules; Customer/Staff cannot.
+
 The movie's STANDARD/VIP/COUPLE price plus its 3D/IMAX surcharge is the base. All matching active rules add their fixed VND adjustments; the sum is order-independent. The final per-seat price is rounded HALF_UP to whole VND and bounded to **1,000–2,000,000 VND**. Percentage discounts are also rounded HALF_UP. A held online booking keeps its saved price for its hold lifetime.
 
 | Trigger | Parameters | Matching behavior |
@@ -25,7 +32,7 @@ The movie's STANDARD/VIP/COUPLE price plus its 3D/IMAX surcharge is the base. Al
 | `LATE_NIGHT` | `startHour: 22` (default 22) | Showtime begins at/after that hour. |
 | `SNEAK_SHOW` | `showtimeIds: ["id"]` | Showtime ID is explicitly listed. |
 
-Legacy Vietnamese trigger names are recognized. Holiday and sneak rules need explicit dates/IDs; invalid existing rules produce an error rather than an invented price. Adjustments are whole VND in the range -1,000,000 to +1,000,000. Backend local time must be configured for the cinema's timezone (Asia/Ho_Chi_Minh for this project).
+Legacy Vietnamese trigger names are recognized. Holiday and sneak rules need explicit dates/IDs; sneak rule creation/editing checks that the selected showtimes exist. Invalid existing rules produce an error rather than an invented price. Adjustments are whole VND in the range -1,000,000 to +1,000,000. Backend local time must be configured for the cinema's timezone (Asia/Ho_Chi_Minh for this project).
 
 ## Existing database considerations
 
@@ -41,7 +48,7 @@ Promotion quota admission is serialized through the existing `AdmissionCoordinat
 4. As Customer or Staff, call POST/PUT/DELETE `/api/promotions` and `/api/pricing-rules` directly. Expect 403; no document changes. Customer must also get 403 on `/api/bookings/counter-price`.
 5. Select valid seats and hold them. Apply `QA10`; check the booking's stored subtotal/discount/total, not just the displayed amount. The client-supplied subtotal must not change the server price. Remove the code and verify both the UI and saved booking return to the original subtotal.
 6. Apply a code whose minimum spend exceeds the order value. Quote, online apply and counter sale must all reject it. Personal redeemed vouchers must reject another customer account. Create a `usageLimit: 1` promo and apply it to two different holds: only one succeeds; clearing/cancelling/expiring that hold releases the slot.
-7. Add WEEKEND +20,000 and LATE_NIGHT -10,000. On a weekend 23:00 showtime, each seat gains a net +10,000. Compare seat availability, quote, new online hold and counter receipt. Disable a rule and verify **new** quotes change while an existing hold price stays fixed.
+7. Add WEEKEND +20,000 and LATE_NIGHT -10,000. On a weekend 23:00 showtime, each seat gains a net +10,000. Compare seat availability, quote, new online hold and counter receipt. Edit the adjustment and verify new quotes reflect it. A stale second edit must return 409. Disable a rule: it stays in the list with a red trash icon; new quotes stop applying it while an existing hold price stays fixed. Soft-delete it: it disappears after reload, its document remains, and old booking prices still do not change. An Active rule cannot be soft-deleted; an archived rule cannot be reactivated.
 8. Change seats rapidly with Network throttling. A late older response must not replace the current price. A failed quote blocks proceeding. For an online promo write, interrupt its response: only a read of the booking may follow; unresolved recovery must block payment and expose the read-only retry button.
 9. Disable/change a promotion after applying it but before creating a VNPAY payment. Initiation must reject stale eligibility/discount and request reapplication/removal. Existing pending payments must retain their original amount.
 

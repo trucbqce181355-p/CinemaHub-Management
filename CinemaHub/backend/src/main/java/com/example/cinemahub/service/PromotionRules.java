@@ -10,7 +10,7 @@ public final class PromotionRules {
     private PromotionRules() {}
     public static String code(String value) {
         String code = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        if (!code.matches("[A-Z0-9_-]{1,64}")) throw new IllegalArgumentException("Mã khuyến mãi không hợp lệ");
+        if (!code.matches("[A-Z0-9_%-]{1,64}")) throw new IllegalArgumentException("Mã khuyến mãi không hợp lệ");
         return code;
     }
     public static void validate(Promotion p) {

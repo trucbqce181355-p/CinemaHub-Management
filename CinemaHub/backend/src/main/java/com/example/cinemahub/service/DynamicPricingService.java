@@ -50,14 +50,14 @@ public class DynamicPricingService {
             throw new IllegalArgumentException("Vui lòng cung cấp danh sách ngày hoặc ID suất chiếu hợp lệ");
         return list.stream().map(Object::toString).toList();
     }
-    public List<PricingRule> rules() { return repository.findAll().stream().filter(r -> "Active".equals(r.getStatus())).toList(); }
+    public List<PricingRule> rules() { return repository.findApplicableRules(); }
     public double price(Showtime showtime, double base) { return price(showtime, base, rules()); }
     public double price(Showtime showtime, double base, List<PricingRule> rules) {
         Money.vnd(base);
         if (showtime.getStartTime() == null) throw new IllegalArgumentException("Suất chiếu thiếu thời gian bắt đầu");
         double adjustment = 0;
         for (PricingRule r : rules) {
-            if (!"Active".equals(r.getStatus())) continue;
+            if (r.isArchived() || !"Active".equals(r.getStatus())) continue;
             validate(r); // Fail explicitly for invalid legacy configuration; never silently misprice.
             Map<String, Object> c = r.getConditionParams() == null ? Map.of() : r.getConditionParams();
             LocalDateTime start = showtime.getStartTime();

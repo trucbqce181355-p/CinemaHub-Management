@@ -37,6 +37,7 @@ public class Promotion {
     private LocalDateTime endDate;
     
     private String status;
+    private boolean archived;
     private Map<String, Object> conditions;
     private String bannerImage;
 }

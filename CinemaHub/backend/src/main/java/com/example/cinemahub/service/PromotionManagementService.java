@@ -46,10 +46,11 @@ public class PromotionManagementService {
     public Promotion update(String id, Promotion p) {
         return admission.write(() -> {
             Promotion old = promotions.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
             PromotionRules.validate(p);
             if (!Objects.equals(PromotionRules.code(old.getCode()), p.getCode())
-                    && ("Active".equals(old.getStatus()) || mongo.exists(Query.query(Criteria.where("promoCode").is(old.getCode())).collation(Collation.of("en").strength(Collation.ComparisonLevel.secondary())), Booking.class)))
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể đổi mã đang Active hoặc đã có lịch sử đặt vé");
+                    && mongo.exists(Query.query(Criteria.where("promoCode").is(old.getCode())).collation(Collation.of("en").strength(Collation.ComparisonLevel.secondary())), Booking.class))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Mã đã được dùng trong đơn đặt vé nên không thể đổi tên mã. Bạn vẫn có thể sửa tiêu đề và các thông tin khác");
             ensureUniqueCode();
             return replace(id, p.getVersion(), p, Promotion.class,
                     List.of("code", "title", "description", "discountType", "discountValue", "startDate", "endDate", "status", "conditions", "bannerImage"));
@@ -57,28 +58,71 @@ public class PromotionManagementService {
     }
     public Promotion disable(String id, Long version) {
         return admission.write(() -> {
-            promotions.findById(id).orElseThrow(this::notFound);
+            Promotion old = promotions.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
             Promotion updated = mongo.findAndModify(version(id, version), new Update().set("status", "Disabled").set("version", version == null ? 1L : version + 1),
                     FindAndModifyOptions.options().returnNew(true), Promotion.class);
             if (updated == null) throw changed(); return updated;
         });
     }
+    public Promotion archive(String id, Long revision) {
+        return admission.write(() -> {
+            Promotion old = promotions.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
+            if (!"Disabled".equals(old.getStatus()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được xóa mềm mã khuyến mãi đã Disabled");
+            Query query = version(id, revision);
+            query.addCriteria(Criteria.where("status").is("Disabled").and("archived").ne(true));
+            Promotion result = mongo.findAndModify(query,
+                    new Update().set("archived", true).set("version", revision == null ? 1L : revision + 1),
+                    FindAndModifyOptions.options().returnNew(true), Promotion.class);
+            if (result == null) throw changed();
+            return result;
+        });
+    }
     public PricingRule create(PricingRule r) {
-        return admission.write(() -> { DynamicPricingService.validate(r); r.setId(null); r.setVersion(0L); return pricing.insert(r); });
+        return admission.write(() -> { validatePricingRule(r); r.setId(null); r.setArchived(false); r.setVersion(0L); return pricing.insert(r); });
     }
     public PricingRule update(String id, PricingRule r) {
         return admission.write(() -> {
-            pricing.findById(id).orElseThrow(this::notFound); DynamicPricingService.validate(r);
+            PricingRule old = pricing.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
+            validatePricingRule(r);
             return replace(id, r.getVersion(), r, PricingRule.class, List.of("triggerVariable", "conditionParams", "adjustmentValue", "status"));
         });
     }
     public PricingRule disableRule(String id, Long revision) {
         return admission.write(() -> {
-            pricing.findById(id).orElseThrow(this::notFound);
+            PricingRule old = pricing.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
             PricingRule r = mongo.findAndModify(version(id, revision), new Update().set("status", "Disabled").set("version", revision == null ? 1L : revision + 1),
                     FindAndModifyOptions.options().returnNew(true), PricingRule.class);
             if (r == null) throw changed(); return r;
         });
+    }
+    public PricingRule archiveRule(String id, Long revision) {
+        return admission.write(() -> {
+            PricingRule old = pricing.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
+            if (!"Disabled".equals(old.getStatus()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được xóa mềm luật giá đã Disabled");
+            Query query = version(id, revision);
+            query.addCriteria(Criteria.where("status").is("Disabled").and("archived").ne(true));
+            PricingRule result = mongo.findAndModify(query,
+                    new Update().set("archived", true).set("version", revision == null ? 1L : revision + 1),
+                    FindAndModifyOptions.options().returnNew(true), PricingRule.class);
+            if (result == null) throw changed();
+            return result;
+        });
+    }
+    private void validatePricingRule(PricingRule rule) {
+        DynamicPricingService.validate(rule);
+        if ("SNEAK_SHOW".equals(rule.getTriggerVariable())) {
+            for (Object id : (List<?>) rule.getConditionParams().get("showtimeIds")) {
+                if (!mongo.exists(Query.query(Criteria.where("_id").is(id)), Showtime.class))
+                    throw new IllegalArgumentException("Không tìm thấy suất chiếu: " + id);
+            }
+        }
     }
     private Query version(String id, Long version) { return Query.query(Criteria.where("_id").is(id).and("version").is(version)); }
     private <T> T replace(String id, Long revision, T value, Class<T> type, List<String> fields) {

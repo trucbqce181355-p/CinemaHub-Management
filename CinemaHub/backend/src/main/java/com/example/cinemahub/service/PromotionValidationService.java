@@ -15,7 +15,9 @@ public class PromotionValidationService {
         List<Promotion> matches = promotionRepository.findAllByCodeIgnoreCase(PromotionRules.code(code));
         if (matches.size() != 1) throw new IllegalArgumentException(matches.isEmpty()
                 ? "Mã khuyến mãi không tồn tại" : "Mã khuyến mãi bị trùng; vui lòng liên hệ quản lý");
-        Promotion p = matches.get(0); PromotionRules.validate(p);
+        Promotion p = matches.get(0);
+        if (p.isArchived()) throw new IllegalArgumentException("Mã khuyến mãi đã được xóa khỏi danh sách");
+        PromotionRules.validate(p);
         if (!PromotionRules.active(p, LocalDateTime.now())) throw new IllegalArgumentException("Khuyến mãi không còn hiệu lực");
         return p;
     }

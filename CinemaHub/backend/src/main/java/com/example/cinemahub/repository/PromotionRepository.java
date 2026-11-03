@@ -13,6 +13,9 @@ public interface PromotionRepository extends MongoRepository<Promotion, String> 
     Optional<Promotion> findByCode(String code);
     List<Promotion> findAllByCodeIgnoreCase(String code);
     
-    @Query("{ 'status': 'Active', 'startDate': { $lte: ?0 }, 'endDate': { $gt: ?0 } }")
+    @Query("{ 'archived': { $ne: true } }")
+    List<Promotion> findVisiblePromotions();
+
+    @Query("{ 'archived': { $ne: true }, 'status': 'Active', 'startDate': { $lte: ?0 }, 'endDate': { $gt: ?0 } }")
     List<Promotion> findActivePromotions(LocalDateTime currentDate);
 }

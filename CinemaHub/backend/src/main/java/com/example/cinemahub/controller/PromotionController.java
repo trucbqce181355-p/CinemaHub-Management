@@ -15,7 +15,7 @@ public class PromotionController {
     private final PromotionRepository promotionRepository;
     private final PromotionValidationService validationService;
     private final PromotionManagementService management;
-    @GetMapping public List<Promotion> getAllPromotions() { return promotionRepository.findAll(); }
+    @GetMapping public List<Promotion> getAllPromotions() { return promotionRepository.findVisiblePromotions(); }
     public record PublicPromotion(String code, String title, String description, String discountType,
             Double discountValue, LocalDateTime startDate, LocalDateTime endDate, String bannerImage,
             Object minSpend, Object maxDiscount) {}
@@ -35,6 +35,9 @@ public class PromotionController {
     }
     @DeleteMapping("/{id}") public Promotion deletePromotion(@PathVariable String id, @RequestParam(required=false) Long version) {
         return management.disable(id, version);
+    }
+    @DeleteMapping("/{id}/archive") public Promotion archivePromotion(@PathVariable String id, @RequestParam(required=false) Long version) {
+        return management.archive(id, version);
     }
     public record CheckRequest(String code, Double subtotal) {}
     @PostMapping("/validate") public Map<String, Object> validatePromotion(@RequestBody CheckRequest request, Authentication auth) {

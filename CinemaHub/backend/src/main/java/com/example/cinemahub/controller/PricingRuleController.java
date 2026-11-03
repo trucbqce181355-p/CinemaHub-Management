@@ -12,7 +12,7 @@ import java.util.List;
 public class PricingRuleController {
     private final PricingRuleRepository pricingRuleRepository;
     private final PromotionManagementService management;
-    @GetMapping public List<PricingRule> getAllPricingRules() { return pricingRuleRepository.findAll(); }
+    @GetMapping public List<PricingRule> getAllPricingRules() { return pricingRuleRepository.findVisibleRules(); }
     @PostMapping public ResponseEntity<PricingRule> createPricingRule(@Valid @RequestBody PricingRuleRequest request) {
         return ResponseEntity.status(201).body(management.create(request.rule()));
     }
@@ -21,5 +21,8 @@ public class PricingRuleController {
     }
     @DeleteMapping("/{id}") public PricingRule deletePricingRule(@PathVariable String id, @RequestParam(required=false) Long version) {
         return management.disableRule(id, version);
+    }
+    @DeleteMapping("/{id}/archive") public PricingRule archivePricingRule(@PathVariable String id, @RequestParam(required=false) Long version) {
+        return management.archiveRule(id, version);
     }
 }

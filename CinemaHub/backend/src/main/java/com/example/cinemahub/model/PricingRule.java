@@ -23,4 +23,5 @@ public class PricingRule {
     private Double adjustmentValue;
     
     private String status;
+    private boolean archived;
 }

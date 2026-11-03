@@ -66,6 +66,43 @@ class PromotionPricingIntegrationTest {
         Promotion p = management.create(promo()); Promotion copy = promo(); copy.setCode(" test "); copy.setId(p.getId());
         assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> management.create(copy)); assertEquals(1, promos.count());
     }
+    @Test void percentSymbolWorksThroughCreateLookupAndApply() {
+        Promotion p = promo(); p.setCode(" giam10% ");
+        Promotion created = management.create(p);
+        assertEquals("GIAM10%", created.getCode());
+        assertEquals(created.getId(), validation.validateCode("giam10%").getId());
+        Booking b = held("owner"); var req = apply(b); req.setCode("giam10%");
+        assertEquals(90001d, bookings.applyPromo(req).getNewTotal());
+        assertEquals("GIAM10%", mongo.findById(b.getId(), Booking.class).getPromoCode());
+    }
+    @Test void softDeleteHidesDisabledPromotionButKeepsHistoryAndCodeReservation() {
+        Promotion p = management.create(promo());
+        mongo.insert(Booking.builder().promoCode("TEST").status("CONFIRMED").build());
+        assertThrows(ResponseStatusException.class, () -> management.archive(p.getId(), p.getVersion()));
+        Promotion disabled = management.disable(p.getId(), p.getVersion());
+        assertEquals(1, promos.findVisiblePromotions().size());
+        assertThrows(ResponseStatusException.class, () -> management.archive(disabled.getId(), 0L));
+        Promotion archived = management.archive(disabled.getId(), disabled.getVersion());
+        assertTrue(archived.isArchived()); assertEquals("Disabled", archived.getStatus());
+        assertTrue(promos.findVisiblePromotions().isEmpty()); assertEquals(1, promos.count());
+        assertEquals(1, mongo.count(new org.springframework.data.mongodb.core.query.Query(), Booking.class));
+        assertThrows(IllegalArgumentException.class, () -> validation.validateCode("TEST"));
+        assertThrows(ResponseStatusException.class, () -> management.update(archived.getId(), archived));
+        assertThrows(ResponseStatusException.class, () -> management.disable(archived.getId(), archived.getVersion()));
+        assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> management.create(promo()));
+    }
+    @Test void legacyRowsRemainVisibleAndArchivedRowsCannotAppearInPublicList() {
+        Promotion p = management.create(promo());
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(p.getId())),
+                new org.springframework.data.mongodb.core.query.Update().unset("archived"), Promotion.class);
+        assertEquals(1, promos.findVisiblePromotions().size());
+        Promotion disabled = management.disable(p.getId(), p.getVersion());
+        Promotion archived = management.archive(disabled.getId(), disabled.getVersion());
+        archived.setStatus("Active"); promos.save(archived);
+        assertTrue(promos.findActivePromotions(LocalDateTime.now()).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> validation.validateCode("TEST"));
+    }
     @Test void invalidRulesAndPromotionsCannotBeSaved() {
         for (double n : new double[]{-1, 101, Double.NaN}) { Promotion p = promo(); p.setDiscountType("Percentage"); p.setDiscountValue(n); assertThrows(IllegalArgumentException.class, () -> management.create(p)); }
         Promotion p = promo(); p.setEndDate(p.getStartDate()); assertThrows(IllegalArgumentException.class, () -> management.create(p));
@@ -80,10 +117,19 @@ class PromotionPricingIntegrationTest {
         assertThrows(ResponseStatusException.class, () -> management.disable(p.getId(), 0L));
         management.disable(p.getId(), 1L); assertEquals("Disabled", promos.findById(p.getId()).orElseThrow().getStatus()); assertEquals(1, promos.count());
     }
-    @Test void activeAndHistoricallyUsedCodesCannotBeRenamed() {
-        Promotion p = management.create(promo()); p.setCode("NEW"); assertThrows(ResponseStatusException.class, () -> management.update(p.getId(), p));
-        Promotion disabled = management.disable(p.getId(), 0L); mongo.insert(Booking.builder().promoCode("test").status("CONFIRMED").build());
-        Promotion edit = disabled; edit.setCode("NEW"); assertThrows(ResponseStatusException.class, () -> management.update(edit.getId(), edit));
+    @Test void activeUnusedCodeCanBeRenamedWithoutDisabling() {
+        Promotion p = management.create(promo()); p.setCode("new10%");
+        Promotion saved = management.update(p.getId(), p);
+        assertEquals("NEW10%", saved.getCode()); assertEquals("Active", saved.getStatus());
+        assertEquals(p.getId(), validation.validateCode("NEW10%").getId());
+        assertThrows(IllegalArgumentException.class, () -> validation.validateCode("TEST"));
+    }
+    @Test void historicalCodeIsProtectedRegardlessOfStatus() {
+        Promotion p = management.create(promo());
+        mongo.insert(Booking.builder().promoCode("test").status("CONFIRMED").build());
+        p.setCode("NEW"); assertThrows(ResponseStatusException.class, () -> management.update(p.getId(), p));
+        Promotion disabled = management.disable(p.getId(), p.getVersion());
+        disabled.setCode("NEW"); assertThrows(ResponseStatusException.class, () -> management.update(disabled.getId(), disabled));
     }
     @Test void legacyDocumentWithoutVersionCanBeEdited() {
         Promotion p = promos.insert(promo()); assertNull(p.getVersion()); p.setTitle("Legacy updated");
@@ -138,6 +184,47 @@ class PromotionPricingIntegrationTest {
         assertEquals(110001d, bookings.holdSeats(hold,"owner").getSubtotal());
         PricingRule r = management.create(rule("WEEKEND", -1000000, Map.of())); assertEquals(1000d, bookings.calculatePrice(request("A1")).getTotalAmount());
         management.disableRule(r.getId(), r.getVersion()); assertEquals(110001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+    }
+    @Test void pricingCrudPreservesHeldPricesAndArchivesOnlyDisabledRules() {
+        PricingRule r = management.create(rule("WEEKEND", 20000, Map.of()));
+        assertEquals(0L, r.getVersion()); assertFalse(r.isArchived());
+        assertEquals(1, rules.findVisibleRules().size()); assertEquals(120001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+        HoldSeatRequest hold = new HoldSeatRequest(); hold.setShowtimeId(show.getId()); hold.setSeatIds(List.of("A1"));
+        Booking savedHold = bookings.holdSeats(hold, "owner");
+        assertThrows(ResponseStatusException.class, () -> management.archiveRule(r.getId(), r.getVersion()));
+        r.setAdjustmentValue(30000d); PricingRule updated = management.update(r.getId(), r);
+        assertEquals(1L, updated.getVersion()); assertEquals(130001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+        assertEquals(120001d, mongo.findById(savedHold.getId(), Booking.class).getSubtotal());
+        assertThrows(ResponseStatusException.class, () -> management.update(r.getId(), r));
+        assertThrows(ResponseStatusException.class, () -> management.disableRule(r.getId(), 0L));
+        PricingRule disabled = management.disableRule(r.getId(), updated.getVersion());
+        assertEquals("Disabled", disabled.getStatus()); assertEquals(100001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+        assertEquals(1, rules.findVisibleRules().size());
+        assertThrows(ResponseStatusException.class, () -> management.archiveRule(r.getId(), 1L));
+        PricingRule archived = management.archiveRule(r.getId(), disabled.getVersion());
+        assertTrue(archived.isArchived()); assertEquals(1, rules.count()); assertTrue(rules.findVisibleRules().isEmpty());
+        assertThrows(ResponseStatusException.class, () -> management.update(r.getId(), archived));
+        assertThrows(ResponseStatusException.class, () -> management.disableRule(r.getId(), archived.getVersion()));
+        assertEquals(120001d, mongo.findById(savedHold.getId(), Booking.class).getTotalAmount());
+    }
+    @Test void legacyPricingRowsAreVisibleAndArchivedRulesNeverAffectPrice() {
+        PricingRule r = rules.insert(rule("WEEKEND", 20000, Map.of()));
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(r.getId())),
+                new org.springframework.data.mongodb.core.query.Update().unset("archived"), PricingRule.class);
+        assertEquals(1, rules.findVisibleRules().size()); assertEquals(120001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+        PricingRule disabled = management.disableRule(r.getId(), null);
+        PricingRule archived = management.archiveRule(r.getId(), disabled.getVersion());
+        archived.setStatus("Active"); rules.save(archived);
+        assertTrue(rules.findApplicableRules().isEmpty()); assertEquals(100001d, bookings.calculatePrice(request("A1")).getTotalAmount());
+        assertEquals(100001d, new DynamicPricingService(rules).price(show,100001d,List.of(archived)));
+    }
+    @Test void sneakRulesCannotReferenceMissingShowtimes() {
+        assertThrows(IllegalArgumentException.class, () -> management.create(rule("SNEAK_SHOW", 10000, Map.of("showtimeIds", List.of("missing")))));
+        PricingRule r = management.create(rule("SNEAK_SHOW", 10000, Map.of("showtimeIds", List.of(show.getId()))));
+        r.setConditionParams(Map.of("showtimeIds", List.of("missing")));
+        assertThrows(IllegalArgumentException.class, () -> management.update(r.getId(), r));
+        assertEquals(1, rules.count());
     }
     @Test void holidayAndSneakRulesUseExplicitDatesAndScreeningIds() {
         management.create(rule("HOLIDAY", 5000, Map.of("dates", List.of("2030-01-05"))));
