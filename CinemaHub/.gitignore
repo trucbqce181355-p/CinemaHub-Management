@@ -32,3 +32,12 @@ build/
 ### VS Code ###
 .vscode/
 node_modules/
+
+# Local reports and generated runtime files
+/docs/code-file-inventory.md
+*.class
+*.log
+*.tmp
+.env
+.env.*
+!.env.example
