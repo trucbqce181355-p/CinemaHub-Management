@@ -62,13 +62,19 @@ public class BookingController {
 
     // 4. Calculate total ticket price (with seat types, format surcharge, promo)
     @PostMapping("/calculate-price")
-    public ResponseEntity<?> calculatePrice(@Valid @RequestBody CalculatePriceRequest req) {
+    public ResponseEntity<?> calculatePrice(@Valid @RequestBody CalculatePriceRequest req, Authentication authentication) {
         try {
-            return ResponseEntity.ok(bookingService.calculatePrice(req));
+            return ResponseEntity.ok(bookingService.calculatePrice(req, authentication == null || "anonymousUser".equals(authentication.getName()) ? null : authentication.getName()));
         } catch (RuntimeException e) {
             if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @PostMapping("/counter-price")
+    public ResponseEntity<?> counterPrice(@Valid @RequestBody CalculatePriceRequest req) {
+        try { return ResponseEntity.ok(bookingService.calculateCounterPrice(req)); }
+        catch (RuntimeException ex) { return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage())); }
     }
 
     // 5. Apply promo code
@@ -167,5 +173,11 @@ public class BookingController {
             if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+    @DeleteMapping("/{id}/promo")
+    public ResponseEntity<?> clearPromo(@PathVariable String id, Authentication authentication) {
+        payments.owned(id, authentication.getName());
+        try { return ResponseEntity.ok(bookingService.clearPromo(id)); }
+        catch (IllegalArgumentException ex) { return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage())); }
     }
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, RefreshCcw, Save, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, RefreshCcw, Save, LayoutGrid } from 'lucide-react';
 
 const SeatManagementModal = ({ room, onClose }) => {
   const [seats, setSeats] = useState([]);
@@ -7,6 +7,18 @@ const SeatManagementModal = ({ room, onClose }) => {
   const [showGenModal, setShowGenModal] = useState(false);
   const [genConfig, setGenConfig] = useState({ rows: 6, cols: 10 });
   const [saveMessage, setSaveMessage] = useState(null);
+  const mapViewportRef = useRef(null);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const viewport = mapViewportRef.current;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setMapSize({ width, height });
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
 
   const getAuthHeaders = () => {
     const userStr = localStorage.getItem('user');
@@ -100,73 +112,88 @@ const SeatManagementModal = ({ room, onClose }) => {
   const getSeatColor = (s) => {
     if (s.status !== 'ACTIVE') return 'bg-gray-800 text-gray-500 opacity-30 border-gray-700 line-through';
     if (s.seatType === 'VIP') return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
-    if (s.seatType === 'COUPLE') return 'bg-pink-500/20 text-pink-400 border-pink-500/50 rounded-full w-14';
+    if (s.seatType === 'COUPLE') return 'bg-pink-500/20 text-pink-400 border-pink-500/50 rounded-full';
     return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
   };
 
   // Group seats by row for display
   const rows = [...new Set(seats.map(s => s.row))].sort();
+  const seatRows = rows.map(row => ({ row, seats: seats.filter(s => s.row === row).sort((a, b) => a.col - b.col) }));
+  const columns = [...new Set(seats.map(seat => seat.col))].sort((a, b) => a - b);
+  const seatGridWidth = columns.length * 32 + Math.max(0, columns.length - 1) * 6;
+  // All seat types share a column footprint so changing a type cannot stretch the map.
+  const mapWidth = Math.max(180, seatGridWidth + 60);
+  const mapHeight = 48 + rows.length * 32 + Math.max(0, rows.length - 1) * 10;
+  const mapScale = Math.min(1, mapSize.width / mapWidth, mapSize.height / mapHeight);
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-4xl border border-white/10 relative max-h-[90vh] overflow-hidden flex flex-col">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
-
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold font-display text-white">
-            Sơ đồ ghế: <span className="text-primary">{room.name}</span>
-          </h2>
-          <div className="flex gap-2">
-            <button onClick={handleGenerateClick} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center gap-2 transition-colors">
-              <RefreshCcw className="w-4 h-4" /> Tạo Mẫu
-            </button>
-            <button onClick={handleSave} className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg flex items-center gap-2 transition-colors font-bold shadow-lg shadow-primary/20">
-              <Save className="w-4 h-4" /> Lưu Lại
-            </button>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="seat-map-title" className="bg-[#121212] rounded-3xl w-full max-w-2xl border border-white/10 relative max-h-[90vh] overflow-hidden flex flex-col text-white shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-6 py-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="rounded-xl bg-primary/20 p-3 text-primary"><LayoutGrid className="h-6 w-6" /></div>
+            <div className="min-w-0"><h2 id="seat-map-title" className="text-2xl font-bold font-display">Sơ đồ ghế</h2><p className="mt-1 break-words text-sm text-gray-400">{room.name}</p></div>
           </div>
-        </div>
+          <button type="button" onClick={onClose} aria-label="Đóng sơ đồ ghế" className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white"><X className="w-6 h-6" /></button>
+        </header>
 
-        <div className="flex items-center gap-6 mb-6 justify-center p-4 bg-black/50 rounded-xl border border-white/5">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 justify-center p-4 bg-white/[0.03] rounded-2xl border border-white/10">
           <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-500/20 border border-blue-500/50 rounded"></div><span className="text-sm text-gray-400">Thường</span></div>
           <div className="flex items-center gap-2"><div className="w-4 h-4 bg-orange-500/20 border border-orange-500/50 rounded"></div><span className="text-sm text-gray-400">VIP</span></div>
           <div className="flex items-center gap-2"><div className="w-6 h-4 bg-pink-500/20 border border-pink-500/50 rounded-full"></div><span className="text-sm text-gray-400">Couple</span></div>
           <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-800 border border-gray-700 rounded opacity-50"></div><span className="text-sm text-gray-400">Bảo trì/Ẩn</span></div>
-          <span className="text-xs text-gray-500 ml-4 italic">(Click vào ghế để đổi loại)</span>
+          <span className="w-full text-center text-xs text-gray-500 italic">(Click vào ghế để đổi loại)</span>
         </div>
 
-        <div className="flex-1 overflow-auto bg-black/30 rounded-xl p-8 border border-white/5 custom-scrollbar">
+        <div className="relative h-[clamp(180px,40vh,360px)] overflow-hidden bg-white/[0.03] rounded-2xl border border-white/10">
+          <div ref={mapViewportRef} className="absolute inset-3 flex items-center justify-center">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-gray-400 animate-pulse">Đang tải sơ đồ...</div>
+            <div className="flex items-center justify-center min-h-32 text-gray-400 animate-pulse">Đang tải sơ đồ...</div>
           ) : seats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-4">
+            <div className="flex flex-col items-center justify-center min-h-32 text-center text-sm text-gray-500 gap-4">
               <p>Phòng này chưa có sơ đồ ghế.</p>
               <button onClick={handleGenerateClick} className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors">Tạo Sơ Đồ Mặc Định</button>
             </div>
           ) : (
-            <div className="min-w-max mx-auto space-y-4">
-              <div className="w-full text-center py-2 bg-white/10 text-gray-400 rounded-lg mb-12 uppercase tracking-[1em] text-sm">Màn hình</div>
+            <div className="relative shrink-0" style={{ width: mapWidth * mapScale, height: mapHeight * mapScale }}>
+            <div className="absolute left-0 top-0 origin-top-left" style={{ width: mapWidth, height: mapHeight, transform: `scale(${mapScale})` }}>
+              <div style={{ width: seatGridWidth }} className="h-6 mx-auto flex items-center justify-center bg-white/10 text-gray-400 rounded-lg mb-6 uppercase tracking-[0.5em] text-xs">Màn hình</div>
 
-              {rows.map(row => (
-                <div key={row} className="flex justify-center items-center gap-4">
-                  <div className="w-8 text-center font-bold text-gray-500">{row}</div>
-                  <div className="flex gap-2">
-                    {seats.filter(s => s.row === row).sort((a, b) => a.col - b.col).map(s => (
+              <div className="flex flex-col gap-2.5">
+              {seatRows.map(({ row, seats: rowSeats }) => (
+                <div key={row} className="flex justify-center items-center gap-2.5">
+                  <div className="w-5 shrink-0 text-center text-xs font-bold text-gray-500">{row}</div>
+                  <div className="grid items-center gap-1.5" style={{ width: seatGridWidth, gridTemplateColumns: `repeat(${columns.length}, 32px)`, gridTemplateRows: '32px' }}>
+                    {rowSeats.map(s => (
                       <button
+                        type="button"
                         key={s.id || s.seatNumber}
                         onClick={() => handleSeatClick(s.id || s.seatNumber)}
-                        className={`w-10 h-10 flex items-center justify-center text-xs font-bold border rounded transition-all duration-300 hover:scale-110 ${getSeatColor(s)}`}
+                        style={{ gridColumn: columns.indexOf(s.col) + 1, gridRow: 1, width: 32, height: s.seatType === 'COUPLE' ? 24 : 32 }}
+                        className={`shrink-0 flex items-center justify-center text-[10px] font-bold border rounded transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white ${getSeatColor(s)}`}
                         title={`Ghế ${s.seatNumber} - ${s.seatType} - ${s.status}`}
                       >
                         {s.seatNumber}
                       </button>
                     ))}
                   </div>
-                  <div className="w-8 text-center font-bold text-gray-500">{row}</div>
+                  <div className="w-5 shrink-0 text-center text-xs font-bold text-gray-500">{row}</div>
                 </div>
               ))}
+              </div>
+            </div>
             </div>
           )}
+          </div>
         </div>
+        </div>
+
+        <footer className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-white/10 px-6 py-4 sm:px-8">
+          <button type="button" onClick={onClose} className="rounded-xl px-5 py-3 text-gray-300 hover:bg-white/10">Đóng</button>
+          <button type="button" onClick={handleGenerateClick} disabled={loading} className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-gray-200 hover:bg-white/15 disabled:opacity-50"><RefreshCcw className="h-4 w-4" />Tạo mẫu</button>
+          <button type="button" onClick={handleSave} disabled={loading || seats.length === 0} className="flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-bold hover:bg-red-700 disabled:opacity-50"><Save className="h-4 w-4" />Lưu lại</button>
+        </footer>
 
         {/* Generate Modal */}
         {showGenModal && (

@@ -18,6 +18,8 @@ public class CalculatePriceRequest {
     private List<String> seatIds;
 
     private String promoCode;
+    @jakarta.validation.constraints.Email
+    private String customerEmail;
 
     @Data
     @Builder

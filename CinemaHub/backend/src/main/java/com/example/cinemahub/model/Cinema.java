@@ -24,8 +24,14 @@ public class Cinema {
     
     @NotBlank(message = "Trạng thái không được để trống")
     private String status;
+    private boolean deleted;
     
     private List<String> facilities;
     private Map<String, Double> mapCoordinates;
+    private String imageUrl;
+    private String imageId;
+    private String description;
+    private List<String> houseRules;
+    private List<String> services;
 }
 

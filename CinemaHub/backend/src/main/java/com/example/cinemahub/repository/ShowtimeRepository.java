@@ -15,6 +15,7 @@ public interface ShowtimeRepository extends MongoRepository<Showtime, String> {
     long countByMovieId(String movieId);
     List<Showtime> findByCinemaId(String cinemaId);
     List<Showtime> findByMovieIdAndCinemaId(String movieId, String cinemaId);
+    List<Showtime> findByCinemaIdAndStartTimeBetweenOrderByStartTimeAsc(String cinemaId, LocalDateTime start, LocalDateTime end);
     List<Showtime> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
     List<Showtime> findByMovieIdAndStartTimeBetween(String movieId, LocalDateTime start, LocalDateTime end);
 }

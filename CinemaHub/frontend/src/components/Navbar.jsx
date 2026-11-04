@@ -29,7 +29,7 @@ const Navbar = () => {
     { name: 'Trang chủ', path: '/' },
     { name: 'Phim', path: '/movies' },
     { name: 'Rạp phim', path: '/cinemas' },
-    { name: 'Khuyến mãi', path: '/' },
+    { name: 'Khuyến mãi', path: '/promotions' },
   ];
 
   return (

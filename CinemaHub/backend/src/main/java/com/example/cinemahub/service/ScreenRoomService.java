@@ -12,10 +12,15 @@ public class ScreenRoomService {
     private AdmissionCoordinator admission;
 
     @Autowired
+    private ScreeningActivityService screeningActivity;
+
+    @Autowired
     private ScreenRoomRepository screenRoomRepository;
 
     public List<ScreenRoom> getRoomsByCinema(String cinemaId) {
-        return screenRoomRepository.findByCinemaId(cinemaId);
+        return screenRoomRepository.findByCinemaId(cinemaId).stream()
+                .filter(room -> !room.isDeleted())
+                .toList();
     }
 
     public ScreenRoom getRoomById(String roomId) {
@@ -29,6 +34,7 @@ public class ScreenRoomService {
     private ScreenRoom createRoomInternal(String cinemaId, ScreenRoom room) {
         room.setCinemaId(cinemaId);
         room.setStatus("Active");
+        room.setDeleted(false);
         return screenRoomRepository.save(room);
     }
 
@@ -38,6 +44,10 @@ public class ScreenRoomService {
 
     private ScreenRoom updateRoomInternal(String roomId, ScreenRoom roomDetails) {
         ScreenRoom room = getRoomById(roomId);
+        if (room.isDeleted()) throw new IllegalArgumentException("Phòng chiếu đã được xóa khỏi danh sách, không thể chỉnh sửa hoặc kích hoạt lại.");
+        if ("Disabled".equalsIgnoreCase(roomDetails.getStatus())) {
+            screeningActivity.assertRoomCanDisable(roomId);
+        }
         room.setName(roomDetails.getName());
         room.setCapacity(roomDetails.getCapacity());
         room.setScreenType(roomDetails.getScreenType()); // UC-41
@@ -53,15 +63,20 @@ public class ScreenRoomService {
 
     private ScreenRoom disableRoomInternal(String roomId) {
         ScreenRoom room = getRoomById(roomId);
+        screeningActivity.assertRoomCanDisable(roomId);
         room.setStatus("Disabled");
         return screenRoomRepository.save(room);
     }
 
-    public void deleteRoomPermanently(String roomId) {
-        admission.write(() -> deleteRoomPermanentlyInternal(roomId));
+    public ScreenRoom softDeleteRoom(String roomId) {
+        return admission.write(() -> {
+            ScreenRoom room = getRoomById(roomId);
+            if (!"Disabled".equalsIgnoreCase(room.getStatus())) {
+                throw new IllegalArgumentException("Vui lòng ngưng hoạt động phòng chiếu trước khi xóa.");
+            }
+            room.setDeleted(true);
+            return screenRoomRepository.save(room);
+        });
     }
 
-    private void deleteRoomPermanentlyInternal(String roomId) {
-        screenRoomRepository.deleteById(roomId);
-    }
 }

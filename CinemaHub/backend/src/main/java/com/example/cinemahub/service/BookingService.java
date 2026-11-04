@@ -44,6 +44,9 @@ public class BookingService {
     private PromotionValidationService promotionValidationService;
 
     @Autowired
+    private DynamicPricingService dynamicPricingService;
+
+    @Autowired
     private EmailService emailService;
 
     @Autowired
@@ -92,6 +95,7 @@ public class BookingService {
 
         // Fetch actual seats from database
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+        List<PricingRule> priceRules = dynamicPricingService.rules();
         if (actualSeats == null || actualSeats.isEmpty()) {
             throw new RuntimeException("Phòng chiếu này chưa được cấu hình sơ đồ ghế!");
         }
@@ -108,7 +112,7 @@ public class BookingService {
                 continue;
             }
 
-            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
 
             String status = "AVAILABLE";
             if (bookedSeats.contains(seatId)) {
@@ -193,13 +197,14 @@ public class BookingService {
 
         Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+        List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<Booking.BookedSeat> seatList = new ArrayList<>();
         double subtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
-            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
-            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
-            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
+            Seat seat = requireSeat(actualSeats, seatId);
+            String seatType = seat.getSeatType();
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
             subtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
@@ -283,20 +288,39 @@ public class BookingService {
     }
 
     // 4. Calculate Total Ticket Price
-    public CalculatePriceRequest.PriceResult calculatePrice(CalculatePriceRequest req) {
+    public CalculatePriceRequest.PriceResult calculateCounterPrice(CalculatePriceRequest req) {
+        return calculatePrice(req, counterCustomer(req.getCustomerEmail()));
+    }
+    private String counterCustomer(String email) {
+        if (email == null || email.isBlank()) return null;
+        User customer = mongo.findOne(org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("email").is(email.trim())), User.class);
+        return customer == null ? null : customer.getId();
+    }
+    public CalculatePriceRequest.PriceResult calculatePrice(CalculatePriceRequest req) { return calculatePrice(req, null); }
+
+    public CalculatePriceRequest.PriceResult calculatePrice(CalculatePriceRequest req, String userId) {
+        return admission.read(() -> calculatePriceInternal(req, userId));
+    }
+
+    private CalculatePriceRequest.PriceResult calculatePriceInternal(CalculatePriceRequest req, String userId) {
+        if (req.getSeatIds() == null || req.getSeatIds().isEmpty() || req.getSeatIds().stream().anyMatch(Objects::isNull)
+                || new HashSet<>(req.getSeatIds()).size() != req.getSeatIds().size())
+            throw new IllegalArgumentException("Danh sách ghế rỗng hoặc bị trùng");
         Showtime showtime = showtimeRepository.findById(req.getShowtimeId())
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không tồn tại"));
 
         Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+        List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<CalculatePriceRequest.SeatPriceItem> seatItems = new ArrayList<>();
         double subtotal = 0.0;
 
         for (String seatId : req.getSeatIds()) {
-            Seat seat = actualSeats.stream().filter(s -> s.getSeatNumber().equals(seatId)).findFirst().orElse(null);
-            String seatType = seat != null ? seat.getSeatType() : "STANDARD";
-            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
+            Seat seat = requireSeat(actualSeats, seatId);
+            String seatType = seat.getSeatType();
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
             subtotal += price;
 
             seatItems.add(CalculatePriceRequest.SeatPriceItem.builder()
@@ -311,13 +335,9 @@ public class BookingService {
         String promoTitle = null;
 
         if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
-            try {
-                Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
-                discount = computeDiscount(promo, subtotal);
-                promoTitle = promo.getTitle();
-            } catch (Exception e) {
-                // Invalid promo code, discount remains 0
-            }
+            Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
+            discount = promotionValidationService.discount(promo, subtotal, userId, null);
+            promoTitle = promo.getTitle();
         }
 
         double totalAmount = Math.max(0.0, subtotal - discount);
@@ -326,7 +346,7 @@ public class BookingService {
                 .subtotal(subtotal)
                 .discountAmount(discount)
                 .totalAmount(totalAmount)
-                .promoCode(discount > 0 ? req.getPromoCode() : null)
+                .promoCode(discount > 0 ? PromotionRules.code(req.getPromoCode()) : null)
                 .promoTitle(promoTitle)
                 .seats(seatItems)
                 .build();
@@ -334,26 +354,24 @@ public class BookingService {
 
     // 5. Apply Promo Code
     public ApplyPromoRequest.PromoResult applyPromo(ApplyPromoRequest req) {
+        return admission.write(() -> applyPromoInternal(req));
+    }
+
+    private ApplyPromoRequest.PromoResult applyPromoInternal(ApplyPromoRequest req) {
         Booking pricedBooking = bookingRepository.findById(req.getBookingId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn"));
         if (!"PENDING".equals(pricedBooking.getStatus()) || pricedBooking.getPayment() != null
                 || pricedBooking.getHoldExpiresAt() == null
                 || !pricedBooking.getHoldExpiresAt().isAfter(LocalDateTime.now()))
             throw new RuntimeException("Không thể đổi giá khi đã khởi tạo thanh toán hoặc đơn hết hạn");
+        if (pricedBooking.getSubtotal() == null || pricedBooking.getSubtotal() != Money.vnd(pricedBooking.getSubtotal()))
+            throw new IllegalArgumentException("Đơn cũ có giá không hợp lệ. Vui lòng giữ ghế lại");
         req.setSubtotal(pricedBooking.getSubtotal());
         Promotion promo = promotionValidationService.validateCode(req.getCode());
 
-        // Check minimum spend condition if present
-        if (promo.getConditions() != null && promo.getConditions().containsKey("minSpend")) {
-            Object minSpendObj = promo.getConditions().get("minSpend");
-            double minSpend = Double.parseDouble(minSpendObj.toString());
-            if (req.getSubtotal() < minSpend) {
-                throw new RuntimeException(String.format("Mã chỉ áp dụng cho đơn hàng từ %,.0f đ", minSpend));
-            }
-        }
-
-        double discountAmount = computeDiscount(promo, req.getSubtotal());
+        double discountAmount = promotionValidationService.discount(promo, req.getSubtotal(), pricedBooking.getUserId(), pricedBooking.getId());
         double newTotal = Math.max(0.0, req.getSubtotal() - discountAmount);
+        if (newTotal <= 0) throw new IllegalArgumentException("Thanh toán online cần tổng tiền lớn hơn 0. Vui lòng dùng mã khác");
 
         if (req.getBookingId() != null && !req.getBookingId().isBlank()) {
             java.util.Optional.of(pricedBooking).ifPresent(b -> {
@@ -579,6 +597,7 @@ public class BookingService {
 
         Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
+        List<PricingRule> priceRules = dynamicPricingService.rules();
 
         // Build seats and price
         List<Booking.BookedSeat> seatList = new ArrayList<>();
@@ -589,7 +608,7 @@ public class BookingService {
                 throw new RuntimeException("Ghế " + seatId + " không tồn tại hoặc không hoạt động");
             Seat seat = matches.get(0);
             String seatType = seat.getSeatType();
-            Double price = calculateSingleSeatPrice(showtime, movie, seatType);
+            Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
             subtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
@@ -600,19 +619,18 @@ public class BookingService {
                     .build());
         }
 
+        String counterCustomerId = counterCustomer(req.getCustomerEmail());
         double discount = 0.0;
         if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
-            try {
-                Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
-                discount = computeDiscount(promo, subtotal);
-            } catch (Exception ignored) {
-            }
+            Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
+            discount = promotionValidationService.discount(promo, subtotal, counterCustomerId, null);
         }
 
         double totalAmount = Math.max(0.0, subtotal - discount);
         String reference = generateBookingReference();
 
         Booking booking = Booking.builder()
+                .userId(counterCustomerId)
                 .id(UUID.randomUUID().toString())
                 .bookingReference(reference)
                 .customerName(req.getCustomerName())
@@ -630,7 +648,7 @@ public class BookingService {
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
                 .subtotal(subtotal)
-                .promoCode(discount > 0 ? req.getPromoCode() : null)
+                .promoCode(discount > 0 ? PromotionRules.code(req.getPromoCode()) : null)
                 .discountAmount(discount)
                 .totalAmount(totalAmount)
                 .status("CONFIRMED")
@@ -766,7 +784,7 @@ public class BookingService {
         return "STANDARD";
     }
 
-    private Double calculateSingleSeatPrice(Showtime showtime, Movie movie, String seatType) {
+    private Double calculateSingleSeatPrice(Showtime showtime, Movie movie, String seatType, List<PricingRule> priceRules) {
         // Retrieve base prices from the movie configuration, fallback to default if
         // missing
         double base = 90000.0;
@@ -785,18 +803,38 @@ public class BookingService {
             base += 40000.0;
         }
 
-        return base;
+        return dynamicPricingService.price(showtime, base, priceRules);
     }
 
-    private double computeDiscount(Promotion promo, double subtotal) {
-        if ("PERCENTAGE".equalsIgnoreCase(promo.getDiscountType())) {
-            double percent = promo.getDiscountValue() != null ? promo.getDiscountValue() : 0.0;
-            return Math.min(subtotal, (double) Math.round(subtotal * (percent / 100.0)));
-        } else {
-            // FIXED_AMOUNT
-            double fixed = promo.getDiscountValue() != null ? promo.getDiscountValue() : 0.0;
-            return Math.min(subtotal, (double) Math.round(fixed));
-        }
+    private Seat requireSeat(List<Seat> seats, String number) {
+        List<Seat> matches = seats.stream().filter(seat -> Objects.equals(number, seat.getSeatNumber())).toList();
+        if (matches.size() != 1 || !"ACTIVE".equalsIgnoreCase(matches.get(0).getStatus()))
+            throw new IllegalArgumentException("Ghế không tồn tại, bị trùng hoặc không hoạt động: " + number);
+        return matches.get(0);
+    }
+
+    /** An applied discount is a held reservation; recheck eligibility before initiating payment. */
+    public void validatePaymentPromotion(Booking booking) {
+        if (booking.getPromoCode() == null || booking.getPromoCode().isBlank()) return;
+        Promotion p = promotionValidationService.validateCode(booking.getPromoCode());
+        double discount = promotionValidationService.discount(p, booking.getSubtotal(), booking.getUserId(), booking.getId());
+        if (!Objects.equals(booking.getDiscountAmount(), discount)
+                || !Objects.equals(booking.getTotalAmount(), Money.vnd(booking.getSubtotal() - discount)))
+            throw new IllegalArgumentException("Khuyến mãi đã thay đổi. Vui lòng áp dụng lại mã trước khi thanh toán");
+    }
+
+    public Map<String, Object> clearPromo(String id) {
+        return admission.write(() -> {
+            Booking b = bookingRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn"));
+            var q = org.springframework.data.mongodb.core.query.Query.query(
+                    org.springframework.data.mongodb.core.query.Criteria.where("_id").is(id).and("version").is(b.getVersion())
+                            .and("status").is("PENDING").and("payment").is(null).and("holdExpiresAt").gt(LocalDateTime.now()));
+            var u = new org.springframework.data.mongodb.core.query.Update().unset("promoCode").set("discountAmount", 0d)
+                    .set("totalAmount", b.getSubtotal()).inc("version", 1).set("updatedAt", LocalDateTime.now());
+            if (mongo.updateFirst(q, u, Booking.class).getModifiedCount() != 1)
+                throw new IllegalArgumentException("Đơn đã thay đổi hoặc không còn được phép sửa");
+            return Map.of("subtotal", b.getSubtotal(), "discountAmount", 0d, "totalAmount", b.getSubtotal());
+        });
     }
 
     private String generateBookingReference() {

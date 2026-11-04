@@ -1,3 +1,4 @@
+import Promotions from './pages/Promotions';
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
@@ -125,6 +126,7 @@ function App() {
 
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
+          <Route path="/promotions" element={<Promotions />} />
           <Route path="/movies" element={<Movies />} />
           <Route path="/cinemas" element={<Cinemas />} />
           <Route path="/membership" element={<Navigate to="/profile?tab=membership" replace />} />
