@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cinemas/{cinemaId}/rooms")
@@ -43,10 +44,14 @@ public class ScreenRoomController {
         return ResponseEntity.ok(screenRoomService.disableRoom(roomId));
     }
 
-    // Delete Permanently
-    @DeleteMapping("/{roomId}/permanent")
-    public ResponseEntity<Void> deleteRoomPermanently(@PathVariable String cinemaId, @PathVariable String roomId) {
-        screenRoomService.deleteRoomPermanently(roomId);
-        return ResponseEntity.ok().build();
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException error) {
+        return ResponseEntity.badRequest().body(Map.of("error", error.getMessage()));
+    }
+
+    // The legacy URL is retained as an alias; both routes only archive the record.
+    @DeleteMapping({"/{roomId}/soft-delete", "/{roomId}/permanent"})
+    public ResponseEntity<ScreenRoom> softDeleteRoom(@PathVariable String cinemaId, @PathVariable String roomId) {
+        return ResponseEntity.ok(screenRoomService.softDeleteRoom(roomId));
     }
 }

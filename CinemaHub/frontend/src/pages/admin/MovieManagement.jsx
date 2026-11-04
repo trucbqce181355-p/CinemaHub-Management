@@ -477,7 +477,8 @@ const MovieManagement = () => {
               </button>
             </div>
 
-            <div className="p-8 overflow-y-auto">
+            <form onSubmit={isEditModalOpen ? handleEditMovie : handleAddMovie} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto p-8">
               {formError && (
                 <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
                   <AlertCircle className="w-5 h-5" />
@@ -485,7 +486,7 @@ const MovieManagement = () => {
                 </div>
               )}
 
-              <form onSubmit={isEditModalOpen ? handleEditMovie : handleAddMovie} className="space-y-6">
+              <div className="space-y-6">
 
                 {/* Row 1: Titles */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -703,8 +704,10 @@ const MovieManagement = () => {
                   ></textarea>
                 </div>
 
+              </div>
+              </div>
                 {/* Action Buttons */}
-                <div className="pt-6 border-t border-white/10 flex justify-end gap-4 sticky bottom-0 bg-[#121212] py-4 mt-6">
+                <div className="shrink-0 border-t border-white/10 bg-[#121212] px-8 py-4 flex justify-end gap-4 rounded-b-3xl">
                   <button
                     type="button"
                     onClick={() => {
@@ -728,8 +731,7 @@ const MovieManagement = () => {
                   </button>
                 </div>
 
-              </form>
-            </div>
+            </form>
           </div>
         </div>
       )}

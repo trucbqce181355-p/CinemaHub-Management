@@ -79,10 +79,10 @@ export default function CameraQrScanner({ onScan, paused, onRestart }) {
 
   return (
     <div className="w-full space-y-4 text-center">
-      <h2 className="text-xl font-bold text-gray-200">Quét QR trên vé bằng camera</h2>
-      <div className="relative aspect-square max-w-sm mx-auto rounded-2xl overflow-hidden bg-black border border-white/20">
+      <h2 className="text-lg font-bold text-gray-200">Quét QR trên vé bằng camera</h2>
+      <div className="relative aspect-square w-full max-w-64 mx-auto rounded-xl overflow-hidden bg-black border border-white/10">
         <video ref={videoRef} muted playsInline autoPlay aria-label="Camera quét mã QR" className="w-full h-full object-cover" />
-        {!enabled && <div className="absolute inset-0 flex items-center justify-center"><Camera className="w-20 h-20 text-gray-500" /></div>}
+        {!enabled && <div className="absolute inset-0 flex items-center justify-center"><Camera className="w-12 h-12 text-gray-500" /></div>}
         {enabled && !ready && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-gray-200">Đang mở camera...</div>}
         {enabled && paused && <div className="absolute inset-0 flex items-center justify-center bg-black/65 text-white px-5">Đã nhận mã. Hãy xem kết quả kiểm tra vé.</div>}
       </div>
@@ -92,11 +92,11 @@ export default function CameraQrScanner({ onScan, paused, onRestart }) {
           setError(''); setReady(false);
           if (!enabled) onRestart();
           setEnabled(value => !value);
-        }} className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 flex items-center gap-2">
-          {enabled ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
+        }} className="px-4 py-2.5 text-sm rounded-xl bg-white/10 hover:bg-white/20 flex items-center gap-2">
+          {enabled ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
           {enabled ? 'Tắt camera' : 'Bật camera'}
         </button>
-        {enabled && paused && <button type="button" onClick={onRestart} className="px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 font-bold">Quét vé tiếp theo</button>}
+        {enabled && paused && <button type="button" onClick={onRestart} className="px-4 py-2.5 text-sm rounded-xl bg-primary hover:bg-red-700 font-bold">Quét vé tiếp theo</button>}
       </div>
       <p className="text-sm text-gray-400">Đưa trọn mã QR vào khung hình và giữ máy ổn định.</p>
     </div>

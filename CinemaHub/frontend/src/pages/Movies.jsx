@@ -83,7 +83,7 @@ const Movies = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-white mb-4"
           >
-            Danh sách Phim
+            Danh sách Phim <span className="bg-gradient-to-r from-primary to-orange-500 bg-clip-text text-transparent">CinemaHub</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
