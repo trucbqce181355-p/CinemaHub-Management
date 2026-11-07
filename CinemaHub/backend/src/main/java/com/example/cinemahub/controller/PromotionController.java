@@ -16,6 +16,14 @@ public class PromotionController {
     private final PromotionValidationService validationService;
     private final PromotionManagementService management;
     @GetMapping public List<Promotion> getAllPromotions() { return promotionRepository.findVisiblePromotions(); }
+    @GetMapping("/{id}") public Promotion getPromotion(@PathVariable String id) {
+        return promotionRepository.findById(id).filter(p -> !p.isArchived()).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy chương trình"));
+    }
+    @PatchMapping("/{id}/status") public Promotion changeStatus(@PathVariable String id,
+            @Valid @RequestBody com.example.cinemahub.dto.ProgramStatusRequest request) {
+        return management.changeStatus(id, request.status(), request.version());
+    }
     public record PublicPromotion(String code, String title, String description, String discountType,
             Double discountValue, LocalDateTime startDate, LocalDateTime endDate, String bannerImage,
             Object minSpend, Object maxDiscount) {}

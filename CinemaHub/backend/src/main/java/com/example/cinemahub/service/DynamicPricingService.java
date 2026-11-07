@@ -29,12 +29,14 @@ public class DynamicPricingService {
             throw new IllegalArgumentException("Trạng thái luật giá không hợp lệ");
         Map<String, Object> c = r.getConditionParams() == null ? Map.of() : r.getConditionParams();
         Set<String> supported = switch (r.getTriggerVariable()) {
+            case "WEEKEND" -> Set.of("daysOfWeek");
             case "HOLIDAY" -> Set.of("dates");
             case "SNEAK_SHOW" -> Set.of("showtimeIds");
             case "LATE_NIGHT" -> Set.of("startHour");
             default -> Set.of();
         };
         if (!supported.containsAll(c.keySet())) throw new IllegalArgumentException("Tham số luật giá không hợp lệ");
+        if (r.getTriggerVariable().equals("WEEKEND")) weekendDays(c);
         if (r.getTriggerVariable().equals("HOLIDAY")) {
             for (String date : strings(c.get("dates"))) LocalDate.parse(date);
         }
@@ -50,6 +52,16 @@ public class DynamicPricingService {
             throw new IllegalArgumentException("Vui lòng cung cấp danh sách ngày hoặc ID suất chiếu hợp lệ");
         return list.stream().map(Object::toString).toList();
     }
+    private static List<String> weekendDays(Map<String, Object> conditions) {
+        // Existing rules without a selection retain their original weekend scope.
+        if (!conditions.containsKey("daysOfWeek")) return List.of("SATURDAY", "SUNDAY");
+        Object value = conditions.get("daysOfWeek");
+        if (!(value instanceof List<?> days) || days.isEmpty() || days.size() > 2
+                || days.stream().anyMatch(day -> !Set.of("SATURDAY", "SUNDAY").contains(Objects.toString(day, "")))
+                || new HashSet<>(days).size() != days.size())
+            throw new IllegalArgumentException("Chọn ít nhất một ngày: Thứ Bảy hoặc Chủ nhật");
+        return days.stream().map(Object::toString).toList();
+    }
     public List<PricingRule> rules() { return repository.findApplicableRules(); }
     public double price(Showtime showtime, double base) { return price(showtime, base, rules()); }
     public double price(Showtime showtime, double base, List<PricingRule> rules) {
@@ -62,7 +74,7 @@ public class DynamicPricingService {
             Map<String, Object> c = r.getConditionParams() == null ? Map.of() : r.getConditionParams();
             LocalDateTime start = showtime.getStartTime();
             boolean match = switch (r.getTriggerVariable()) {
-                case "WEEKEND" -> start.getDayOfWeek() == DayOfWeek.SATURDAY || start.getDayOfWeek() == DayOfWeek.SUNDAY;
+                case "WEEKEND" -> weekendDays(c).contains(start.getDayOfWeek().name());
                 case "HOLIDAY" -> strings(c.get("dates")).contains(start.toLocalDate().toString());
                 case "LATE_NIGHT" -> start.getHour() >= PromotionRules.amount(c.getOrDefault("startHour", 22));
                 case "SNEAK_SHOW" -> strings(c.get("showtimeIds")).contains(showtime.getId());

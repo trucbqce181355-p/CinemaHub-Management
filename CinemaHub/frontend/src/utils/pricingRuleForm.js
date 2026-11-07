@@ -1,10 +1,17 @@
-export function pricingRulePayload({ trigger, direction, amount, dates, showtimeIds, startHour, status, version }) {
+export const weekendOptions = [{ value: 'SATURDAY', label: 'Thứ Bảy' }, { value: 'SUNDAY', label: 'Chủ nhật' }];
+export const weekendDaysLabel = (days = ['SATURDAY', 'SUNDAY']) => weekendOptions.filter(day => Array.isArray(days) && days.includes(day.value)).map(day => day.label).join(' và ') || 'Chưa chọn ngày';
+
+export function pricingRulePayload({ trigger, direction, amount, dates, showtimeIds, startHour, weekendDays = ['SATURDAY', 'SUNDAY'], status, version }) {
   if (!['WEEKEND', 'HOLIDAY', 'LATE_NIGHT', 'SNEAK_SHOW'].includes(trigger)) throw new Error('Vui lòng chọn loại luật giá.');
   if (amount === '' || !Number.isInteger(Number(amount)) || Number(amount) < 0 || Number(amount) > 1000000)
     throw new Error('Mức điều chỉnh phải là số nguyên từ 0 đến 1.000.000đ.');
   if (!['increase', 'decrease'].includes(direction)) throw new Error('Vui lòng chọn tăng hoặc giảm giá.');
   let conditionParams = {};
-  if (trigger === 'HOLIDAY') {
+  if (trigger === 'WEEKEND') {
+    if (!Array.isArray(weekendDays) || !weekendDays.length || weekendDays.some(day => !['SATURDAY', 'SUNDAY'].includes(day)))
+      throw new Error('Chọn ít nhất một ngày: Thứ Bảy hoặc Chủ nhật.');
+    conditionParams = { daysOfWeek: weekendOptions.filter(day => weekendDays.includes(day.value)).map(day => day.value) };
+  } else if (trigger === 'HOLIDAY') {
     const selected = [...new Set(dates || [])].sort();
     if (!selected.length || selected.length > 366) throw new Error('Chọn từ 1 đến 366 ngày áp dụng.');
     if (selected.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d))

@@ -65,6 +65,27 @@ public class PromotionManagementService {
             if (updated == null) throw changed(); return updated;
         });
     }
+    public Promotion changeStatus(String id, String status, Long revision) {
+        if ("Disabled".equals(status)) return disable(id, revision);
+        if (!"Active".equals(status)) throw new IllegalArgumentException("Trạng thái không hợp lệ");
+        return admission.write(() -> {
+            Promotion old = promotions.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
+            if (!"Disabled".equals(old.getStatus()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được kích hoạt lại chương trình đã vô hiệu hóa");
+            if (old.getEndDate() == null || !old.getEndDate().isAfter(java.time.LocalDateTime.now()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Khuyến mãi đã hết hạn. Hãy cập nhật thời gian hiệu lực trước khi kích hoạt lại");
+            old.setStatus("Active");
+            PromotionRules.validate(old);
+            Query query = version(id, revision);
+            query.addCriteria(Criteria.where("status").is("Disabled").and("archived").ne(true));
+            Promotion result = mongo.findAndModify(query,
+                    new Update().set("status", "Active").set("version", revision == null ? 1L : revision + 1),
+                    FindAndModifyOptions.options().returnNew(true), Promotion.class);
+            if (result == null) throw changed();
+            return result;
+        });
+    }
     public Promotion archive(String id, Long revision) {
         return admission.write(() -> {
             Promotion old = promotions.findById(id).orElseThrow(this::notFound);
@@ -110,6 +131,25 @@ public class PromotionManagementService {
             query.addCriteria(Criteria.where("status").is("Disabled").and("archived").ne(true));
             PricingRule result = mongo.findAndModify(query,
                     new Update().set("archived", true).set("version", revision == null ? 1L : revision + 1),
+                    FindAndModifyOptions.options().returnNew(true), PricingRule.class);
+            if (result == null) throw changed();
+            return result;
+        });
+    }
+    public PricingRule changeRuleStatus(String id, String status, Long revision) {
+        if ("Disabled".equals(status)) return disableRule(id, revision);
+        if (!"Active".equals(status)) throw new IllegalArgumentException("Trạng thái không hợp lệ");
+        return admission.write(() -> {
+            PricingRule old = pricing.findById(id).orElseThrow(this::notFound);
+            if (old.isArchived()) throw notFound();
+            if (!"Disabled".equals(old.getStatus()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được kích hoạt lại luật giá đã vô hiệu hóa");
+            old.setStatus("Active");
+            validatePricingRule(old);
+            Query query = version(id, revision);
+            query.addCriteria(Criteria.where("status").is("Disabled").and("archived").ne(true));
+            PricingRule result = mongo.findAndModify(query,
+                    new Update().set("status", "Active").set("version", revision == null ? 1L : revision + 1),
                     FindAndModifyOptions.options().returnNew(true), PricingRule.class);
             if (result == null) throw changed();
             return result;

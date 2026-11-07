@@ -13,6 +13,14 @@ public class PricingRuleController {
     private final PricingRuleRepository pricingRuleRepository;
     private final PromotionManagementService management;
     @GetMapping public List<PricingRule> getAllPricingRules() { return pricingRuleRepository.findVisibleRules(); }
+    @GetMapping("/{id}") public PricingRule getPricingRule(@PathVariable String id) {
+        return pricingRuleRepository.findById(id).filter(r -> !r.isArchived()).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy luật giá"));
+    }
+    @PatchMapping("/{id}/status") public PricingRule changeStatus(@PathVariable String id,
+            @Valid @RequestBody com.example.cinemahub.dto.ProgramStatusRequest request) {
+        return management.changeRuleStatus(id, request.status(), request.version());
+    }
     @PostMapping public ResponseEntity<PricingRule> createPricingRule(@Valid @RequestBody PricingRuleRequest request) {
         return ResponseEntity.status(201).body(management.create(request.rule()));
     }
