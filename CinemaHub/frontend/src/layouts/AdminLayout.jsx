@@ -1,6 +1,10 @@
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin, Award, MessageSquare, UtensilsCrossed } from 'lucide-react';
+import { 
+  Clapperboard, Users, Film, Calendar, LogOut, 
+  LayoutDashboard, Settings, Ticket, Tag, MapPin, 
+  Award, MessageSquare, UtensilsCrossed, Newspaper 
+} from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -31,12 +35,13 @@ const AdminLayout = () => {
       items.push({ name: 'Hội viên & Điểm', path: '/admin/membership', icon: <Award className="w-5 h-5" /> });
     }
 
-    // Quyền Manager & Admin: Quản lý phim, rạp, bắp nước, khuyến mãi
+    // Quyền Manager & Admin: Quản lý phim, rạp, bắp nước, khuyến mãi, tin tức
     if (user.role === 'Manager' || user.role === 'Admin') {
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
-      items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> }); // <-- ĐÃ THÊM VÀO ĐÂY
+      items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> });
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
+      items.push({ name: 'Tin tức & Bài viết', path: '/admin/news', icon: <Newspaper className="w-5 h-5" /> });
     }
 
     // Manager & Staff
@@ -56,10 +61,11 @@ const AdminLayout = () => {
       '/admin/users',
       '/admin/movies',
       '/admin/cinemas',
-      '/admin/food', // <-- ĐÃ THÊM VỊ TRÍ HIỂN THỊ
+      '/admin/food',
       '/admin/showtimes',
       '/admin/checkin',
       '/admin/promotions',
+      '/admin/news',
       '/admin/reviews',
       '/admin/settings',
       '/admin/membership'

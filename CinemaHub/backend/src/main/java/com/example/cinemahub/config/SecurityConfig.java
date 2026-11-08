@@ -38,6 +38,8 @@ public class SecurityConfig {
                 
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
+                .requestMatchers("/api/news/**").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers("/api/cinemas/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/showtimes/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/bookings/seats").permitAll()

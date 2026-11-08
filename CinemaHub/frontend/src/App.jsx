@@ -19,11 +19,14 @@ import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ShowtimeManagement from './pages/admin/ShowtimeManagement';
 import ReviewManagement from './pages/admin/ReviewManagement';
 import FoodManagement from './pages/admin/FoodManagement';
+import NewsManagement from './pages/admin/NewsManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
 import Movies from './pages/Movies';
 import Cinemas from './pages/Cinemas';
+import News from './pages/News';
+import NewsDetails from './pages/NewsDetails';
 import PaymentCallback from './pages/PaymentCallback';
 
 const ProtectedRoute = ({ children }) => {
@@ -121,12 +124,15 @@ function App() {
           <Route path="checkin" element={<TicketCheckIn />} />
           <Route path="reviews" element={<ReviewManagement />} />
           <Route path="food" element={<FoodManagement />} />
+          <Route path="news" element={<NewsManagement />} />
         </Route>
 
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/movies" element={<Movies />} />
           <Route path="/cinemas" element={<Cinemas />} />
+          <Route path="/news" element={<News />} />
+          <Route path="/news/:id" element={<NewsDetails />} />
           <Route path="/membership" element={<Navigate to="/profile?tab=membership" replace />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
