@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, ArrowRight, Printer, RefreshCw, Calendar, Clock, MapPin, Film, Home } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, Printer, RefreshCw, Calendar, Clock, MapPin, Film, Home, Utensils } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getTicketQrValue } from '../utils/ticketQr';
 
@@ -151,11 +151,13 @@ const PaymentCallback = () => {
               {/* Food Items */}
               {booking.foodItems && booking.foodItems.length > 0 && (
                 <div className="bg-white/5 p-3.5 rounded-xl text-xs space-y-1.5 border border-white/5">
-                  <span className="text-amber-400 font-semibold block">Bắp nước nhận tại quầy bar:</span>
+                  <span className="text-amber-400 font-semibold block flex items-center gap-1.5">
+                    <Utensils className="w-3.5 h-3.5" /> Bắp nước nhận tại quầy bar:
+                  </span>
                   {booking.foodItems.map(f => (
-                    <div key={f.foodItemId} className="flex justify-between text-gray-300">
-                      <span>• {f.name}</span>
-                      <span className="font-bold text-white">x{f.quantity}</span>
+                    <div key={f.foodItemId || f.name} className="flex justify-between text-gray-300">
+                      <span>• {f.name} (x{f.quantity})</span>
+                      <span className="font-bold text-white">{((f.price || 0) * f.quantity).toLocaleString()} đ</span>
                     </div>
                   ))}
                 </div>

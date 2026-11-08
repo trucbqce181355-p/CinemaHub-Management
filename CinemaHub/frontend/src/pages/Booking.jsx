@@ -215,7 +215,7 @@ const Booking = () => {
   const [isHolding, setIsHolding] = useState(false);
 
   // Pricing & Promo
-  const [pricing, setPricing] = useState({ subtotal: 0, discount: 0, total: 0 });
+  const [pricing, setPricing] = useState({ seatSubtotal: 0, foodSubtotal: 0, subtotal: 0, discount: 0, total: 0 });
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState('');
@@ -384,39 +384,116 @@ const Booking = () => {
     return () => clearInterval(interval);
   }, [currentStep, selectedShowtime]);
 
-  // 4. Calculate Price dynamically when selected seats change
+  // 4. Authoritative Price calculation dynamically when selected seats or F&B change
   useEffect(() => {
-    if (!selectedShowtime || selectedSeats.length === 0) {
-      setPricing({ subtotal: 0, discount: 0, total: 0 });
+    if (activeBooking && !isCounterMode) {
+      const activeSeatSub = activeBooking.seats?.length
+        ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
+        : Math.max(0, (activeBooking.subtotal || 0) - (activeBooking.foodSubtotal || 0));
+      const activeFoodSub = activeBooking.foodSubtotal != null
+        ? activeBooking.foodSubtotal
+        : (activeBooking.foodItems?.reduce((s, x) => s + ((x.price || 0) * (x.quantity || 0)), 0) || 0);
+      const activeSub = activeBooking.subtotal != null ? activeBooking.subtotal : (activeSeatSub + activeFoodSub);
+      const activeDisc = activeBooking.discountAmount || 0;
+      const activeTot = activeBooking.totalAmount != null ? activeBooking.totalAmount : Math.max(0, activeSub - activeDisc);
+
+      setPricing({
+        seatSubtotal: activeSeatSub,
+        foodSubtotal: activeFoodSub,
+        subtotal: activeSub,
+        discount: activeDisc,
+        total: activeTot
+      });
+      setPriceError('');
+      setPriceLoading(false);
       return;
     }
 
-    const calcPrice = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/bookings/calculate-price`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            showtimeId: selectedShowtime.id,
-            seatIds: selectedSeats,
-            promoCode: appliedPromo?.code || null
-          })
-        });
+    if (!selectedShowtime || selectedSeats.length === 0) {
+      setPricing({
+        seatSubtotal: 0,
+        foodSubtotal: foodTotal,
+        subtotal: foodTotal,
+        discount: 0,
+        total: foodTotal
+      });
+      setPriceError('');
+      setPriceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setPriceLoading(true);
+    setPriceError('');
+    const timeout = setTimeout(() => controller.abort('timeout'), 15000);
+
+    const endpoint = isCounterMode ? `${API_BASE}/bookings/counter-price` : `${API_BASE}/bookings/calculate-price`;
+    fetch(endpoint, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {})
+      },
+      body: JSON.stringify({
+        showtimeId: selectedShowtime.id,
+        seatIds: selectedSeats,
+        promoCode: appliedPromo?.code || null,
+        customerEmail: customerEmail || undefined,
+        selectedFoods: selectedFoods.map(f => ({
+          foodItemId: f.foodItemId,
+          name: f.name,
+          price: f.price,
+          quantity: f.quantity
+        }))
+      })
+    })
+      .then(async res => {
         const data = await res.json();
-        if (res.ok) {
+        if (!res.ok) throw new Error(data.error || 'Không tính được giá vé.');
+        return data;
+      })
+      .then(data => {
+        if (!controller.signal.aborted) {
+          const seatSub = data.seatSubtotal != null ? data.seatSubtotal : Math.max(0, data.subtotal - (data.foodSubtotal || 0));
+          const foodSub = data.foodSubtotal != null ? data.foodSubtotal : foodTotal;
+          const sub = data.subtotal != null ? data.subtotal : (seatSub + foodSub);
+          const disc = data.discountAmount || 0;
+          const tot = data.totalAmount != null ? data.totalAmount : Math.max(0, sub - disc);
+
           setPricing({
-            subtotal: data.subtotal || 0,
-            discount: data.discountAmount || 0,
-            total: data.totalAmount || 0
+            seatSubtotal: seatSub,
+            foodSubtotal: foodSub,
+            subtotal: sub,
+            discount: disc,
+            total: tot
           });
         }
-      } catch (err) {
-        console.error('Calculate price error:', err);
-      }
-    };
+      })
+      .catch(e => {
+        if (!controller.signal.aborted || controller.signal.reason === 'timeout') {
+          setPriceError(e.message || 'Hết thời gian tính giá.');
+          setPricing({
+            seatSubtotal: 0,
+            foodSubtotal: foodTotal,
+            subtotal: foodTotal,
+            discount: 0,
+            total: foodTotal
+          });
+        }
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        if (!controller.signal.aborted || controller.signal.reason === 'timeout') {
+          setPriceLoading(false);
+        }
+      });
 
-    calcPrice();
-  }, [selectedSeats, selectedShowtime, appliedPromo]);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [selectedSeats, selectedFoods, foodTotal, selectedShowtime, appliedPromo, activeBooking, isCounterMode, user?.token, customerEmail]);
 
   // 5. 10-Minute Hold Countdown Timer
   useEffect(() => {
@@ -437,11 +514,14 @@ const Booking = () => {
   }, [activeBooking, remainingSeconds]);
 
   const handleHoldExpired = () => {
-    setAppliedPromo(null);setPromoUncertain(false);setPromoMessage(null);
+    setAppliedPromo(null);
+    setPromoUncertain(false);
+    setPromoMessage(null);
     setIsHolding(false);
     setActiveBooking(null);
     setSelectedSeats([]);
     setSelectedFoods([]);
+    setPricing({ seatSubtotal: 0, foodSubtotal: 0, subtotal: 0, discount: 0, total: 0 });
     setCurrentStep(2);
     setErrorMessage('Thời gian giữ ghế đã hết hạn! Vui lòng chọn lại ghế.');
     fetchSeatAvailability();
@@ -463,7 +543,7 @@ const Booking = () => {
           if (expiresAt && expiresAt > now) {
             const diffSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
             setActiveBooking(b);
-            if(b.promoCode)setAppliedPromo({code:b.promoCode,discountAmount:b.discountAmount,newTotal:b.totalAmount});
+            if (b.promoCode) setAppliedPromo({ code: b.promoCode, discountAmount: b.discountAmount, newTotal: b.totalAmount });
             setIsHolding(true);
             setRemainingSeconds(diffSeconds);
             if (b.seats && b.seats.length > 0) {
@@ -473,11 +553,18 @@ const Booking = () => {
             if (b.customerEmail) setCustomerEmail(b.customerEmail);
             if (b.customerPhone) setCustomerPhone(b.customerPhone);
             if (b.totalAmount) {
+              const seatSub = b.seats?.reduce((s, x) => s + (x.price || 0), 0) || Math.max(0, (b.subtotal || 0) - (b.foodSubtotal || 0));
+              const foodSub = b.foodSubtotal != null ? b.foodSubtotal : 0;
               setPricing({
+                seatSubtotal: seatSub,
+                foodSubtotal: foodSub,
                 subtotal: b.subtotal || b.totalAmount,
                 discount: b.discountAmount || 0,
                 total: b.totalAmount
               });
+            }
+            if (b.foodItems && b.foodItems.length > 0) {
+              setSelectedFoods(b.foodItems);
             }
             setCurrentStep(3);
           } else {
@@ -631,6 +718,15 @@ const Booking = () => {
       setAppliedPromo(null); setPromoMessage(null);
       setIsHolding(true);
       setRemainingSeconds(600);
+      const holdSeatSub = data.seats?.reduce((s, x) => s + (x.price || 0), 0) || Math.max(0, (data.subtotal || 0) - (data.foodSubtotal || 0));
+      const holdFoodSub = data.foodSubtotal != null ? data.foodSubtotal : foodTotal;
+      setPricing({
+        seatSubtotal: holdSeatSub,
+        foodSubtotal: holdFoodSub,
+        subtotal: data.subtotal,
+        discount: data.discountAmount || 0,
+        total: data.totalAmount
+      });
       setCurrentStep(3);
       fetchSeatAvailability();
     } catch (err) {
@@ -640,31 +736,170 @@ const Booking = () => {
     }
   };
 
-  // Step 3: Apply Promo Code
-  const handleApplyPromo = async () => {
-    if(!promoCodeInput.trim()||promoInFlight.current||promoUncertain)return;
-    promoInFlight.current=true;setPromoBusy(true);setPromoMessage(null);
-    try {
-      if(!isCounterMode){await changeSavedPromo('apply');return;}
-      const res=await fetch(API_BASE+'/bookings/counter-price',{
-        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+user?.token},
-        body:JSON.stringify({showtimeId:selectedShowtime.id,seatIds:selectedSeats,promoCode:promoCodeInput.trim().toUpperCase(),customerEmail:customerEmail||undefined})
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Mã giảm giá không hợp lệ hoặc hết lượt dùng');
-      }
-
-      setAppliedPromo(data);
-      setPricing(prev => ({
+  // Step 3: Promo Handlers (Reconciled with hold snapshot)
+  const savedPromo = (data, recovered = false) => {
+    setAppliedPromo(data.code ? data : null);
+    setPromoUncertain(false);
+    setActiveBooking(prev => {
+      if (!prev) return prev;
+      return {
         ...prev,
-        discount: data.discountAmount,
-        total: data.newTotal
-      }));
-      setPromoMessage({ type: 'success', text: `Áp dụng thành công mã ${data.code}: -${data.discountAmount.toLocaleString()}đ` });
-    } catch (err) {
-      setPromoMessage({ type: 'error', text: err.message });
+        promoCode: data.code,
+        discountAmount: data.discountAmount,
+        totalAmount: data.newTotal,
+        subtotal: data.subtotal
+      };
+    });
+    setPricing(prev => ({
+      ...prev,
+      subtotal: data.subtotal,
+      discount: data.discountAmount,
+      total: data.newTotal
+    }));
+    setPromoMessage({
+      type: 'success',
+      text: recovered
+        ? 'Đã đọc lại giá và mã đang lưu trên đơn.'
+        : data.code
+          ? `Đã áp dụng mã ${data.code}: -${(data.discountAmount || 0).toLocaleString()}đ`
+          : 'Đã bỏ mã khuyến mãi.'
+    });
+  };
+
+  const changeSavedPromo = async (operation) => {
+    if (!activeBooking) return;
+    const bookingId = activeBooking.id;
+    const result = await requestPromoChange({
+      base: API_BASE,
+      token: user?.token,
+      bookingId,
+      operation,
+      code: promoCodeInput.trim().toUpperCase(),
+      subtotal: activeBooking.subtotal
+    });
+    if (activeBookingRef.current?.id !== bookingId) return;
+    if (result.uncertain) {
+      setPromoUncertain(true);
+      setPromoMessage({
+        type: 'error',
+        text: 'Chưa xác định được kết quả thay đổi mã. Hãy kiểm tra lại giá đã lưu trước khi thanh toán.'
+      });
+      return;
+    }
+    savedPromo(result.data, result.reconciled);
+    if (operation === 'clear') setPromoCodeInput('');
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoCodeInput.trim() || promoInFlight.current || promoUncertain) return;
+    promoInFlight.current = true;
+    setPromoBusy(true);
+    setPromoMessage(null);
+    try {
+      if (!isCounterMode) {
+        await changeSavedPromo('apply');
+        return;
+      }
+      const res = await fetch(`${API_BASE}/bookings/counter-price`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + user?.token
+        },
+        body: JSON.stringify({
+          showtimeId: selectedShowtime.id,
+          seatIds: selectedSeats,
+          promoCode: promoCodeInput.trim().toUpperCase(),
+          customerEmail: customerEmail || undefined,
+          selectedFoods: selectedFoods.map(f => ({
+            foodItemId: f.foodItemId,
+            name: f.name,
+            price: f.price,
+            quantity: f.quantity
+          }))
+        })
+      });
+      const raw = await res.json();
+      if (!res.ok) throw new Error(raw.error || 'Mã giảm giá không hợp lệ hoặc hết lượt dùng');
+      const data = { ...raw, code: raw.promoCode, newTotal: raw.totalAmount };
+      setAppliedPromo(data);
+      setPricing({
+        seatSubtotal: raw.seatSubtotal != null ? raw.seatSubtotal : Math.max(0, raw.subtotal - (raw.foodSubtotal || 0)),
+        foodSubtotal: raw.foodSubtotal != null ? raw.foodSubtotal : foodTotal,
+        subtotal: raw.subtotal,
+        discount: raw.discountAmount,
+        total: raw.totalAmount
+      });
+      setPromoMessage({ type: 'success', text: `Áp dụng thành công mã ${data.code}: -${(data.discountAmount || 0).toLocaleString()}đ` });
+    } catch (e) {
+      setPromoMessage({ type: 'error', text: e.message });
       setAppliedPromo(null);
+    } finally {
+      promoInFlight.current = false;
+      setPromoBusy(false);
+    }
+  };
+
+  const handleRemovePromo = async () => {
+    if (promoInFlight.current || promoUncertain) return;
+    promoInFlight.current = true;
+    setPromoBusy(true);
+    try {
+      if (!isCounterMode) {
+        await changeSavedPromo('clear');
+      } else {
+        setAppliedPromo(null);
+        setPromoCodeInput('');
+        setPromoMessage(null);
+        const res = await fetch(`${API_BASE}/bookings/counter-price`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + user?.token
+          },
+          body: JSON.stringify({
+            showtimeId: selectedShowtime.id,
+            seatIds: selectedSeats,
+            promoCode: null,
+            customerEmail: customerEmail || undefined,
+            selectedFoods: selectedFoods.map(f => ({
+              foodItemId: f.foodItemId,
+              name: f.name,
+              price: f.price,
+              quantity: f.quantity
+            }))
+          })
+        });
+        const raw = await res.json();
+        if (res.ok) {
+          setPricing({
+            seatSubtotal: raw.seatSubtotal != null ? raw.seatSubtotal : Math.max(0, raw.subtotal - (raw.foodSubtotal || 0)),
+            foodSubtotal: raw.foodSubtotal != null ? raw.foodSubtotal : foodTotal,
+            subtotal: raw.subtotal,
+            discount: 0,
+            total: raw.totalAmount
+          });
+        }
+      }
+    } catch (e) {
+      setPromoMessage({ type: 'error', text: e.message });
+    } finally {
+      promoInFlight.current = false;
+      setPromoBusy(false);
+    }
+  };
+
+  const recoverPromo = async () => {
+    if (promoInFlight.current) return;
+    promoInFlight.current = true;
+    setPromoBusy(true);
+    try {
+      await changeSavedPromo('recover');
+    } catch (e) {
+      setPromoMessage({ type: 'error', text: e.message });
+    } finally {
+      promoInFlight.current = false;
+      setPromoBusy(false);
     }
   };
 
@@ -1228,62 +1463,73 @@ const Booking = () => {
             />
 
             {/* FLOATING BOTTOM BAR */}
-            <div className="sticky bottom-4 z-40 bg-[#181818]/95 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="hidden sm:block">
-                  <span className="text-xs text-gray-400 uppercase font-semibold">Ghế ({selectedSeats.length}):</span>
-                  <div className="text-base font-black text-primary">
-                    {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'Chưa chọn'}
-                  </div>
-                </div>
-                {selectedFoods.length > 0 && (
-                  <div className="border-l border-white/10 pl-4 hidden sm:block">
-                    <span className="text-xs text-gray-400 uppercase font-semibold">Bắp nước ({selectedFoods.reduce((acc, f) => acc + f.quantity, 0)}):</span>
-                    <div className="text-base font-black text-amber-400">
-                      +{foodTotal.toLocaleString()} đ
+            {(() => {
+              const effectiveFoodTotal = pricing.foodSubtotal > 0 ? pricing.foodSubtotal : foodTotal;
+              const effectiveSeatTotal = pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - effectiveFoodTotal);
+              const effectiveSubtotal = pricing.subtotal > 0 ? pricing.subtotal : (effectiveSeatTotal + effectiveFoodTotal);
+
+              return (
+                <div className="sticky bottom-4 z-40 bg-[#181818]/95 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="hidden sm:block">
+                      <span className="text-xs text-gray-400 uppercase font-semibold">Ghế ({selectedSeats.length}):</span>
+                      <div className="text-base font-black text-primary">
+                        {selectedSeats.length > 0 ? (
+                          <span>{selectedSeats.join(', ')} <span className="text-xs text-white/70 font-normal">({effectiveSeatTotal.toLocaleString()} đ)</span></span>
+                        ) : 'Chưa chọn'}
+                      </div>
+                    </div>
+                    {effectiveFoodTotal > 0 && (
+                      <div className="border-l border-white/10 pl-4 hidden sm:block">
+                        <span className="text-xs text-gray-400 uppercase font-semibold">Bắp nước ({selectedFoods.reduce((acc, f) => acc + f.quantity, 0)}):</span>
+                        <div className="text-base font-black text-amber-400">
+                          +{effectiveFoodTotal.toLocaleString()} đ
+                        </div>
+                      </div>
+                    )}
+                    <div className="border-l border-white/10 pl-4 hidden sm:block">
+                      <span className="text-xs text-gray-400 uppercase font-semibold">Tạm tính tổng:</span>
+                      <div className="text-xl font-black text-white">
+                        {effectiveSubtotal.toLocaleString()} đ
+                      </div>
+                    </div>
+
+                    {/* Mobile version */}
+                    <div className="sm:hidden flex justify-between w-full">
+                      <div>
+                        <span className="text-xs text-gray-400">Ghế: </span>
+                        <span className="font-bold text-primary">{selectedSeats.join(', ') || '0'}</span>
+                        <span className="text-xs text-gray-300 ml-1">({effectiveSeatTotal.toLocaleString()}đ)</span>
+                        {effectiveFoodTotal > 0 && (
+                          <span className="text-xs text-amber-400 ml-2">+{effectiveFoodTotal.toLocaleString()}đ F&B</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-400">Tổng: </span>
+                        <span className="font-bold text-white">{effectiveSubtotal.toLocaleString()} đ</span>
+                      </div>
                     </div>
                   </div>
-                )}
-                <div className="border-l border-white/10 pl-4 hidden sm:block">
-                  <span className="text-xs text-gray-400 uppercase font-semibold">Tạm tính tổng:</span>
-                  <div className="text-xl font-black text-white">
-                    {pricing.subtotal.toLocaleString()} đ
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button
+                      onClick={() => setCurrentStep(1)}
+                      className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-gray-300 font-bold rounded-xl text-sm transition-all"
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      disabled={selectedSeats.length === 0 || isProcessing || priceLoading || !!priceError}
+                      onClick={handleProceedToPayment}
+                      className="flex-1 sm:flex-none px-8 py-3.5 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CreditCard className="w-5 h-5" />}
+                      <span>{isCounterMode ? 'Xuất vé tại quầy' : 'Tiếp tục thanh toán'}</span>
+                    </button>
                   </div>
                 </div>
-
-                {/* Mobile version */}
-                <div className="sm:hidden flex justify-between w-full">
-                  <div>
-                    <span className="text-xs text-gray-400">Ghế: </span>
-                    <span className="font-bold text-primary">{selectedSeats.join(', ') || '0'}</span>
-                    {selectedFoods.length > 0 && (
-                      <span className="text-xs text-amber-400 ml-2">+{foodTotal.toLocaleString()}đ F&B</span>
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-400">Tổng: </span>
-                    <span className="font-bold text-white">{pricing.subtotal.toLocaleString()} đ</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  onClick={() => setCurrentStep(1)}
-                  className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-gray-300 font-bold rounded-xl text-sm transition-all"
-                >
-                  Quay lại
-                </button>
-                <button
-                  disabled={selectedSeats.length === 0 || isProcessing || priceLoading || !!priceError}
-                  onClick={handleProceedToPayment}
-                  className="flex-1 sm:flex-none px-8 py-3.5 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CreditCard className="w-5 h-5" />}
-                  <span>{isCounterMode ? 'Xuất vé tại quầy' : 'Tiếp tục thanh toán'}</span>
-                </button>
-              </div>
-            </div>
+              );
+            })()}
 
           </motion.div>
         )}
@@ -1493,44 +1739,68 @@ const Booking = () => {
                     </div>
 
                     {/* Danh sách bắp nước đã chọn */}
-                    {selectedFoods.length > 0 && (
-                      <div className="pt-2 border-t border-white/5 space-y-1">
-                        <span className="text-xs font-semibold text-amber-400 flex items-center gap-1">
-                          <Utensils className="w-3.5 h-3.5" /> Bắp nước & Combo:
-                        </span>
-                        {selectedFoods.map(food => (
-                          <div key={food.foodItemId} className="flex justify-between text-xs text-gray-300 pl-2">
-                            <span>• {food.name} (x{food.quantity})</span>
-                            <span className="font-medium text-white">{(food.price * food.quantity).toLocaleString()} đ</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {(() => {
+                      const displayFoods = (activeBooking?.foodItems && activeBooking.foodItems.length > 0)
+                        ? activeBooking.foodItems
+                        : selectedFoods;
+
+                      if (displayFoods.length === 0) return null;
+
+                      return (
+                        <div className="pt-2 border-t border-white/5 space-y-1">
+                          <span className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                            <Utensils className="w-3.5 h-3.5" /> Bắp nước & Combo:
+                          </span>
+                          {displayFoods.map(food => (
+                            <div key={food.foodItemId || food.name} className="flex justify-between text-xs text-gray-300 pl-2">
+                              <span>• {food.name} (x{food.quantity})</span>
+                              <span className="font-medium text-white">{((food.price || 0) * food.quantity).toLocaleString()} đ</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Bảng tính tiền */}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between text-gray-400">
-                      <span>Tiền vé ghế</span>
-                      <span>{(pricing.subtotal - foodTotal).toLocaleString()} đ</span>
-                    </div>
-                    {foodTotal > 0 && (
-                      <div className="flex justify-between text-amber-400">
-                        <span>Tiền bắp nước & combo</span>
-                        <span>+{foodTotal.toLocaleString()} đ</span>
+                  {(() => {
+                    const displayFoodPrice = activeBooking?.foodSubtotal != null
+                      ? activeBooking.foodSubtotal
+                      : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : foodTotal);
+
+                    const displaySeatPrice = (activeBooking?.seats && activeBooking.seats.length > 0)
+                      ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
+                      : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - displayFoodPrice));
+
+                    const displaySubtotal = pricing.subtotal > 0 ? pricing.subtotal : (displaySeatPrice + displayFoodPrice);
+                    const displayDiscount = pricing.discount || activeBooking?.discountAmount || 0;
+                    const displayFinalTotal = pricing.total > 0 ? pricing.total : Math.max(0, displaySubtotal - displayDiscount);
+
+                    return (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between text-gray-400">
+                          <span>Tiền vé ghế ({selectedSeats.length} vé)</span>
+                          <span className="font-medium text-white">{displaySeatPrice.toLocaleString()} đ</span>
+                        </div>
+                        {displayFoodPrice > 0 && (
+                          <div className="flex justify-between text-amber-400">
+                            <span>Tiền bắp nước & combo</span>
+                            <span className="font-medium">+{displayFoodPrice.toLocaleString()} đ</span>
+                          </div>
+                        )}
+                        {displayDiscount > 0 && (
+                          <div className="flex justify-between text-green-400 font-bold">
+                            <span>Voucher ({appliedPromo?.code || activeBooking?.promoCode})</span>
+                            <span>-{displayDiscount.toLocaleString()} đ</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-baseline pt-3 border-t border-white/10">
+                          <span className="text-base font-bold text-white">Tổng thanh toán</span>
+                          <span className="text-2xl font-black text-primary">{displayFinalTotal.toLocaleString()} đ</span>
+                        </div>
                       </div>
-                    )}
-                    {pricing.discount > 0 && (
-                      <div className="flex justify-between text-green-400 font-bold">
-                        <span>Voucher ({appliedPromo?.code})</span>
-                        <span>-{pricing.discount.toLocaleString()} đ</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-baseline pt-3 border-t border-white/10">
-                      <span className="text-base font-bold text-white">Tổng thanh toán</span>
-                      <span className="text-2xl font-black text-primary">{pricing.total.toLocaleString()} đ</span>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Nút hành động */}
                   {isCounterMode ? (
@@ -1638,13 +1908,15 @@ const Booking = () => {
                 </div>
 
                 {/* Danh sách bắp nước trong hóa đơn xác nhận */}
-                {(confirmedData.foodItems || confirmedData.booking?.foodItems || selectedFoods).length > 0 && (
+                {((confirmedData.foodItems || confirmedData.booking?.foodItems || selectedFoods) || []).length > 0 && (
                   <div className="bg-white/5 p-3 rounded-xl text-xs space-y-1">
-                    <span className="text-amber-400 font-semibold block">Bắp nước nhận tại quầy bar:</span>
+                    <span className="text-amber-400 font-semibold block flex items-center gap-1.5">
+                      <Utensils className="w-3.5 h-3.5" /> Bắp nước nhận tại quầy bar:
+                    </span>
                     {(confirmedData.foodItems || confirmedData.booking?.foodItems || selectedFoods).map(f => (
-                      <div key={f.foodItemId} className="flex justify-between text-gray-300">
-                        <span>• {f.name}</span>
-                        <span className="font-bold text-white">x{f.quantity}</span>
+                      <div key={f.foodItemId || f.name} className="flex justify-between text-gray-300">
+                        <span>• {f.name} (x{f.quantity})</span>
+                        <span className="font-bold text-white">{((f.price || 0) * f.quantity).toLocaleString()} đ</span>
                       </div>
                     ))}
                   </div>
