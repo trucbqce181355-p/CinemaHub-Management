@@ -56,7 +56,7 @@ const UserManagement = () => {
 
   const AVAILABLE_PERMISSIONS = [
     { id: 'manage_movies', label: 'Quản lý Phim (Thêm, Sửa, Xóa phim)' },
-    { id: 'manage_showtimes', label: 'Quản lý Suất chiếu (Lên lịch chiếu)' },
+    { id: 'manage_showtimes', label: 'Quản lý Suất chiếu' },
     { id: 'manage_bookings', label: 'Quản lý Đặt vé (Xem/Hủy vé)' },
     { id: 'manage_users', label: 'Quản lý Người dùng (Khóa/Phân quyền)' },
     { id: 'view_reports', label: 'Xem Báo cáo Doanh thu' }

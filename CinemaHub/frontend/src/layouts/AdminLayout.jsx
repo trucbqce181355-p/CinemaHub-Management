@@ -52,9 +52,9 @@ const AdminLayout = () => {
       items.push({ name: 'Tin tức & Bài viết', path: '/admin/news', icon: <Newspaper className="w-5 h-5" /> });
     }
 
-    // Manager & Staff
-    if (user.role === 'Manager' || user.role === 'Staff') {
-      items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
+    // Admin, Manager & Staff
+    if (user.role === 'Admin' || user.role === 'Manager' || user.role === 'Staff') {
+      items.push({ name: 'Suất chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
 

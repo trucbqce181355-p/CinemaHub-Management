@@ -38,5 +38,7 @@ public class Showtime {
 
     private Double basePrice = 90000.0;
 
-    private String status = "Active"; // Active, Cancelled
+    private String status = "Active"; // Active, Cancelled, Deleted
+
+    private Boolean isDeleted = false;
 }

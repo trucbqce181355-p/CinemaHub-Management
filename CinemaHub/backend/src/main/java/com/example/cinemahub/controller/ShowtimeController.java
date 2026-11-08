@@ -43,7 +43,21 @@ public class ShowtimeController {
             Showtime created = showtimeService.createShowtime(showtime);
             return ResponseEntity.ok(created);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/auto-generate")
+    public ResponseEntity<?> autoGenerateShowtimes(@RequestBody com.example.cinemahub.dto.AutoGenerateShowtimesRequest req) {
+        try {
+            List<Showtime> generated = showtimeService.autoGenerateShowtimes(req);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Đã tạo tự động thành công " + generated.size() + " suất chiếu",
+                    "count", generated.size(),
+                    "showtimes", generated
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 
@@ -53,7 +67,7 @@ public class ShowtimeController {
             Showtime updated = showtimeService.updateShowtime(id, showtime);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 
@@ -64,7 +78,7 @@ public class ShowtimeController {
             Showtime updated = showtimeService.updateStatus(id, status);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 
@@ -74,7 +88,7 @@ public class ShowtimeController {
             showtimeService.deleteShowtime(id);
             return ResponseEntity.ok(Map.of("message", "Đã xóa suất chiếu thành công"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 }
