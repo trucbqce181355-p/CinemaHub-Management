@@ -25,6 +25,7 @@ import ResetPassword from './pages/ResetPassword';
 import Movies from './pages/Movies';
 import Cinemas from './pages/Cinemas';
 import PaymentCallback from './pages/PaymentCallback';
+import RefundManagement from './pages/admin/RefundManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -119,6 +120,7 @@ function App() {
           <Route path="promotions" element={<PromotionManagement />} />
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
+          <Route path="refunds" element={<RefundManagement />} />
           <Route path="reviews" element={<ReviewManagement />} />
           <Route path="food" element={<FoodManagement />} />
         </Route>

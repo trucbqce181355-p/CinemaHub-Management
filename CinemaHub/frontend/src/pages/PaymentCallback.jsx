@@ -69,6 +69,16 @@ const PaymentCallback = () => {
   const booking = result?.booking;
   const ticket = result?.ticket;
 
+  if (isSuccess && booking && !ticket) return (
+    <div className="max-w-xl mx-auto py-20 px-6 text-center space-y-5">
+      <CheckCircle2 className="mx-auto h-14 w-14 text-green-400" />
+      <h1 className="text-2xl font-bold">Đã thanh toán — đang phát hành vé</h1>
+      <p className="text-gray-400">Hệ thống đã ghi nhận tiền. Vui lòng chờ xử lý vé; không thanh toán lại.</p>
+      <button className="btn-primary" onClick={() => window.location.reload()}>Kiểm tra lại vé</button>
+      <Link to="/profile?tab=booking" className="block text-primary">Xem lịch sử đặt vé</Link>
+    </div>
+  );
+
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-3xl mx-auto flex flex-col items-center justify-center">
       {isSuccess && booking && ticket ? (
@@ -191,7 +201,9 @@ const PaymentCallback = () => {
             <XCircle className="w-12 h-12" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-2">Thanh Toán Chưa Hoàn Tất</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{result?.status === 'REFUNDED' ? 'Đã Hoàn Tiền'
+              : result?.status === 'EXPIRED' ? 'Thanh Toán Đã Hết Hạn'
+                : result?.status === 'REVIEW_REQUIRED' ? 'Giao Dịch Cần Đối Soát' : 'Thanh Toán Chưa Hoàn Tất'}</h2>
             <p className="text-sm text-gray-400">
               {error || 'Giao dịch qua cổng VNPAY đã bị hủy hoặc không thành công.'}
             </p>

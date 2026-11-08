@@ -47,6 +47,9 @@ public class BookingService {
     private EmailService emailService;
 
     @Autowired
+    private TicketDeliveryService ticketDelivery;
+
+    @Autowired
     private com.example.cinemahub.repository.PaymentRepository paymentRepository;
 
     @Autowired
@@ -397,7 +400,8 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn"));
         if (!"CONFIRMED".equals(booking.getStatus()) || booking.getPayment() == null
-                || !"SUCCESS".equals(booking.getPayment().getStatus()))
+                || !"SUCCESS".equals(booking.getPayment().getStatus())
+                || booking.getPayment().isReconciliationRequired() || Refund.blocksAdmission(booking.getRefund()))
             throw new RuntimeException("Chưa có thanh toán hợp lệ");
         LocalDateTime now = LocalDateTime.now();
         // Create Ticket document
@@ -441,7 +445,6 @@ public class BookingService {
                 Booking.class);
         Booking savedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
         if (inserted) {
-            sendConfirmationEmailSafely(savedBooking, savedTicket);
             try {
                 if (membershipService != null) {
                     membershipService.awardPointsForBooking(savedBooking);
@@ -454,6 +457,7 @@ public class BookingService {
             }
         }
 
+        ticketDelivery.enqueueTicket(savedBooking, savedTicket);
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Đặt vé thành công!");
         result.put("booking", savedBooking);
