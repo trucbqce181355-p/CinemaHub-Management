@@ -25,6 +25,8 @@ public class Booking {
     // CAS revision for payment/quote changes; null also supports existing imported bookings.
     private Long version;
     private Payment payment;
+    private Refund refund;
+    private boolean ticketEmailQueued;
 
     private String userId; // Optional for guests
     private String customerName;

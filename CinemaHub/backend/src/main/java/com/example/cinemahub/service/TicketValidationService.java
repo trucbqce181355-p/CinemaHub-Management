@@ -189,6 +189,9 @@ public class TicketValidationService {
         if (booking == null || !"CONFIRMED".equals(booking.getStatus())) {
             throw failure(HttpStatus.CONFLICT, "BOOKING_UNAVAILABLE", "Đơn đặt vé không tồn tại, chưa xác nhận hoặc đã bị hủy.");
         }
+        if (com.example.cinemahub.model.Refund.blocksAdmission(booking.getRefund())) {
+            throw failure(HttpStatus.CONFLICT, "REFUND_PENDING", "Vé đang chờ xử lý hoàn tiền hoặc cần đối soát, không thể check-in.");
+        }
         return booking;
     }
 

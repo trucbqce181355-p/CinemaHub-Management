@@ -25,6 +25,10 @@ const AdminLayout = () => {
       { name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> }
     ];
 
+    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
+      items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
+    }
+
     // Quyền Admin
     if (user.role === 'Admin') {
       items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });

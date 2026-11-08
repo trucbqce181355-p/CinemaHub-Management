@@ -138,6 +138,18 @@ public class PaymentService {
         owned(booking.getId(), userId);
         Map<String, Object> result = new java.util.HashMap<>(bookings.getBookingDetails(booking.getId()));
         result.put("status", booking.getPayment().isReconciliationRequired() ? "REVIEW_REQUIRED" : booking.getPayment().getStatus());
+        String status = result.get("status").toString();
+        result.put("message", switch (status) {
+            case "SUCCESS" -> "Thanh toán thành công. Vé được phát hành sau khi xác minh giao dịch.";
+            case "FAILED" -> "24".equals(booking.getPayment().getResponseCode())
+                    ? "Bạn đã hủy thanh toán tại VNPay. Ghế đã được giải phóng; vui lòng đặt lại nếu cần."
+                    : "VNPay thông báo thanh toán không thành công. Không phát hành vé; vui lòng đặt lại.";
+            case "CANCELLED" -> "Đơn đã hủy. Không phát hành vé.";
+            case "EXPIRED" -> "Đã hết thời gian giữ ghế. Không phát hành vé; vui lòng chọn lại ghế.";
+            case "REVIEW_REQUIRED" -> "Giao dịch cần đối soát. Không tự động phát hành vé hoặc thanh toán thêm.";
+            case "REFUNDED" -> "Đã hoàn tiền. Vé và QR không còn hiệu lực.";
+            default -> "Giao dịch đang chờ kết quả từ VNPay.";
+        });
         result.put("transactionNo", java.util.Objects.toString(booking.getPayment().getProviderTransactionId(), ""));
         return result;
     }

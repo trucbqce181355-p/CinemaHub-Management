@@ -10,6 +10,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { getTicketQrValue } from '../utils/ticketQr';
 import { useAuth } from '../context/AuthContext';
+import PaymentBookingActions from '../components/PaymentBookingActions';
 const Profile = () => {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
@@ -624,7 +625,7 @@ const Profile = () => {
                 <div className="space-y-6">
                   {realBookings.length > 0 ? (
                     realBookings.map((b, index) => {
-                      const isConfirmed = b.status === 'CONFIRMED';
+                      const isConfirmed = b.status === 'CONFIRMED' && (!b.refund || b.refund.status === 'REJECTED');
                       const isCancelled = b.status === 'CANCELLED';
                       const isPending = b.status === 'PENDING';
                       let badgeColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
@@ -697,13 +698,13 @@ const Profile = () => {
                                     >
                                       <QrCode className="w-3.5 h-3.5" /> Xem Vé & Mã QR
                                     </button>
-                                    <button
+                                    {!b.payment && <button
                                       type="button"
                                       onClick={() => handleCancelBooking(b.id)}
                                       className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-xl text-xs font-bold transition-all"
                                     >
                                       Hủy vé
-                                    </button>
+                                    </button>}
                                   </>
                                 )}
                                 {isPending && (
@@ -726,6 +727,7 @@ const Profile = () => {
                                 )}
                               </div>
                             </div>
+                            {(b.payment || b.refund) && <PaymentBookingActions booking={b} onChanged={fetchBookings} />}
                           </div>
                         </motion.div>
                       );

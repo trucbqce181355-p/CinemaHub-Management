@@ -30,6 +30,7 @@ import Cinemas from './pages/Cinemas';
 import News from './pages/News';
 import NewsDetails from './pages/NewsDetails';
 import PaymentCallback from './pages/PaymentCallback';
+import RefundManagement from './pages/admin/RefundManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -124,6 +125,7 @@ function App() {
           <Route path="promotions" element={<PromotionManagement />} />
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="checkin" element={<TicketCheckIn />} />
+          <Route path="refunds" element={<RefundManagement />} />
           <Route path="reviews" element={<ReviewManagement />} />
           <Route path="food" element={<FoodManagement />} />
           <Route path="food-stock" element={<CinemaStockManagement />} />

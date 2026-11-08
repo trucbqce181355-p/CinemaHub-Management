@@ -72,14 +72,16 @@ public class PaymentRepository {
     }
 
     public void flagReconciliation(String id, String providerId, LocalDateTime now) {
-        change(Criteria.where("_id").is(id).and("payment.status").in("EXPIRED", "FAILED"),
+        change(Criteria.where("_id").is(id).and("payment.status").in("EXPIRED", "FAILED", "CANCELLED"),
                 new Update().set("payment.reconciliationRequired", true)
                         .set("payment.providerTransactionId", providerId), now);
     }
 
     public List<Booking> unissued() {
         return mongo.find(Query.query(Criteria.where("payment.status").is("SUCCESS")
-                .and("status").is("CONFIRMED").and("ticketId").is(null)).limit(100), Booking.class);
+                .and("status").is("CONFIRMED").and("refund.status").nin("PENDING_APPROVAL", "PROCESSING", "REVIEW_REQUIRED", "FAILED", "SUCCEEDED")
+                .orOperator(Criteria.where("ticketId").is(null), Criteria.where("ticketEmailQueued").ne(true)))
+                .limit(100), Booking.class);
     }
 
     private Booking change(Criteria guard, Update update, LocalDateTime now) {
