@@ -16,4 +16,5 @@ public class HoldSeatRequest {
     private String customerName;
     private String customerEmail;
     private String customerPhone;
+    private List<SelectFoodBookingRequest.SelectedFoodItem> selectedFoods;
 }

@@ -48,6 +48,10 @@ public class Booking {
     @Builder.Default
     private List<BookedSeat> seats = new ArrayList<>();
 
+    @Builder.Default
+    private List<BookedFoodItem> foodItems = new ArrayList<>();
+
+    private Double foodSubtotal;
     private Double subtotal;
     private String promoCode;
     private Double discountAmount;
@@ -81,5 +85,16 @@ public class Booking {
         private String seatNumber;   // e.g. A1, C5
         private String seatType;     // STANDARD, VIP, COUPLE
         private Double price;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BookedFoodItem {
+        private String foodItemId;
+        private String name;
+        private Double price;
+        private Integer quantity;
     }
 }

@@ -21,11 +21,15 @@ public class CalculatePriceRequest {
     @jakarta.validation.constraints.Email
     private String customerEmail;
 
+    private List<SelectFoodBookingRequest.SelectedFoodItem> selectedFoods;
+
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PriceResult {
+        private Double seatSubtotal;
+        private Double foodSubtotal;
         private Double subtotal;
         private Double discountAmount;
         private Double totalAmount;

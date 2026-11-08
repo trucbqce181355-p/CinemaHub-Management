@@ -53,6 +53,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/promotions/validate").authenticated()
                 .requestMatchers("/api/promotions/**", "/api/pricing-rules/**").hasAnyRole("Manager", "Admin")
                 .requestMatchers("/api/food-beverage/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/inventory/**").permitAll()
+                .requestMatchers("/api/inventory", "/api/inventory/**").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/membership/tiers").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/membership/rules").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/membership/rewards").permitAll()

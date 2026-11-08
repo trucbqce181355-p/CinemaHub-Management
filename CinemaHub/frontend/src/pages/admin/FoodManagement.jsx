@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Plus, Edit, Trash2, CheckCircle, XCircle, Coffee, Package, Minus, PlusCircle } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api/food-beverage'; 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '') + '/food-beverage'; 
 
 export default function FoodManagement() {
   const [foods, setFoods] = useState([]);
@@ -200,7 +201,13 @@ export default function FoodManagement() {
           <h1 className="text-3xl font-bold text-red-500">Quản Lý Bắp Nước & Combo (F&B)</h1>
           <p className="text-neutral-400 mt-1">Quản trị danh mục món lẻ, thuộc tính và combo khuyến mãi</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          <Link
+            to="/admin/food-stock"
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2 rounded-lg font-medium transition text-gray-200"
+          >
+            <Package size={18} className="text-amber-400" /> Tồn Kho Theo Rạp
+          </Link>
           <button
             onClick={() => { resetForm(); setIsComboMode(false); setShowModal(true); }}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-medium transition"

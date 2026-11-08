@@ -3,6 +3,7 @@ package com.example.cinemahub.service;
 import com.example.cinemahub.dto.*;
 import com.example.cinemahub.model.*;
 import com.example.cinemahub.repository.BookingRepository;
+import com.example.cinemahub.repository.FoodItemRepository;
 import com.example.cinemahub.repository.ShowtimeRepository;
 import com.example.cinemahub.repository.TicketRepository;
 import com.example.cinemahub.repository.SeatRepository;
@@ -57,6 +58,12 @@ public class BookingService {
 
     @Autowired
     private MembershipService membershipService;
+
+    @Autowired
+    private FoodItemRepository foodItemRepository;
+
+    @Autowired
+    private InventoryService inventoryService;
 
     // 1. Get Seat Availability (Seat matrix with live status)
     public SeatAvailabilityDTO getSeatAvailability(String showtimeId) {
@@ -200,12 +207,12 @@ public class BookingService {
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<Booking.BookedSeat> seatList = new ArrayList<>();
-        double subtotal = 0.0;
+        double seatSubtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
             Seat seat = requireSeat(actualSeats, seatId);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            subtotal += price;
+            seatSubtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
                     .seatId(seatId)
@@ -221,6 +228,14 @@ public class BookingService {
             if (!available)
                 throw new RuntimeException("Ghế không tồn tại hoặc không hoạt động: " + seatId);
         }
+
+        List<Booking.BookedFoodItem> bookedFoods = inventoryService.deductBookingFoods(
+                showtime.getCinemaId(), req.getSelectedFoods());
+        double foodSubtotal = Money.vnd(bookedFoods.stream()
+                .mapToDouble(f -> Money.vnd(f.getPrice()) * f.getQuantity())
+                .sum());
+        double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
+
         String reference = generateBookingReference();
         LocalDateTime expiresAt = now.plusSeconds(holdDurationSeconds);
 
@@ -241,6 +256,8 @@ public class BookingService {
                 .showtimeStart(showtime.getStartTime())
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
+                .foodItems(bookedFoods)
+                .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .discountAmount(0.0)
                 .totalAmount(subtotal)
@@ -251,7 +268,12 @@ public class BookingService {
                 .updatedAt(now)
                 .build();
 
-        return bookingRepository.save(booking);
+        try {
+            return bookingRepository.save(booking);
+        } catch (RuntimeException ex) {
+            inventoryService.restoreBookingFoods(showtime.getCinemaId(), bookedFoods);
+            throw ex;
+        }
     }
 
     // 3. Check Seat Hold Duration
@@ -315,13 +337,13 @@ public class BookingService {
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<CalculatePriceRequest.SeatPriceItem> seatItems = new ArrayList<>();
-        double subtotal = 0.0;
+        double seatSubtotal = 0.0;
 
         for (String seatId : req.getSeatIds()) {
             Seat seat = requireSeat(actualSeats, seatId);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            subtotal += price;
+            seatSubtotal += price;
 
             seatItems.add(CalculatePriceRequest.SeatPriceItem.builder()
                     .seatId(seatId)
@@ -330,6 +352,9 @@ public class BookingService {
                     .price(price)
                     .build());
         }
+
+        double foodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
 
         double discount = 0.0;
         String promoTitle = null;
@@ -343,6 +368,8 @@ public class BookingService {
         double totalAmount = Math.max(0.0, subtotal - discount);
 
         return CalculatePriceRequest.PriceResult.builder()
+                .seatSubtotal(Money.vnd(seatSubtotal))
+                .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .discountAmount(discount)
                 .totalAmount(totalAmount)
@@ -544,6 +571,7 @@ public class BookingService {
                 org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true), Booking.class);
         if (updated == null)
             throw new RuntimeException("Đơn đã thay đổi hoặc đang thanh toán");
+        inventoryService.restoreBookingFoods(updated);
         return updated;
     }
 
@@ -585,7 +613,9 @@ public class BookingService {
                     }
                 }
             } else if ("PENDING".equalsIgnoreCase(b.getStatus())) {
-                if (b.getHoldExpiresAt() != null && b.getHoldExpiresAt().isAfter(now)) {
+                if (b.getHoldExpiresAt() != null && !b.getHoldExpiresAt().isAfter(now)) {
+                    paymentRepository.expire(b.getId(), now);
+                } else if (b.getHoldExpiresAt() != null && b.getHoldExpiresAt().isAfter(now)) {
                     for (Booking.BookedSeat s : b.getSeats()) {
                         if (req.getSeatIds().contains(s.getSeatId())) {
                             throw new RuntimeException("Ghế " + s.getSeatId() + " đang được giữ chỗ online.");
@@ -601,7 +631,7 @@ public class BookingService {
 
         // Build seats and price
         List<Booking.BookedSeat> seatList = new ArrayList<>();
-        double subtotal = 0.0;
+        double seatSubtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
             List<Seat> matches = actualSeats.stream().filter(s -> seatId.equals(s.getSeatNumber())).toList();
             if (matches.size() != 1 || !"ACTIVE".equalsIgnoreCase(matches.get(0).getStatus()))
@@ -609,7 +639,7 @@ public class BookingService {
             Seat seat = matches.get(0);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            subtotal += price;
+            seatSubtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
                     .seatId(seatId)
@@ -619,12 +649,18 @@ public class BookingService {
                     .build());
         }
 
+        double foodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
+
         String counterCustomerId = counterCustomer(req.getCustomerEmail());
         double discount = 0.0;
         if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
             Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
             discount = promotionValidationService.discount(promo, subtotal, counterCustomerId, null);
         }
+
+        List<Booking.BookedFoodItem> bookedFoods = inventoryService.deductBookingFoods(
+                showtime.getCinemaId(), req.getSelectedFoods());
 
         double totalAmount = Math.max(0.0, subtotal - discount);
         String reference = generateBookingReference();
@@ -647,6 +683,8 @@ public class BookingService {
                 .showtimeStart(showtime.getStartTime())
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
+                .foodItems(bookedFoods)
+                .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .promoCode(discount > 0 ? PromotionRules.code(req.getPromoCode()) : null)
                 .discountAmount(discount)
@@ -684,9 +722,16 @@ public class BookingService {
         ticket.setSeats(seatStatuses);
         ticket.setQrCode("CINEMAHUB|COUNTER|" + reference + "|" + UUID.randomUUID());
 
-        Ticket savedTicket = ticketRepository.save(ticket);
-        booking.setTicketId(savedTicket.getId());
-        Booking savedBooking = bookingRepository.save(booking);
+        Ticket savedTicket;
+        Booking savedBooking;
+        try {
+            savedTicket = ticketRepository.save(ticket);
+            booking.setTicketId(savedTicket.getId());
+            savedBooking = bookingRepository.save(booking);
+        } catch (RuntimeException ex) {
+            inventoryService.restoreBookingFoods(showtime.getCinemaId(), bookedFoods);
+            throw ex;
+        }
 
         try {
             if (membershipService != null) {
@@ -837,6 +882,38 @@ public class BookingService {
         });
     }
 
+    private double calculateFoodSubtotal(List<SelectFoodBookingRequest.SelectedFoodItem> selectedFoods) {
+        if (selectedFoods == null || selectedFoods.isEmpty()) {
+            return 0.0;
+        }
+        Map<String, Integer> aggregated = new LinkedHashMap<>();
+        for (SelectFoodBookingRequest.SelectedFoodItem item : selectedFoods) {
+            if (item == null || item.getFoodItemId() == null || item.getFoodItemId().isBlank()) {
+                continue;
+            }
+            int qty = item.getQuantity() != null ? item.getQuantity() : 0;
+            if (qty <= 0) continue;
+            if (qty > 99) {
+                throw new IllegalArgumentException("Số lượng mỗi món bắp nước không vượt quá 99");
+            }
+            aggregated.merge(item.getFoodItemId().trim(), qty, Integer::sum);
+        }
+        if (aggregated.isEmpty()) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        for (Map.Entry<String, Integer> entry : aggregated.entrySet()) {
+            FoodItem food = foodItemRepository.findById(entry.getKey())
+                    .orElseThrow(() -> new IllegalArgumentException("Món bắp nước không tồn tại"));
+            if (!Boolean.TRUE.equals(food.getActive())) {
+                throw new IllegalArgumentException("Món \"" + food.getName() + "\" hiện đã tạm ngưng phục vụ");
+            }
+            double unitPrice = Money.vnd(food.getBasePrice() != null ? food.getBasePrice() : 0.0);
+            sum += unitPrice * entry.getValue();
+        }
+        return Money.vnd(sum);
+    }
+
     private String generateBookingReference() {
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         String randomStr = UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT);
@@ -851,6 +928,13 @@ public class BookingService {
             String seatNames = booking.getSeats().stream()
                     .map(Booking.BookedSeat::getSeatNumber)
                     .collect(Collectors.joining(", "));
+            String foodSummary = "";
+            if (booking.getFoodItems() != null && !booking.getFoodItems().isEmpty()) {
+                String foods = booking.getFoodItems().stream()
+                        .map(f -> f.getName() + " x" + f.getQuantity())
+                        .collect(Collectors.joining(", "));
+                foodSummary = "Bắp nước & Combo: " + foods + "\n";
+            }
             String text = String.format(
                     "Xin chào %s,\n\nBạn đã đặt vé thành công tại CinemaHub!\n\n" +
                             "Mã đặt chỗ: %s\n" +
@@ -858,6 +942,7 @@ public class BookingService {
                             "Rạp: %s (%s)\n" +
                             "Suất chiếu: %s\n" +
                             "Ghế: %s\n" +
+                            "%s" +
                             "Tổng thanh toán: %,.0f đ\n\n" +
                             "Vui lòng đưa mã vé khi đến rạp để soát vé. Chúc bạn xem phim vui vẻ!",
                     booking.getCustomerName(),
@@ -867,6 +952,7 @@ public class BookingService {
                     booking.getRoomName(),
                     booking.getShowtimeStart(),
                     seatNames,
+                    foodSummary,
                     booking.getTotalAmount());
             emailService.sendEmail(booking.getCustomerEmail(),
                     "[CinemaHub] Xác nhận đặt vé thành công - " + booking.getBookingReference(), text);

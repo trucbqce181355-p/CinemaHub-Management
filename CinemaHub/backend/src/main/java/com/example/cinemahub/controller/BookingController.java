@@ -2,7 +2,9 @@ package com.example.cinemahub.controller;
 
 import com.example.cinemahub.dto.*;
 import com.example.cinemahub.model.Booking;
+import com.example.cinemahub.repository.BookingRepository;
 import com.example.cinemahub.service.BookingService;
+import com.example.cinemahub.service.InventoryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -174,10 +176,39 @@ public class BookingController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    @Autowired
+    private InventoryService inventoryService;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
     @DeleteMapping("/{id}/promo")
     public ResponseEntity<?> clearPromo(@PathVariable String id, Authentication authentication) {
         payments.owned(id, authentication.getName());
         try { return ResponseEntity.ok(bookingService.clearPromo(id)); }
         catch (IllegalArgumentException ex) { return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage())); }
+    }
+
+    @PostMapping("/select-food")
+    public ResponseEntity<?> selectFoodInBooking(@RequestBody SelectFoodBookingRequest req, Authentication authentication) {
+        try {
+            Booking booking = bookingRepository.findById(req.getBookingId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy Booking ID"));
+            if (authentication != null) {
+                payments.owned(booking.getId(), authentication.getName());
+            }
+            String cinemaId = (req.getCinemaId() != null && !req.getCinemaId().isBlank())
+                    ? req.getCinemaId()
+                    : booking.getCinemaId();
+            List<Booking.BookedFoodItem> bookedFoods = inventoryService.deductBookingFoods(cinemaId, req.getItems());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Chọn bắp nước thành công!",
+                    "foodItems", bookedFoods
+            ));
+        } catch (RuntimeException e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException status) throw status;
+            String msg = e.getMessage() != null ? e.getMessage() : "Không thể chọn bắp nước";
+            return ResponseEntity.badRequest().body(Map.of("error", msg, "message", msg));
+        }
     }
 }

@@ -24,4 +24,5 @@ public class CounterBookingRequest {
 
     private String promoCode;
     private String staffNotes;
+    private List<SelectFoodBookingRequest.SelectedFoodItem> selectedFoods;
 }

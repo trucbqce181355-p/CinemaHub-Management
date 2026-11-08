@@ -11,4 +11,5 @@ public interface FoodItemRepository extends MongoRepository<FoodItem, String> {
     List<FoodItem> findByActiveTrue();
     List<FoodItem> findByCategory(String category);
     List<FoodItem> findByIsComboTrueAndActiveTrue();
+    List<FoodItem> findByComboItemsFoodItemId(String foodItemId);
 }

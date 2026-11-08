@@ -16,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PaymentRepository {
     private final MongoTemplate mongo;
+    private final com.example.cinemahub.service.InventoryService inventoryService;
 
     public Booking find(String id) { return mongo.findById(id, Booking.class); }
 
@@ -36,10 +37,14 @@ public class PaymentRepository {
     public Booking complete(String transactionId, boolean success, String providerId, String code, LocalDateTime now) {
         Criteria guard = Criteria.where("payment.transactionId").is(transactionId)
                 .and("payment.status").is("PENDING").and("status").is("PENDING").and("holdExpiresAt").gt(now);
-        return change(guard, new Update().set("status", success ? "CONFIRMED" : "CANCELLED")
+        Booking updated = change(guard, new Update().set("status", success ? "CONFIRMED" : "CANCELLED")
                 .set("payment.status", success ? "SUCCESS" : "FAILED")
                 .set("payment.providerTransactionId", providerId).set("payment.responseCode", code)
                 .set("payment.updatedAt", now), now);
+        if (updated != null && !success && inventoryService != null) {
+            inventoryService.restoreBookingFoods(updated);
+        }
+        return updated;
     }
 
     public boolean expire(String id, LocalDateTime now) {
@@ -51,7 +56,14 @@ public class PaymentRepository {
             guard.and("payment.status").is("PENDING");
             update.set("payment.status", "EXPIRED").set("payment.updatedAt", now);
         } else guard.and("payment").is(null);
-        return change(guard, update, now) != null;
+        Booking expired = change(guard, update, now);
+        if (expired != null) {
+            if (inventoryService != null) {
+                inventoryService.restoreBookingFoods(expired);
+            }
+            return true;
+        }
+        return false;
     }
 
     public List<Booking> expired(LocalDateTime now) {

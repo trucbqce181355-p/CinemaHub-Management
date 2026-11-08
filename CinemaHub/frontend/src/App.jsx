@@ -20,6 +20,7 @@ import ScreenRoomManagement from './pages/admin/ScreenRoomManagement';
 import ShowtimeManagement from './pages/admin/ShowtimeManagement';
 import ReviewManagement from './pages/admin/ReviewManagement';
 import FoodManagement from './pages/admin/FoodManagement';
+import CinemaStockManagement from './pages/admin/CinemaStockManagement';
 import NewsManagement from './pages/admin/NewsManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
@@ -125,6 +126,7 @@ function App() {
           <Route path="checkin" element={<TicketCheckIn />} />
           <Route path="reviews" element={<ReviewManagement />} />
           <Route path="food" element={<FoodManagement />} />
+          <Route path="food-stock" element={<CinemaStockManagement />} />
           <Route path="news" element={<NewsManagement />} />
         </Route>
 

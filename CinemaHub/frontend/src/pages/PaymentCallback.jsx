@@ -5,7 +5,7 @@ import { CheckCircle2, XCircle, ArrowRight, Printer, RefreshCw, Calendar, Clock,
 import { QRCodeSVG } from 'qrcode.react';
 import { getTicketQrValue } from '../utils/ticketQr';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
 const PaymentCallback = () => {
   const navigate = useNavigate();
@@ -147,6 +147,19 @@ const PaymentCallback = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Food Items */}
+              {booking.foodItems && booking.foodItems.length > 0 && (
+                <div className="bg-white/5 p-3.5 rounded-xl text-xs space-y-1.5 border border-white/5">
+                  <span className="text-amber-400 font-semibold block">Bắp nước nhận tại quầy bar:</span>
+                  {booking.foodItems.map(f => (
+                    <div key={f.foodItemId} className="flex justify-between text-gray-300">
+                      <span>• {f.name}</span>
+                      <span className="font-bold text-white">x{f.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Meta details */}
               <div className="flex flex-wrap justify-between items-center text-xs text-gray-400 gap-2">
