@@ -151,10 +151,18 @@ public class MembershipService {
 
             tierRepository.saveAll(Arrays.asList(bronze, silver, gold, platinum));
         } else {
-            // Auto-migration for existing tiers if they still have old minPoints
+            // Auto-migration for existing tiers: populate ticket/fnb discount percentages and update minPoints
             tierRepository.findAll().forEach(t -> {
                 boolean changed = false;
                 if ("BRONZE".equalsIgnoreCase(t.getCode())) {
+                    if (t.getTicketDiscountPercent() == null) {
+                        t.setTicketDiscountPercent(0.0);
+                        changed = true;
+                    }
+                    if (t.getFnbDiscountPercent() == null) {
+                        t.setFnbDiscountPercent(0.0);
+                        changed = true;
+                    }
                     t.setBenefits(Arrays.asList(
                             "Tích 1 điểm cho mỗi 1.000đ chi tiêu",
                             "Tặng bắp ngọt vào tháng sinh nhật",
@@ -162,21 +170,51 @@ public class MembershipService {
                             "Đặt vé trực tuyến giữ chỗ nhanh chóng"
                     ));
                     changed = true;
-                } else if ("SILVER".equalsIgnoreCase(t.getCode()) && (t.getMinPoints() == null || t.getMinPoints() == 500)) {
-                    t.setMinPoints(1000);
-                    t.setMinSpend(1000000.0);
-                    t.setDescription("Hạng dành cho khán giả thân thiết với chi tiêu tích lũy từ 1.000.000đ.");
-                    changed = true;
-                } else if ("GOLD".equalsIgnoreCase(t.getCode()) && (t.getMinPoints() == null || t.getMinPoints() == 1500)) {
-                    t.setMinPoints(3000);
-                    t.setMinSpend(3000000.0);
-                    t.setDescription("Hạng thành viên VIP với chi tiêu tích lũy từ 3.000.000đ.");
-                    changed = true;
-                } else if ("PLATINUM".equalsIgnoreCase(t.getCode()) && (t.getMinPoints() == null || t.getMinPoints() == 3000)) {
-                    t.setMinPoints(6000);
-                    t.setMinSpend(6000000.0);
-                    t.setDescription("Hạng thành viên đẳng cấp cao nhất với chi tiêu tích lũy từ 6.000.000đ.");
-                    changed = true;
+                } else if ("SILVER".equalsIgnoreCase(t.getCode())) {
+                    if (t.getMinPoints() == null || t.getMinPoints() == 500) {
+                        t.setMinPoints(1000);
+                        t.setMinSpend(1000000.0);
+                        t.setDescription("Hạng dành cho khán giả thân thiết với chi tiêu tích lũy từ 1.000.000đ.");
+                        changed = true;
+                    }
+                    if (t.getTicketDiscountPercent() == null || t.getTicketDiscountPercent() <= 0.0) {
+                        t.setTicketDiscountPercent(5.0);
+                        changed = true;
+                    }
+                    if (t.getFnbDiscountPercent() == null || t.getFnbDiscountPercent() <= 0.0) {
+                        t.setFnbDiscountPercent(5.0);
+                        changed = true;
+                    }
+                } else if ("GOLD".equalsIgnoreCase(t.getCode())) {
+                    if (t.getMinPoints() == null || t.getMinPoints() == 1500) {
+                        t.setMinPoints(3000);
+                        t.setMinSpend(3000000.0);
+                        t.setDescription("Hạng thành viên VIP với chi tiêu tích lũy từ 3.000.000đ.");
+                        changed = true;
+                    }
+                    if (t.getTicketDiscountPercent() == null || t.getTicketDiscountPercent() <= 0.0) {
+                        t.setTicketDiscountPercent(10.0);
+                        changed = true;
+                    }
+                    if (t.getFnbDiscountPercent() == null || t.getFnbDiscountPercent() <= 0.0) {
+                        t.setFnbDiscountPercent(10.0);
+                        changed = true;
+                    }
+                } else if ("PLATINUM".equalsIgnoreCase(t.getCode())) {
+                    if (t.getMinPoints() == null || t.getMinPoints() == 3000) {
+                        t.setMinPoints(6000);
+                        t.setMinSpend(6000000.0);
+                        t.setDescription("Hạng thành viên đẳng cấp cao nhất với chi tiêu tích lũy từ 6.000.000đ.");
+                        changed = true;
+                    }
+                    if (t.getTicketDiscountPercent() == null || t.getTicketDiscountPercent() <= 0.0) {
+                        t.setTicketDiscountPercent(15.0);
+                        changed = true;
+                    }
+                    if (t.getFnbDiscountPercent() == null || t.getFnbDiscountPercent() <= 0.0) {
+                        t.setFnbDiscountPercent(15.0);
+                        changed = true;
+                    }
                 }
                 if (changed) {
                     tierRepository.save(t);
@@ -497,7 +535,15 @@ public class MembershipService {
         }
 
         if (qualifying != null) {
-            user.setMembershipTier(qualifying.getCode());
+            if (user.getMembershipTier() == null || user.getMembershipTier().isBlank()) {
+                user.setMembershipTier(qualifying.getCode());
+            } else {
+                MembershipTier currentTier = tierRepository.findByCode(user.getMembershipTier().toUpperCase()).orElse(null);
+                // Only upgrade, do NOT demote if user was manually assigned or already qualified for a higher tier
+                if (currentTier == null || (qualifying.getLevel() != null && currentTier.getLevel() != null && qualifying.getLevel() > currentTier.getLevel())) {
+                    user.setMembershipTier(qualifying.getCode());
+                }
+            }
         }
     }
 

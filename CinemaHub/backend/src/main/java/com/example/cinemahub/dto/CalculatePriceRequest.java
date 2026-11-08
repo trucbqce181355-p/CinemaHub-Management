@@ -20,6 +20,7 @@ public class CalculatePriceRequest {
     private String promoCode;
     @jakarta.validation.constraints.Email
     private String customerEmail;
+    private String customerPhone;
 
     private List<SelectFoodBookingRequest.SelectedFoodItem> selectedFoods;
 
@@ -29,6 +30,9 @@ public class CalculatePriceRequest {
     @AllArgsConstructor
     public static class PriceResult {
         private Double seatSubtotal;
+        private Double rawSeatSubtotal;
+        private Double seatDiscountAmount;
+        private Double ticketDiscountPercent;
         private Double foodSubtotal;
         private Double rawFoodSubtotal;
         private Double foodDiscountAmount;
@@ -52,5 +56,6 @@ public class CalculatePriceRequest {
         private String seatNumber;
         private String seatType;
         private Double price;
+        private Double rawPrice;
     }
 }

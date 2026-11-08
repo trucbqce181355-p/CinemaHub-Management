@@ -47,7 +47,6 @@ const Footer = () => {
               <li><a href="/#phim-dang-chieu" onClick={(e) => handleScrollTo(e, 'phim-dang-chieu')} className="hover:text-primary transition-colors">Phim đang chiếu</a></li>
               <li><a href="/#phim-sap-chieu" onClick={(e) => handleScrollTo(e, 'phim-sap-chieu')} className="hover:text-primary transition-colors">Phim sắp chiếu</a></li>
               <li><Link to="/cinemas" className="hover:text-primary transition-colors">Rạp phim</Link></li>
-              <li><Link to="/promotions" className="hover:text-primary transition-colors">Khuyến mãi</Link></li>
             </ul>
           </div>
 

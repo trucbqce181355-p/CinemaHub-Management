@@ -65,6 +65,9 @@ public class BookingService {
     @Autowired
     private InventoryService inventoryService;
 
+    @Autowired
+    private com.example.cinemahub.repository.UserRepository userRepository;
+
     // 1. Get Seat Availability (Seat matrix with live status)
     public SeatAvailabilityDTO getSeatAvailability(String showtimeId) {
         Showtime showtime = showtimeRepository.findById(showtimeId)
@@ -207,20 +210,22 @@ public class BookingService {
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<Booking.BookedSeat> seatList = new ArrayList<>();
-        double seatSubtotal = 0.0;
+        double rawSeatSubtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
             Seat seat = requireSeat(actualSeats, seatId);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            seatSubtotal += price;
+            rawSeatSubtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
                     .seatId(seatId)
                     .seatNumber(seatId)
                     .seatType(seatType)
                     .price(price)
+                    .rawPrice(price)
                     .build());
         }
+        rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
 
         for (String seatId : req.getSeatIds()) {
             boolean available = actualSeats.stream().anyMatch(s -> seatId.equals(s.getSeatNumber())
@@ -235,6 +240,8 @@ public class BookingService {
                 .mapToDouble(f -> Money.vnd(f.getPrice()) * f.getQuantity())
                 .sum());
 
+        double ticketDiscountPercent = 0.0;
+        double seatDiscountAmount = 0.0;
         double fnbDiscountPercent = 0.0;
         double foodDiscountAmount = 0.0;
         String memberTierName = null;
@@ -247,18 +254,36 @@ public class BookingService {
         if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
             customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);
         }
+        if (customer == null && req.getCustomerPhone() != null && !req.getCustomerPhone().isBlank()) {
+            customer = userRepository.findByPhoneNumber(req.getCustomerPhone().trim()).orElse(null);
+        }
 
         if (customer != null && membershipService != null) {
             MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
-            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
-                fnbDiscountPercent = tier.getFnbDiscountPercent();
+            if (tier != null) {
                 memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
                 memberTierCode = tier.getCode();
-                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                if (tier.getTicketDiscountPercent() != null && tier.getTicketDiscountPercent() > 0) {
+                    ticketDiscountPercent = tier.getTicketDiscountPercent();
+                    seatDiscountAmount = Money.vnd(rawSeatSubtotal * (ticketDiscountPercent / 100.0));
+                }
+                if (tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                    fnbDiscountPercent = tier.getFnbDiscountPercent();
+                    foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                }
             }
         }
+        double seatSubtotal = Math.max(0.0, Money.vnd(rawSeatSubtotal - seatDiscountAmount));
         double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
+
+        if (ticketDiscountPercent > 0) {
+            for (Booking.BookedSeat bookedSeat : seatList) {
+                double rawP = bookedSeat.getRawPrice() != null ? bookedSeat.getRawPrice() : bookedSeat.getPrice();
+                bookedSeat.setPrice(Money.vnd(rawP * (1.0 - ticketDiscountPercent / 100.0)));
+                bookedSeat.setRawPrice(rawP);
+            }
+        }
 
         String reference = generateBookingReference();
         LocalDateTime expiresAt = now.plusSeconds(holdDurationSeconds);
@@ -281,6 +306,10 @@ public class BookingService {
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
                 .foodItems(bookedFoods)
+                .rawSeatSubtotal(rawSeatSubtotal)
+                .seatDiscountAmount(seatDiscountAmount)
+                .ticketDiscountPercent(ticketDiscountPercent)
+                .seatSubtotal(seatSubtotal)
                 .rawFoodSubtotal(rawFoodSubtotal)
                 .foodDiscountAmount(foodDiscountAmount)
                 .fnbDiscountPercent(fnbDiscountPercent)
@@ -366,23 +395,27 @@ public class BookingService {
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
         List<CalculatePriceRequest.SeatPriceItem> seatItems = new ArrayList<>();
-        double seatSubtotal = 0.0;
+        double rawSeatSubtotal = 0.0;
 
         for (String seatId : req.getSeatIds()) {
             Seat seat = requireSeat(actualSeats, seatId);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            seatSubtotal += price;
+            rawSeatSubtotal += price;
 
             seatItems.add(CalculatePriceRequest.SeatPriceItem.builder()
                     .seatId(seatId)
                     .seatNumber(seatId)
                     .seatType(seatType)
                     .price(price)
+                    .rawPrice(price)
                     .build());
         }
+        rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
 
         double rawFoodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double ticketDiscountPercent = 0.0;
+        double seatDiscountAmount = 0.0;
         double fnbDiscountPercent = 0.0;
         double foodDiscountAmount = 0.0;
         String memberTierName = null;
@@ -395,18 +428,36 @@ public class BookingService {
         if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
             customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);
         }
+        if (customer == null && req.getCustomerPhone() != null && !req.getCustomerPhone().isBlank()) {
+            customer = userRepository.findByPhoneNumber(req.getCustomerPhone().trim()).orElse(null);
+        }
 
         if (customer != null && membershipService != null) {
             MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
-            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
-                fnbDiscountPercent = tier.getFnbDiscountPercent();
+            if (tier != null) {
                 memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
                 memberTierCode = tier.getCode();
-                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                if (tier.getTicketDiscountPercent() != null && tier.getTicketDiscountPercent() > 0) {
+                    ticketDiscountPercent = tier.getTicketDiscountPercent();
+                    seatDiscountAmount = Money.vnd(rawSeatSubtotal * (ticketDiscountPercent / 100.0));
+                }
+                if (tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                    fnbDiscountPercent = tier.getFnbDiscountPercent();
+                    foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                }
             }
         }
+        double seatSubtotal = Math.max(0.0, Money.vnd(rawSeatSubtotal - seatDiscountAmount));
         double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
+
+        if (ticketDiscountPercent > 0) {
+            for (CalculatePriceRequest.SeatPriceItem item : seatItems) {
+                double rawP = item.getRawPrice() != null ? item.getRawPrice() : item.getPrice();
+                item.setPrice(Money.vnd(rawP * (1.0 - ticketDiscountPercent / 100.0)));
+                item.setRawPrice(rawP);
+            }
+        }
 
         double discount = 0.0;
         String promoTitle = null;
@@ -420,6 +471,9 @@ public class BookingService {
         double totalAmount = Math.max(0.0, subtotal - discount);
 
         return CalculatePriceRequest.PriceResult.builder()
+                .rawSeatSubtotal(rawSeatSubtotal)
+                .seatDiscountAmount(seatDiscountAmount)
+                .ticketDiscountPercent(ticketDiscountPercent)
                 .seatSubtotal(Money.vnd(seatSubtotal))
                 .rawFoodSubtotal(rawFoodSubtotal)
                 .foodDiscountAmount(foodDiscountAmount)
@@ -688,7 +742,7 @@ public class BookingService {
 
         // Build seats and price
         List<Booking.BookedSeat> seatList = new ArrayList<>();
-        double seatSubtotal = 0.0;
+        double rawSeatSubtotal = 0.0;
         for (String seatId : req.getSeatIds()) {
             List<Seat> matches = actualSeats.stream().filter(s -> seatId.equals(s.getSeatNumber())).toList();
             if (matches.size() != 1 || !"ACTIVE".equalsIgnoreCase(matches.get(0).getStatus()))
@@ -696,15 +750,17 @@ public class BookingService {
             Seat seat = matches.get(0);
             String seatType = seat.getSeatType();
             Double price = calculateSingleSeatPrice(showtime, movie, seatType, priceRules);
-            seatSubtotal += price;
+            rawSeatSubtotal += price;
 
             seatList.add(Booking.BookedSeat.builder()
                     .seatId(seatId)
                     .seatNumber(seatId)
                     .seatType(seatType)
                     .price(price)
+                    .rawPrice(price)
                     .build());
         }
+        rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
 
         double rawFoodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
         String counterCustomerId = counterCustomer(req.getCustomerEmail());
@@ -716,6 +772,8 @@ public class BookingService {
             }
         }
 
+        double ticketDiscountPercent = 0.0;
+        double seatDiscountAmount = 0.0;
         double fnbDiscountPercent = 0.0;
         double foodDiscountAmount = 0.0;
         String memberTierName = null;
@@ -723,15 +781,30 @@ public class BookingService {
 
         if (customer != null && membershipService != null) {
             MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
-            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
-                fnbDiscountPercent = tier.getFnbDiscountPercent();
+            if (tier != null) {
                 memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
                 memberTierCode = tier.getCode();
-                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                if (tier.getTicketDiscountPercent() != null && tier.getTicketDiscountPercent() > 0) {
+                    ticketDiscountPercent = tier.getTicketDiscountPercent();
+                    seatDiscountAmount = Money.vnd(rawSeatSubtotal * (ticketDiscountPercent / 100.0));
+                }
+                if (tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                    fnbDiscountPercent = tier.getFnbDiscountPercent();
+                    foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+                }
             }
         }
+        double seatSubtotal = Math.max(0.0, Money.vnd(rawSeatSubtotal - seatDiscountAmount));
         double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
+
+        if (ticketDiscountPercent > 0) {
+            for (Booking.BookedSeat s : seatList) {
+                double rawP = s.getRawPrice() != null ? s.getRawPrice() : s.getPrice();
+                s.setPrice(Money.vnd(rawP * (1.0 - ticketDiscountPercent / 100.0)));
+                s.setRawPrice(rawP);
+            }
+        }
 
         double discount = 0.0;
         if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
@@ -764,6 +837,10 @@ public class BookingService {
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
                 .foodItems(bookedFoods)
+                .rawSeatSubtotal(rawSeatSubtotal)
+                .seatDiscountAmount(seatDiscountAmount)
+                .ticketDiscountPercent(ticketDiscountPercent)
+                .seatSubtotal(seatSubtotal)
                 .rawFoodSubtotal(rawFoodSubtotal)
                 .foodDiscountAmount(foodDiscountAmount)
                 .fnbDiscountPercent(fnbDiscountPercent)

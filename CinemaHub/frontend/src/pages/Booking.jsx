@@ -237,12 +237,39 @@ const Booking = () => {
   const [selectedFoods, setSelectedFoods] = useState([]);
   const foodTotal = selectedFoods.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
   const rawFoodTotal = selectedFoods.reduce((sum, item) => sum + (((item.rawPrice != null ? item.rawPrice : item.basePrice) || item.price || 0) * (item.quantity || 0)), 0);
+  const rawSeatTotal = selectedSeats.reduce((sum, seatId) => {
+    const seatObj = seatMatrix.find(s => s.seatId === seatId);
+    return sum + (seatObj?.price || 0);
+  }, 0);
 
-  // Member Tier (Loyalty F&B Discount)
+  // Member Tier (Loyalty F&B and Ticket Discount)
   const [memberTier, setMemberTier] = useState(null);
+  const [availableTiers, setAvailableTiers] = useState([]);
+
+  // Fetch all active tiers publicly on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/membership/tiers`)
+      .then(res => res.ok ? res.json() : [])
+      .then(tiers => {
+        if (Array.isArray(tiers) && tiers.length > 0) {
+          setAvailableTiers(tiers);
+          if (user?.membershipTier) {
+            const matched = tiers.find(t => t.code?.toUpperCase() === user.membershipTier?.toUpperCase());
+            if (matched) {
+              setMemberTier(matched);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [user?.membershipTier]);
+
+  // Fetch current user membership details when logged in
   useEffect(() => {
     if (!user?.token) {
-      setMemberTier(null);
+      if (!user?.membershipTier) {
+        setMemberTier(null);
+      }
       return;
     }
     fetch(`${API_BASE}/membership/my-membership`, {
@@ -259,14 +286,17 @@ const Booking = () => {
 
   // Hold & Timer (Step 3)
   const [activeBooking, setActiveBooking] = useState(null);
-  const activeBookingRef=useRef(null);
-  useEffect(()=>{activeBookingRef.current=activeBooking;},[activeBooking]);
+  const activeBookingRef = useRef(null);
+  useEffect(() => { activeBookingRef.current = activeBooking; }, [activeBooking]);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
 
   // Pricing & Promo
   const [pricing, setPricing] = useState({
     seatSubtotal: 0,
+    rawSeatSubtotal: 0,
+    seatDiscountAmount: 0,
+    ticketDiscountPercent: 0,
     foodSubtotal: 0,
     rawFoodSubtotal: 0,
     foodDiscountAmount: 0,
@@ -277,11 +307,15 @@ const Booking = () => {
     total: 0
   });
 
+  const effectiveTicketDiscountPercent = pricing.ticketDiscountPercent != null && pricing.ticketDiscountPercent > 0
+    ? pricing.ticketDiscountPercent
+    : (memberTier?.ticketDiscountPercent || 0);
+
   const effectiveFnbDiscountPercent = pricing.fnbDiscountPercent != null && pricing.fnbDiscountPercent > 0
     ? pricing.fnbDiscountPercent
     : (memberTier?.fnbDiscountPercent || 0);
 
-  const effectiveMemberTierName = pricing.memberTierName || memberTier?.name || (effectiveFnbDiscountPercent > 0 ? 'Hội viên' : '');
+  const effectiveMemberTierName = pricing.memberTierName || memberTier?.name || ((effectiveFnbDiscountPercent > 0 || effectiveTicketDiscountPercent > 0) ? (memberTier?.code || 'Hội viên') : '');
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState('');
@@ -453,9 +487,15 @@ const Booking = () => {
   // 4. Authoritative Price calculation dynamically when selected seats or F&B change
   useEffect(() => {
     if (activeBooking && !isCounterMode) {
-      const activeSeatSub = activeBooking.seats?.length
-        ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
-        : Math.max(0, (activeBooking.subtotal || 0) - (activeBooking.foodSubtotal || 0));
+      const activeSeatSub = activeBooking.seatSubtotal != null
+        ? activeBooking.seatSubtotal
+        : (activeBooking.seats?.length
+            ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
+            : Math.max(0, (activeBooking.subtotal || 0) - (activeBooking.foodSubtotal || 0)));
+      const activeRawSeatSub = activeBooking.rawSeatSubtotal != null ? activeBooking.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : activeSeatSub);
+      const activeSeatDisc = activeBooking.seatDiscountAmount || 0;
+      const activeTicketPercent = activeBooking.ticketDiscountPercent != null ? activeBooking.ticketDiscountPercent : (memberTier?.ticketDiscountPercent || 0);
+
       const activeFoodSub = activeBooking.foodSubtotal != null
         ? activeBooking.foodSubtotal
         : (activeBooking.foodItems?.reduce((s, x) => s + ((x.price || 0) * (x.quantity || 0)), 0) || 0);
@@ -469,6 +509,9 @@ const Booking = () => {
 
       setPricing({
         seatSubtotal: activeSeatSub,
+        rawSeatSubtotal: activeRawSeatSub,
+        seatDiscountAmount: activeSeatDisc,
+        ticketDiscountPercent: activeTicketPercent,
         foodSubtotal: activeFoodSub,
         rawFoodSubtotal: activeRawFoodSub,
         foodDiscountAmount: activeFoodDisc,
@@ -491,6 +534,9 @@ const Booking = () => {
 
       setPricing({
         seatSubtotal: 0,
+        rawSeatSubtotal: 0,
+        seatDiscountAmount: 0,
+        ticketDiscountPercent: effectiveTicketDiscountPercent,
         foodSubtotal: discountedFoodTotal,
         rawFoodSubtotal: rawFoodTotal,
         foodDiscountAmount: foodDiscountAmount,
@@ -523,6 +569,7 @@ const Booking = () => {
         seatIds: selectedSeats,
         promoCode: appliedPromo?.code || null,
         customerEmail: customerEmail || undefined,
+        customerPhone: customerPhone || undefined,
         selectedFoods: selectedFoods.map(f => ({
           foodItemId: f.foodItemId,
           name: f.name,
@@ -546,6 +593,9 @@ const Booking = () => {
 
           setPricing({
             seatSubtotal: seatSub,
+            rawSeatSubtotal: data.rawSeatSubtotal != null ? data.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : seatSub),
+            seatDiscountAmount: data.seatDiscountAmount || 0,
+            ticketDiscountPercent: data.ticketDiscountPercent != null ? data.ticketDiscountPercent : effectiveTicketDiscountPercent,
             foodSubtotal: foodSub,
             rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
             foodDiscountAmount: data.foodDiscountAmount || 0,
@@ -562,6 +612,9 @@ const Booking = () => {
           setPriceError(e.message || 'Hết thời gian tính giá.');
           setPricing({
             seatSubtotal: 0,
+            rawSeatSubtotal: 0,
+            seatDiscountAmount: 0,
+            ticketDiscountPercent: effectiveTicketDiscountPercent,
             foodSubtotal: foodTotal,
             rawFoodSubtotal: rawFoodTotal,
             foodDiscountAmount: 0,
@@ -584,7 +637,7 @@ const Booking = () => {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [selectedSeats, selectedFoods, foodTotal, rawFoodTotal, effectiveFnbDiscountPercent, selectedShowtime, appliedPromo, activeBooking, isCounterMode, user?.token, customerEmail]);
+  }, [selectedSeats, selectedFoods, foodTotal, rawFoodTotal, rawSeatTotal, effectiveTicketDiscountPercent, effectiveFnbDiscountPercent, selectedShowtime, appliedPromo, activeBooking, isCounterMode, user?.token, customerEmail, customerPhone]);
 
   // 5. 10-Minute Hold Countdown Timer
   useEffect(() => {
@@ -809,10 +862,15 @@ const Booking = () => {
       setAppliedPromo(null); setPromoMessage(null);
       setIsHolding(true);
       setRemainingSeconds(600);
-      const holdSeatSub = data.seats?.reduce((s, x) => s + (x.price || 0), 0) || Math.max(0, (data.subtotal || 0) - (data.foodSubtotal || 0));
+      const holdSeatSub = data.seatSubtotal != null
+        ? data.seatSubtotal
+        : (data.seats?.reduce((s, x) => s + (x.price || 0), 0) || Math.max(0, (data.subtotal || 0) - (data.foodSubtotal || 0)));
       const holdFoodSub = data.foodSubtotal != null ? data.foodSubtotal : foodTotal;
       setPricing({
         seatSubtotal: holdSeatSub,
+        rawSeatSubtotal: data.rawSeatSubtotal != null ? data.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : holdSeatSub),
+        seatDiscountAmount: data.seatDiscountAmount || 0,
+        ticketDiscountPercent: data.ticketDiscountPercent != null ? data.ticketDiscountPercent : effectiveTicketDiscountPercent,
         foodSubtotal: holdFoodSub,
         rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
         foodDiscountAmount: data.foodDiscountAmount || 0,
@@ -1561,23 +1619,48 @@ const Booking = () => {
 
             {/* FLOATING BOTTOM BAR */}
             {(() => {
-              const effectiveFoodTotal = pricing.foodSubtotal > 0 ? pricing.foodSubtotal : (
-                effectiveFnbDiscountPercent > 0
-                  ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
-                  : foodTotal
-              );
+              const effectiveRawSeatTotal = pricing.rawSeatSubtotal > 0
+                ? pricing.rawSeatSubtotal
+                : (rawSeatTotal > 0 ? rawSeatTotal : pricing.seatSubtotal);
+
+              const effectiveSeatTotal = pricing.seatSubtotal > 0
+                ? pricing.seatSubtotal
+                : (effectiveTicketDiscountPercent > 0 && effectiveRawSeatTotal > 0
+                    ? Math.max(0, Math.round(effectiveRawSeatTotal * (1 - effectiveTicketDiscountPercent / 100)))
+                    : effectiveRawSeatTotal);
+
               const effectiveRawFoodTotal = pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal;
-              const effectiveSeatTotal = pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - effectiveFoodTotal);
+
+              const effectiveFoodTotal = pricing.foodSubtotal > 0
+                ? pricing.foodSubtotal
+                : (effectiveFnbDiscountPercent > 0
+                    ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
+                    : foodTotal);
+
               const effectiveSubtotal = pricing.subtotal > 0 ? pricing.subtotal : (effectiveSeatTotal + effectiveFoodTotal);
 
               return (
                 <div className="sticky bottom-4 z-40 bg-[#181818]/95 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="hidden sm:block">
-                      <span className="text-xs text-gray-400 uppercase font-semibold">Ghế ({selectedSeats.length}):</span>
-                      <div className="text-base font-black text-primary">
+                      <span className="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5">
+                        <span>Ghế ({selectedSeats.length}):</span>
+                        {effectiveTicketDiscountPercent > 0 && (
+                          <span className="text-[10px] font-extrabold text-red-300 bg-primary/20 border border-primary/30 px-1.5 py-0.5 rounded-full lowercase tracking-normal">
+                            giảm {effectiveTicketDiscountPercent}% {effectiveMemberTierName ? `(${effectiveMemberTierName})` : ''}
+                          </span>
+                        )}
+                      </span>
+                      <div className="text-base font-black text-primary flex items-baseline gap-1.5">
                         {selectedSeats.length > 0 ? (
-                          <span>{selectedSeats.join(', ')} <span className="text-xs text-white/70 font-normal">({effectiveSeatTotal.toLocaleString()} đ)</span></span>
+                          <>
+                            <span>{selectedSeats.join(', ')} <span className="text-xs text-white/90 font-bold">({effectiveSeatTotal.toLocaleString()} đ)</span></span>
+                            {effectiveRawSeatTotal > effectiveSeatTotal && (
+                              <span className="text-xs text-gray-500 line-through font-normal">
+                                {effectiveRawSeatTotal.toLocaleString()} đ
+                              </span>
+                            )}
+                          </>
                         ) : 'Chưa chọn'}
                       </div>
                     </div>
@@ -1614,6 +1697,11 @@ const Booking = () => {
                         <span className="text-xs text-gray-400">Ghế: </span>
                         <span className="font-bold text-primary">{selectedSeats.join(', ') || '0'}</span>
                         <span className="text-xs text-gray-300 ml-1">({effectiveSeatTotal.toLocaleString()}đ)</span>
+                        {effectiveTicketDiscountPercent > 0 && (
+                          <span className="ml-1 text-[10px] bg-primary/20 text-red-300 px-1 py-0.5 rounded font-bold">
+                            -{effectiveTicketDiscountPercent}%
+                          </span>
+                        )}
                         {effectiveFoodTotal > 0 && (
                           <span className="text-xs text-amber-400 ml-2">
                             +{effectiveFoodTotal.toLocaleString()}đ F&B
@@ -1897,9 +1985,15 @@ const Booking = () => {
                       ? activeBooking.rawFoodSubtotal
                       : (pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal);
 
-                    const displaySeatPrice = (activeBooking?.seats && activeBooking.seats.length > 0)
-                      ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
-                      : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - displayFoodPrice));
+                    const displaySeatPrice = activeBooking?.seatSubtotal != null
+                      ? activeBooking.seatSubtotal
+                      : (activeBooking?.seats && activeBooking.seats.length > 0)
+                        ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
+                        : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - displayFoodPrice));
+
+                    const displayRawSeatPrice = activeBooking?.rawSeatSubtotal != null
+                      ? activeBooking.rawSeatSubtotal
+                      : (pricing.rawSeatSubtotal > 0 ? pricing.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : displaySeatPrice));
 
                     const displaySubtotal = pricing.subtotal > 0 ? pricing.subtotal : (displaySeatPrice + displayFoodPrice);
                     const displayDiscount = pricing.discount || activeBooking?.discountAmount || 0;
@@ -1907,9 +2001,23 @@ const Booking = () => {
 
                     return (
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between text-gray-400">
-                          <span>Tiền vé ghế ({selectedSeats.length} vé)</span>
-                          <span className="font-medium text-white">{displaySeatPrice.toLocaleString()} đ</span>
+                        <div className="flex justify-between text-gray-300">
+                          <span className="flex items-center gap-1.5">
+                            <span>Tiền vé ghế ({selectedSeats.length} vé)</span>
+                            {effectiveTicketDiscountPercent > 0 && (
+                              <span className="text-[10px] font-bold bg-primary/20 text-red-300 border border-primary/30 px-1.5 py-0.5 rounded-full">
+                                Giảm {effectiveTicketDiscountPercent}% {effectiveMemberTierName ? `(${effectiveMemberTierName})` : ''}
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex items-baseline gap-1.5 font-medium">
+                            {displayRawSeatPrice > displaySeatPrice && (
+                              <span className="text-xs text-gray-500 line-through font-normal">
+                                {displayRawSeatPrice.toLocaleString()} đ
+                              </span>
+                            )}
+                            <span className="text-white">{displaySeatPrice.toLocaleString()} đ</span>
+                          </div>
                         </div>
                         {displayFoodPrice > 0 && (
                           <div className="flex justify-between text-amber-400">
