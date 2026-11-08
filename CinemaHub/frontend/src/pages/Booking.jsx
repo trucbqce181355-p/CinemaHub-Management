@@ -333,8 +333,9 @@ const Booking = () => {
 
   // CGV Orphan Seat Rule (Không được chừa lại 1 ghế trống đơn độc)
   const wouldCauseOrphanSeat = (seatId, currentSelected) => {
-    const row = seatId.charAt(0);
-    if (row === 'E' || row === 'F') return false; // Couple rows are paired
+    const targetSeat = seatMatrix.find(s => s.seatId === seatId);
+    if (targetSeat?.seatType === 'COUPLE') return false; // Couple rows are paired
+    const row = targetSeat?.row || seatId.replace(/[0-9]/g, '');
 
     const rowSeats = seatMatrix
       .filter(s => s.row === row)
@@ -372,49 +373,52 @@ const Booking = () => {
     if (seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.seatId)) return;
     setErrorMessage('');
 
-    const isCouple = seat.seatType === 'COUPLE' || seat.row === 'E' || seat.row === 'F';
+    const isCouple = seat.seatType === 'COUPLE';
 
     // If it's a couple seat, pair with adjacent seat
     if (isCouple) {
       const colNum = parseInt(seat.col, 10);
       const partnerCol = colNum % 2 === 1 ? colNum + 1 : colNum - 1;
       const partnerSeatId = `${seat.row}${partnerCol}`;
-      const partnerSeat = seatMatrix.find(s => s.seatId === partnerSeatId);
+      const partnerSeat = seatMatrix.find(s => s.seatId === partnerSeatId && s.seatType === 'COUPLE');
 
-      // Check partner availability
-      if (partnerSeat && partnerSeat.status !== 'AVAILABLE' && !selectedSeats.includes(partnerSeatId)) {
-        setErrorMessage(`Ghế đôi ${seat.seatId}-${partnerSeatId} không thể chọn vì ghế ${partnerSeatId} không khả dụng!`);
+      if (partnerSeat) {
+        // Check partner availability
+        if (partnerSeat.status !== 'AVAILABLE' && !selectedSeats.includes(partnerSeatId)) {
+          setErrorMessage(`Ghế đôi ${seat.seatId}-${partnerSeatId} không thể chọn vì ghế ${partnerSeatId} không khả dụng!`);
+          return;
+        }
+
+        if (selectedSeats.includes(seat.seatId)) {
+          // Deselect pair
+          setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId && id !== partnerSeatId));
+        } else {
+          if (selectedSeats.length + 2 > 8) {
+            setErrorMessage('Tối đa mỗi lần đặt là 8 ghế.');
+            return;
+          }
+          setSelectedSeats([...selectedSeats, seat.seatId, partnerSeatId]);
+        }
         return;
       }
+    }
 
-      if (selectedSeats.includes(seat.seatId)) {
-        // Deselect pair
-        setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId && id !== partnerSeatId));
-      } else {
-        if (selectedSeats.length + 2 > 8) {
-          setErrorMessage('Tối đa mỗi lần đặt là 8 ghế.');
-          return;
-        }
-        setSelectedSeats([...selectedSeats, seat.seatId, partnerSeatId]);
-      }
+    // Standard / VIP (or unpaired single couple) seat toggle
+    if (selectedSeats.includes(seat.seatId)) {
+      setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId));
     } else {
-      // Standard / VIP seat toggle
-      if (selectedSeats.includes(seat.seatId)) {
-        setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId));
-      } else {
-        // CGV Orphan Seat Check (chỉ áp dụng khi khách tự đặt online)
-        // Đã tắt theo yêu cầu:
-        // if (!isCounterMode && wouldCauseOrphanSeat(seat.seatId, selectedSeats)) {
-        //   setErrorMessage('⚠️ Quy tắc CGV: Bạn không thể để lại 1 ghế trống đơn lẻ bên cạnh. Vui lòng chọn ghế liền kề hoặc đổi vị trí khác!');
-        //   return;
-        // }
+      // CGV Orphan Seat Check (chỉ áp dụng khi khách tự đặt online)
+      // Đã tắt theo yêu cầu:
+      // if (!isCounterMode && wouldCauseOrphanSeat(seat.seatId, selectedSeats)) {
+      //   setErrorMessage('⚠️ Quy tắc CGV: Bạn không thể để lại 1 ghế trống đơn lẻ bên cạnh. Vui lòng chọn ghế liền kề hoặc đổi vị trí khác!');
+      //   return;
+      // }
 
-        if (selectedSeats.length >= 8) {
-          setErrorMessage('Tối đa mỗi lần đặt là 8 ghế.');
-          return;
-        }
-        setSelectedSeats([...selectedSeats, seat.seatId]);
+      if (selectedSeats.length >= 8) {
+        setErrorMessage('Tối đa mỗi lần đặt là 8 ghế.');
+        return;
       }
+      setSelectedSeats([...selectedSeats, seat.seatId]);
     }
   };
 
@@ -985,9 +989,10 @@ const Booking = () => {
                 <p className="text-gray-400 py-12">Không tìm thấy sơ đồ ghế cho phòng chiếu này.</p>
               ) : (
                 <div className="flex flex-col gap-3.5 mb-10 overflow-x-auto w-full items-center py-2">
-                  {['A', 'B', 'C', 'D', 'E', 'F'].map(row => {
-                    const rowSeats = seatMatrix.filter(s => s.row === row);
-                    const isCoupleRow = row === 'E' || row === 'F';
+                  {[...new Set(seatMatrix.map(s => s.row))].sort((a, b) => a.localeCompare(b)).map(row => {
+                    const rowSeats = seatMatrix
+                      .filter(s => s.row === row)
+                      .sort((a, b) => Number(a.col) - Number(b.col));
 
                     return (
                       <div key={row} className="flex items-center gap-4">
@@ -997,7 +1002,8 @@ const Booking = () => {
                             const isSelected = selectedSeats.includes(seat.seatId);
                             const isBooked = seat.status === 'BOOKED';
                             const isHeld = seat.status === 'HELD' && !isSelected;
-                            const isVip = seat.seatType === 'VIP' || row === 'C' || row === 'D';
+                            const isCouple = seat.seatType === 'COUPLE';
+                            const isVip = seat.seatType === 'VIP';
 
                             let seatStyle = "w-8 h-8 sm:w-10 sm:h-10 rounded-t-lg rounded-b-sm flex items-center justify-center text-xs font-bold cursor-pointer transition-all duration-200 border-b-4 ";
 
@@ -1007,7 +1013,7 @@ const Booking = () => {
                               seatStyle += "bg-amber-500/20 text-amber-400 border-amber-500/40 cursor-not-allowed animate-pulse";
                             } else if (isSelected) {
                               seatStyle += "bg-primary text-white border-red-700 shadow-[0_0_15px_rgba(229,9,20,0.7)] scale-110";
-                            } else if (isCoupleRow) {
+                            } else if (isCouple) {
                               seatStyle += "bg-purple-600/20 text-purple-300 hover:bg-purple-600/40 border-purple-500/40";
                             } else if (isVip) {
                               seatStyle += "bg-amber-500/20 text-amber-300 hover:bg-amber-500/40 border-amber-500/40";
@@ -1021,9 +1027,9 @@ const Booking = () => {
                                 disabled={isBooked || isHeld}
                                 onClick={() => toggleSeat(seat)}
                                 className={seatStyle}
-                                title={`${seat.seatId} (${isCoupleRow ? 'Sweetbox Ghế Đôi' : isVip ? 'VIP' : 'Standard'})`}
+                                title={`${seat.seatId} (${isCouple ? 'Sweetbox Ghế Đôi' : isVip ? 'VIP' : 'Standard'})`}
                               >
-                                {isCoupleRow ? <Heart className="w-3.5 h-3.5 text-purple-400" /> : seat.col}
+                                {isCouple ? <Heart className="w-3.5 h-3.5 text-purple-400" /> : seat.col}
                               </button>
                             );
                           })}

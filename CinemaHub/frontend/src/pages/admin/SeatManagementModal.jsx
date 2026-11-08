@@ -1,6 +1,61 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCcw, Save, LayoutGrid } from 'lucide-react';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const ROW_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+
+const resolveDefaultSeatType = (rowIndex, totalRows) => {
+  if (rowIndex >= totalRows - 2) return 'COUPLE';
+  const remainingRows = Math.max(0, totalRows - 2);
+  const standardRows = Math.floor(remainingRows / 2);
+  return rowIndex < standardRows ? 'STANDARD' : 'VIP';
+};
+
+const buildDefaultSeats = (roomId, rowsCount, colsCount) => {
+  const totalRows = Math.min(Math.max(rowsCount, 0), ROW_LABELS.length);
+  const generated = [];
+  for (let r = 0; r < totalRows; r++) {
+    const row = ROW_LABELS[r];
+    const seatType = resolveDefaultSeatType(r, totalRows);
+    for (let col = 1; col <= colsCount; col++) {
+      generated.push({
+        roomId,
+        row,
+        col,
+        seatNumber: `${row}${col}`,
+        seatType,
+        status: 'ACTIVE'
+      });
+    }
+  }
+  return generated;
+};
+
+const upgradeLegacyDefaultSeats = (loadedSeats) => {
+  if (!Array.isArray(loadedSeats) || loadedSeats.length === 0) return null;
+  const sortedRows = [...new Set(loadedSeats.map(s => s.row).filter(Boolean))].sort();
+  if (sortedRows.length < 2) return null;
+
+  let hasDifference = false;
+  for (const s of loadedSeats) {
+    if (s.status !== 'ACTIVE') return null;
+    const legacyType = (s.row === 'F' || s.row === 'G')
+      ? 'COUPLE'
+      : (s.row === 'C' || s.row === 'D' || s.row === 'E')
+        ? 'VIP'
+        : 'STANDARD';
+    if (s.seatType !== legacyType) return null;
+    const expectedType = resolveDefaultSeatType(sortedRows.indexOf(s.row), sortedRows.length);
+    if (expectedType !== s.seatType) hasDifference = true;
+  }
+
+  if (!hasDifference) return null;
+  return loadedSeats.map(({ id: _id, ...rest }) => ({
+    ...rest,
+    seatType: resolveDefaultSeatType(sortedRows.indexOf(rest.row), sortedRows.length)
+  }));
+};
+
 const SeatManagementModal = ({ room, onClose }) => {
   const [seats, setSeats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +87,23 @@ const SeatManagementModal = ({ room, onClose }) => {
   const fetchSeats = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/seats/${room.id}`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE}/seats/${room.id}`, { headers: getAuthHeaders() });
       if (res.ok) {
-        setSeats(await res.json());
+        const loaded = await res.json();
+        const upgraded = upgradeLegacyDefaultSeats(loaded);
+        if (upgraded) {
+          setSeats(upgraded);
+          const saveRes = await fetch(`${API_BASE}/seats/${room.id}/save`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(upgraded)
+          });
+          if (saveRes.ok) {
+            setSeats(await saveRes.json());
+          }
+        } else {
+          setSeats(loaded);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -47,6 +116,14 @@ const SeatManagementModal = ({ room, onClose }) => {
   }, [room.id]);
 
   const handleGenerateClick = () => {
+    if (seats.length > 0) {
+      const currentRows = new Set(seats.map(s => s.row)).size;
+      const currentCols = new Set(seats.map(s => s.col)).size;
+      setGenConfig({
+        rows: Math.min(15, Math.max(4, currentRows || 6)),
+        cols: Math.min(20, Math.max(6, currentCols || 10))
+      });
+    }
     setShowGenModal(true);
   };
 
@@ -54,11 +131,17 @@ const SeatManagementModal = ({ room, onClose }) => {
     setShowGenModal(false);
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/seats/${room.id}/generate?rows=${genConfig.rows}&cols=${genConfig.cols}`, {
+      const defaultSeats = buildDefaultSeats(room.id, genConfig.rows, genConfig.cols);
+      const res = await fetch(`${API_BASE}/seats/${room.id}/save`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify(defaultSeats)
       });
-      if (res.ok) setSeats(await res.json());
+      if (res.ok) {
+        setSeats(await res.json());
+      } else {
+        setSeats(defaultSeats);
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -66,7 +149,7 @@ const SeatManagementModal = ({ room, onClose }) => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/seats/${room.id}/save`, {
+      const res = await fetch(`${API_BASE}/seats/${room.id}/save`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(seats)
@@ -114,6 +197,18 @@ const SeatManagementModal = ({ room, onClose }) => {
     if (s.seatType === 'VIP') return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
     if (s.seatType === 'COUPLE') return 'bg-pink-500/20 text-pink-400 border-pink-500/50 rounded-full';
     return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
+  };
+
+  const totalGenRows = Math.min(Math.max(genConfig.rows, 0), ROW_LABELS.length);
+  const coupleRowCount = Math.min(2, totalGenRows);
+  const remainingRowCount = Math.max(0, totalGenRows - coupleRowCount);
+  const standardRowCount = Math.floor(remainingRowCount / 2);
+  const vipRowCount = remainingRowCount - standardRowCount;
+  const formatRowRange = (start, count) => {
+    if (count <= 0) return '0 hàng';
+    const first = ROW_LABELS[start];
+    const last = ROW_LABELS[start + count - 1];
+    return count === 1 ? `1 hàng (${first})` : `${count} hàng (${first}–${last})`;
   };
 
   // Group seats by row for display
@@ -223,7 +318,20 @@ const SeatManagementModal = ({ room, onClose }) => {
                   <div className="flex justify-between text-xs text-gray-500"><span>6</span><span>20</span></div>
                 </div>
 
-
+                <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3.5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-gray-300">
+                    <span className="flex items-center gap-2"><span className="w-3 h-3 bg-blue-500/20 border border-blue-500/50 rounded inline-block"></span>Thường</span>
+                    <span className="font-semibold text-blue-400">{formatRowRange(0, standardRowCount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-300">
+                    <span className="flex items-center gap-2"><span className="w-3 h-3 bg-orange-500/20 border border-orange-500/50 rounded inline-block"></span>VIP</span>
+                    <span className="font-semibold text-orange-400">{formatRowRange(standardRowCount, vipRowCount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-300">
+                    <span className="flex items-center gap-2"><span className="w-4 h-3 bg-pink-500/20 border border-pink-500/50 rounded-full inline-block"></span>Couple</span>
+                    <span className="font-semibold text-pink-400">{formatRowRange(standardRowCount + vipRowCount, coupleRowCount)}</span>
+                  </div>
+                </div>
 
                 <button onClick={doGenerate} className="w-full py-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-95">
                   Xác Nhận Tạo Sơ Đồ

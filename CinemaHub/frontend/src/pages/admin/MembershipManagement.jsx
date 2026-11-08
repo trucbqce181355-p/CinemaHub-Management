@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  Award, Star, Gift, Settings, Search, Plus, Edit2, Trash2, 
+  Award, Star, Gift, Search, Plus, Edit2, Trash2, 
   CheckCircle2, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight,
   TrendingUp, Users, Ticket, Tag, ShieldCheck, X, ChevronRight, Coins
 } from 'lucide-react';
@@ -16,15 +16,8 @@ const MembershipManagement = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  // 1. Tiers & Rules State
+  // 1. Tiers State
   const [tiers, setTiers] = useState([]);
-  const [rules, setRules] = useState({
-    earnRateVndPerPoint: 1000,
-    pointExpiryDays: 365,
-    minPointsToRedeem: 500,
-    termsAndConditions: ''
-  });
-  const [isEditingRules, setIsEditingRules] = useState(false);
   const [tierModalOpen, setTierModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState(null);
   const [newPerkInput, setNewPerkInput] = useState('');
@@ -51,7 +44,6 @@ const MembershipManagement = () => {
   useEffect(() => {
     if (user && user.role !== 'Manager') return;
     fetchTiers();
-    fetchRules();
     fetchCustomers();
     fetchTransactions();
     fetchRewards();
@@ -91,18 +83,6 @@ const MembershipManagement = () => {
       }
     } catch (err) {
       console.error("Error fetching tiers", err);
-    }
-  };
-
-  const fetchRules = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/membership/rules`);
-      if (res.ok) {
-        const data = await res.json();
-        setRules(data);
-      }
-    } catch (err) {
-      console.error("Error fetching rules", err);
     }
   };
 
@@ -151,36 +131,7 @@ const MembershipManagement = () => {
     }
   };
 
-  // --- ACTIONS: TIERS & RULES ---
-  const handleSaveRules = async (e) => {
-    e.preventDefault();
-    const payload = {
-      ...rules,
-      earnRateVndPerPoint: Number(rules.earnRateVndPerPoint) || 1000,
-      pointExpiryDays: Number(rules.pointExpiryDays) || 365,
-      minPointsToRedeem: Number(rules.minPointsToRedeem) || 500
-    };
-    try {
-      const res = await fetch(`${API_BASE}/membership/rules`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        showToast("Cập nhật quy tắc tích điểm thành công!");
-        setIsEditingRules(false);
-        fetchRules();
-      } else {
-        showToast("Cập nhật quy tắc thất bại", "error");
-      }
-    } catch (err) {
-      showToast("Lỗi kết nối", "error");
-    }
-  };
-
+  // --- ACTIONS: TIERS ---
   const handleOpenTierModal = (tier = null) => {
     if (tier) {
       setEditingTier({ ...tier, benefits: tier.benefits ? [...tier.benefits] : [] });
@@ -499,113 +450,10 @@ const MembershipManagement = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: MEMBERSHIP TIERS & BENEFITS & RULES */}
+      {/* TAB 1: MEMBERSHIP TIERS & BENEFITS */}
       {/* ========================================================================= */}
       {activeTab === 'tiers' && (
         <div className="space-y-8">
-          {/* Global Rule Settings Card */}
-          <div className="bg-surface border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Settings className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Quy tắc tích điểm & hiệu lực chung</h3>
-                  <p className="text-xs text-gray-400">Thiết lập tỷ lệ quy đổi doanh số ra điểm và thời hạn sử dụng điểm</p>
-                </div>
-              </div>
-              {!isEditingRules ? (
-                <button
-                  onClick={() => setIsEditingRules(true)}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
-                >
-                  <Edit2 className="w-3.5 h-3.5" /> Chỉnh sửa quy tắc
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setIsEditingRules(false)}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-bold rounded-xl transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleSaveRules}
-                    className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-colors shadow-md shadow-primary/20"
-                  >
-                    Lưu thay đổi
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 font-medium block mb-1">Tỷ lệ quy đổi điểm</span>
-                {isEditingRules ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      value={rules.earnRateVndPerPoint ?? ''}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => setRules({ ...rules, earnRateVndPerPoint: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
-                      className="w-28 px-3 py-1.5 bg-black/40 border border-white/20 rounded-lg text-sm text-white font-bold"
-                    />
-                    <span className="text-xs text-gray-400">đ = 1 Điểm</span>
-                  </div>
-                ) : (
-                  <p className="text-lg font-extrabold text-amber-400">
-                    {(rules.earnRateVndPerPoint || 1000).toLocaleString()} đ <span className="text-xs text-gray-400 font-normal">= 1 Điểm</span>
-                  </p>
-                )}
-                <span className="text-[11px] text-gray-500 mt-1 block">Chi tiêu vé hoặc bắp nước để tích điểm</span>
-              </div>
-
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 font-medium block mb-1">Thời hạn hiệu lực điểm</span>
-                {isEditingRules ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      value={rules.pointExpiryDays ?? ''}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => setRules({ ...rules, pointExpiryDays: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
-                      className="w-24 px-3 py-1.5 bg-black/40 border border-white/20 rounded-lg text-sm text-white font-bold"
-                    />
-                    <span className="text-xs text-gray-400">ngày</span>
-                  </div>
-                ) : (
-                  <p className="text-lg font-extrabold text-white">
-                    {rules.pointExpiryDays || 365} <span className="text-xs text-gray-400 font-normal">ngày (12 tháng)</span>
-                  </p>
-                )}
-                <span className="text-[11px] text-gray-500 mt-1 block">Điểm hết hạn tự động sau chu kỳ tính từ ngày phát sinh</span>
-              </div>
-
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 font-medium block mb-1">Điểm tối thiểu đổi quà</span>
-                {isEditingRules ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      value={rules.minPointsToRedeem ?? ''}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => setRules({ ...rules, minPointsToRedeem: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
-                      className="w-24 px-3 py-1.5 bg-black/40 border border-white/20 rounded-lg text-sm text-white font-bold"
-                    />
-                    <span className="text-xs text-gray-400">điểm</span>
-                  </div>
-                ) : (
-                  <p className="text-lg font-extrabold text-emerald-400">
-                    {rules.minPointsToRedeem || 500} <span className="text-xs text-gray-400 font-normal">điểm</span>
-                  </p>
-                )}
-                <span className="text-[11px] text-gray-500 mt-1 block">Khách hàng cần tối thiểu số điểm này để đổi voucher</span>
-              </div>
-            </div>
-          </div>
-
           {/* Tiers Header & Add Button */}
           <div className="flex items-center justify-between">
             <div>
