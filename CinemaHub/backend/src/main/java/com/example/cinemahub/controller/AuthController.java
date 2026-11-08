@@ -61,6 +61,7 @@ public class AuthController {
         response.put("email", user.getEmail());
         response.put("role", user.getRole());
         response.put("permissions", user.getPermissions());
+        response.put("membershipTier", user.getMembershipTier() != null ? user.getMembershipTier() : "BRONZE");
         
         return ResponseEntity.ok(response);
     }

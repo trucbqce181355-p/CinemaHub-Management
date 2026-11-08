@@ -17,7 +17,7 @@ const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').r
 /* ========================================================================= */
 /* COMPONENT CON: CHỌN BẮP NƯỚC & COMBO THEO RẠP (F&B SELECTION)              */
 /* ========================================================================= */
-const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => {
+const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected, fnbDiscountPercent = 0, memberTierName = '' }) => {
   const [foods, setFoods] = useState([]);
   const [stockByFoodId, setStockByFoodId] = useState({});
   const [loading, setLoading] = useState(false);
@@ -79,6 +79,11 @@ const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => 
     const maxStock = stockByFoodId[id] != null ? Math.min(99, stockByFoodId[id]) : 99;
     const newQty = Math.min(maxStock, Math.max(0, currentQty + delta));
 
+    const basePrice = item.basePrice || 0;
+    const discountedPrice = fnbDiscountPercent > 0
+      ? Math.round(basePrice * (1 - fnbDiscountPercent / 100))
+      : basePrice;
+
     const updated = { ...selectedItems };
     if (newQty === 0) {
       delete updated[id];
@@ -86,7 +91,8 @@ const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => 
       updated[id] = {
         foodItemId: id,
         name: item.name,
-        price: item.basePrice || 0,
+        rawPrice: basePrice,
+        price: discountedPrice,
         quantity: newQty
       };
     }
@@ -107,15 +113,27 @@ const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => 
 
   return (
     <div className="bg-[#141414] p-6 rounded-3xl border border-white/10 my-6">
-      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-        <ShoppingBag className="w-5 h-5 text-amber-500" /> Chọn Bắp Nước & Combo Khuyến Mãi Cùng Vé
-      </h3>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-white/10">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <ShoppingBag className="w-5 h-5 text-amber-500" /> Chọn Bắp Nước & Combo Khuyến Mãi Cùng Vé
+        </h3>
+        {fnbDiscountPercent > 0 && (
+          <span className="text-xs font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            Đặc quyền hội viên: Giảm {fnbDiscountPercent}% bắp nước {memberTierName ? `(${memberTierName})` : ''}
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {foods.map(item => {
           const id = item.id || item._id?.$oid || item._id;
           const qty = selectedItems[id]?.quantity || 0;
           const isCombo = item.isCombo || item.category === 'COMBO';
+          const basePrice = item.basePrice || 0;
+          const discountedPrice = fnbDiscountPercent > 0
+            ? Math.round(basePrice * (1 - fnbDiscountPercent / 100))
+            : basePrice;
 
           return (
             <div key={id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-3 hover:border-white/20 transition">
@@ -129,10 +147,15 @@ const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => 
                 className="w-16 h-16 rounded-xl object-cover shrink-0 shadow-sm"
               />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCombo ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
                     {item.category}
                   </span>
+                  {fnbDiscountPercent > 0 && (
+                    <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/25 px-1.5 py-0.5 rounded border border-amber-500/40">
+                      -{fnbDiscountPercent}% VIP
+                    </span>
+                  )}
                   {stockByFoodId[id] != null && (
                     <span className="text-[10px] text-gray-400">
                       • Còn {stockByFoodId[id]}
@@ -140,8 +163,15 @@ const FoodBookingSelect = ({ cinemaId, selectedFoods = [], onFoodSelected }) => 
                   )}
                 </div>
                 <h4 className="font-bold text-sm text-white truncate mt-0.5">{item.name}</h4>
-                <div className="text-primary font-black text-xs mt-0.5">
-                  {(item.basePrice || 0).toLocaleString()} đ
+                <div className="text-primary font-black text-xs mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                  {fnbDiscountPercent > 0 ? (
+                    <>
+                      <span className="text-amber-400">{discountedPrice.toLocaleString()} đ</span>
+                      <span className="text-[10px] text-gray-500 line-through font-normal">{basePrice.toLocaleString()} đ</span>
+                    </>
+                  ) : (
+                    <span>{basePrice.toLocaleString()} đ</span>
+                  )}
                 </div>
               </div>
 
@@ -205,7 +235,27 @@ const Booking = () => {
 
   // F&B Selection state (Tích hợp F&B)
   const [selectedFoods, setSelectedFoods] = useState([]);
-  const foodTotal = selectedFoods.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const foodTotal = selectedFoods.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+  const rawFoodTotal = selectedFoods.reduce((sum, item) => sum + (((item.rawPrice != null ? item.rawPrice : item.basePrice) || item.price || 0) * (item.quantity || 0)), 0);
+
+  // Member Tier (Loyalty F&B Discount)
+  const [memberTier, setMemberTier] = useState(null);
+  useEffect(() => {
+    if (!user?.token) {
+      setMemberTier(null);
+      return;
+    }
+    fetch(`${API_BASE}/membership/my-membership`, {
+      headers: { Authorization: `Bearer ${user.token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.currentTier) {
+          setMemberTier(data.currentTier);
+        }
+      })
+      .catch(() => {});
+  }, [user?.token]);
 
   // Hold & Timer (Step 3)
   const [activeBooking, setActiveBooking] = useState(null);
@@ -215,7 +265,23 @@ const Booking = () => {
   const [isHolding, setIsHolding] = useState(false);
 
   // Pricing & Promo
-  const [pricing, setPricing] = useState({ seatSubtotal: 0, foodSubtotal: 0, subtotal: 0, discount: 0, total: 0 });
+  const [pricing, setPricing] = useState({
+    seatSubtotal: 0,
+    foodSubtotal: 0,
+    rawFoodSubtotal: 0,
+    foodDiscountAmount: 0,
+    fnbDiscountPercent: 0,
+    memberTierName: null,
+    subtotal: 0,
+    discount: 0,
+    total: 0
+  });
+
+  const effectiveFnbDiscountPercent = pricing.fnbDiscountPercent != null && pricing.fnbDiscountPercent > 0
+    ? pricing.fnbDiscountPercent
+    : (memberTier?.fnbDiscountPercent || 0);
+
+  const effectiveMemberTierName = pricing.memberTierName || memberTier?.name || (effectiveFnbDiscountPercent > 0 ? 'Hội viên' : '');
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState('');
@@ -393,6 +459,10 @@ const Booking = () => {
       const activeFoodSub = activeBooking.foodSubtotal != null
         ? activeBooking.foodSubtotal
         : (activeBooking.foodItems?.reduce((s, x) => s + ((x.price || 0) * (x.quantity || 0)), 0) || 0);
+      const activeRawFoodSub = activeBooking.rawFoodSubtotal != null ? activeBooking.rawFoodSubtotal : activeFoodSub;
+      const activeFoodDisc = activeBooking.foodDiscountAmount || 0;
+      const activeFnbPercent = activeBooking.fnbDiscountPercent != null ? activeBooking.fnbDiscountPercent : (memberTier?.fnbDiscountPercent || 0);
+      const activeTierName = activeBooking.memberTierName || memberTier?.name || null;
       const activeSub = activeBooking.subtotal != null ? activeBooking.subtotal : (activeSeatSub + activeFoodSub);
       const activeDisc = activeBooking.discountAmount || 0;
       const activeTot = activeBooking.totalAmount != null ? activeBooking.totalAmount : Math.max(0, activeSub - activeDisc);
@@ -400,6 +470,10 @@ const Booking = () => {
       setPricing({
         seatSubtotal: activeSeatSub,
         foodSubtotal: activeFoodSub,
+        rawFoodSubtotal: activeRawFoodSub,
+        foodDiscountAmount: activeFoodDisc,
+        fnbDiscountPercent: activeFnbPercent,
+        memberTierName: activeTierName,
         subtotal: activeSub,
         discount: activeDisc,
         total: activeTot
@@ -410,12 +484,21 @@ const Booking = () => {
     }
 
     if (!selectedShowtime || selectedSeats.length === 0) {
+      const discountedFoodTotal = effectiveFnbDiscountPercent > 0
+        ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
+        : foodTotal;
+      const foodDiscountAmount = Math.max(0, rawFoodTotal - discountedFoodTotal);
+
       setPricing({
         seatSubtotal: 0,
-        foodSubtotal: foodTotal,
-        subtotal: foodTotal,
+        foodSubtotal: discountedFoodTotal,
+        rawFoodSubtotal: rawFoodTotal,
+        foodDiscountAmount: foodDiscountAmount,
+        fnbDiscountPercent: effectiveFnbDiscountPercent,
+        memberTierName: effectiveMemberTierName,
+        subtotal: discountedFoodTotal,
         discount: 0,
-        total: foodTotal
+        total: discountedFoodTotal
       });
       setPriceError('');
       setPriceLoading(false);
@@ -464,6 +547,10 @@ const Booking = () => {
           setPricing({
             seatSubtotal: seatSub,
             foodSubtotal: foodSub,
+            rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
+            foodDiscountAmount: data.foodDiscountAmount || 0,
+            fnbDiscountPercent: data.fnbDiscountPercent != null ? data.fnbDiscountPercent : effectiveFnbDiscountPercent,
+            memberTierName: data.memberTierName || effectiveMemberTierName,
             subtotal: sub,
             discount: disc,
             total: tot
@@ -476,6 +563,10 @@ const Booking = () => {
           setPricing({
             seatSubtotal: 0,
             foodSubtotal: foodTotal,
+            rawFoodSubtotal: rawFoodTotal,
+            foodDiscountAmount: 0,
+            fnbDiscountPercent: effectiveFnbDiscountPercent,
+            memberTierName: effectiveMemberTierName,
             subtotal: foodTotal,
             discount: 0,
             total: foodTotal
@@ -493,7 +584,7 @@ const Booking = () => {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [selectedSeats, selectedFoods, foodTotal, selectedShowtime, appliedPromo, activeBooking, isCounterMode, user?.token, customerEmail]);
+  }, [selectedSeats, selectedFoods, foodTotal, rawFoodTotal, effectiveFnbDiscountPercent, selectedShowtime, appliedPromo, activeBooking, isCounterMode, user?.token, customerEmail]);
 
   // 5. 10-Minute Hold Countdown Timer
   useEffect(() => {
@@ -521,7 +612,7 @@ const Booking = () => {
     setActiveBooking(null);
     setSelectedSeats([]);
     setSelectedFoods([]);
-    setPricing({ seatSubtotal: 0, foodSubtotal: 0, subtotal: 0, discount: 0, total: 0 });
+    setPricing({ seatSubtotal: 0, foodSubtotal: 0, rawFoodSubtotal: 0, foodDiscountAmount: 0, fnbDiscountPercent: effectiveFnbDiscountPercent, memberTierName: effectiveMemberTierName, subtotal: 0, discount: 0, total: 0 });
     setCurrentStep(2);
     setErrorMessage('Thời gian giữ ghế đã hết hạn! Vui lòng chọn lại ghế.');
     fetchSeatAvailability();
@@ -723,6 +814,10 @@ const Booking = () => {
       setPricing({
         seatSubtotal: holdSeatSub,
         foodSubtotal: holdFoodSub,
+        rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
+        foodDiscountAmount: data.foodDiscountAmount || 0,
+        fnbDiscountPercent: data.fnbDiscountPercent != null ? data.fnbDiscountPercent : effectiveFnbDiscountPercent,
+        memberTierName: data.memberTierName || effectiveMemberTierName,
         subtotal: data.subtotal,
         discount: data.discountAmount || 0,
         total: data.totalAmount
@@ -1460,11 +1555,18 @@ const Booking = () => {
               cinemaId={selectedShowtime?.cinemaId || selectedCinema?.id}
               selectedFoods={selectedFoods}
               onFoodSelected={(foods) => setSelectedFoods(foods)}
+              fnbDiscountPercent={effectiveFnbDiscountPercent}
+              memberTierName={effectiveMemberTierName}
             />
 
             {/* FLOATING BOTTOM BAR */}
             {(() => {
-              const effectiveFoodTotal = pricing.foodSubtotal > 0 ? pricing.foodSubtotal : foodTotal;
+              const effectiveFoodTotal = pricing.foodSubtotal > 0 ? pricing.foodSubtotal : (
+                effectiveFnbDiscountPercent > 0
+                  ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
+                  : foodTotal
+              );
+              const effectiveRawFoodTotal = pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal;
               const effectiveSeatTotal = pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - effectiveFoodTotal);
               const effectiveSubtotal = pricing.subtotal > 0 ? pricing.subtotal : (effectiveSeatTotal + effectiveFoodTotal);
 
@@ -1481,9 +1583,21 @@ const Booking = () => {
                     </div>
                     {effectiveFoodTotal > 0 && (
                       <div className="border-l border-white/10 pl-4 hidden sm:block">
-                        <span className="text-xs text-gray-400 uppercase font-semibold">Bắp nước ({selectedFoods.reduce((acc, f) => acc + f.quantity, 0)}):</span>
-                        <div className="text-base font-black text-amber-400">
-                          +{effectiveFoodTotal.toLocaleString()} đ
+                        <span className="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1.5">
+                          <span>Bắp nước ({selectedFoods.reduce((acc, f) => acc + f.quantity, 0)}):</span>
+                          {effectiveFnbDiscountPercent > 0 && (
+                            <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full lowercase tracking-normal">
+                              giảm {effectiveFnbDiscountPercent}% {effectiveMemberTierName ? `(${effectiveMemberTierName})` : ''}
+                            </span>
+                          )}
+                        </span>
+                        <div className="text-base font-black text-amber-400 flex items-baseline gap-1.5">
+                          <span>+{effectiveFoodTotal.toLocaleString()} đ</span>
+                          {effectiveRawFoodTotal > effectiveFoodTotal && (
+                            <span className="text-xs text-gray-500 line-through font-normal">
+                              {effectiveRawFoodTotal.toLocaleString()} đ
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1501,7 +1615,14 @@ const Booking = () => {
                         <span className="font-bold text-primary">{selectedSeats.join(', ') || '0'}</span>
                         <span className="text-xs text-gray-300 ml-1">({effectiveSeatTotal.toLocaleString()}đ)</span>
                         {effectiveFoodTotal > 0 && (
-                          <span className="text-xs text-amber-400 ml-2">+{effectiveFoodTotal.toLocaleString()}đ F&B</span>
+                          <span className="text-xs text-amber-400 ml-2">
+                            +{effectiveFoodTotal.toLocaleString()}đ F&B
+                            {effectiveFnbDiscountPercent > 0 && (
+                              <span className="ml-1 text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-bold">
+                                -{effectiveFnbDiscountPercent}%
+                              </span>
+                            )}
+                          </span>
                         )}
                       </div>
                       <div>
@@ -1766,7 +1887,15 @@ const Booking = () => {
                   {(() => {
                     const displayFoodPrice = activeBooking?.foodSubtotal != null
                       ? activeBooking.foodSubtotal
-                      : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : foodTotal);
+                      : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : (
+                        effectiveFnbDiscountPercent > 0
+                          ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
+                          : foodTotal
+                      ));
+
+                    const displayRawFoodPrice = activeBooking?.rawFoodSubtotal != null
+                      ? activeBooking.rawFoodSubtotal
+                      : (pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal);
 
                     const displaySeatPrice = (activeBooking?.seats && activeBooking.seats.length > 0)
                       ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
@@ -1784,8 +1913,22 @@ const Booking = () => {
                         </div>
                         {displayFoodPrice > 0 && (
                           <div className="flex justify-between text-amber-400">
-                            <span>Tiền bắp nước & combo</span>
-                            <span className="font-medium">+{displayFoodPrice.toLocaleString()} đ</span>
+                            <span className="flex items-center gap-1.5">
+                              <span>Tiền bắp nước & combo</span>
+                              {effectiveFnbDiscountPercent > 0 && (
+                                <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
+                                  Giảm {effectiveFnbDiscountPercent}% {effectiveMemberTierName ? `(${effectiveMemberTierName})` : ''}
+                                </span>
+                              )}
+                            </span>
+                            <div className="flex items-baseline gap-1.5 font-medium">
+                              {displayRawFoodPrice > displayFoodPrice && (
+                                <span className="text-xs text-gray-500 line-through font-normal">
+                                  {displayRawFoodPrice.toLocaleString()} đ
+                                </span>
+                              )}
+                              <span>+{displayFoodPrice.toLocaleString()} đ</span>
+                            </div>
                           </div>
                         )}
                         {displayDiscount > 0 && (

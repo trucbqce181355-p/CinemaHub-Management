@@ -231,9 +231,33 @@ public class BookingService {
 
         List<Booking.BookedFoodItem> bookedFoods = inventoryService.deductBookingFoods(
                 showtime.getCinemaId(), req.getSelectedFoods());
-        double foodSubtotal = Money.vnd(bookedFoods.stream()
+        double rawFoodSubtotal = Money.vnd(bookedFoods.stream()
                 .mapToDouble(f -> Money.vnd(f.getPrice()) * f.getQuantity())
                 .sum());
+
+        double fnbDiscountPercent = 0.0;
+        double foodDiscountAmount = 0.0;
+        String memberTierName = null;
+        String memberTierCode = null;
+
+        User customer = null;
+        if (userId != null && !userId.isBlank() && !"anonymousUser".equals(userId)) {
+            customer = userRepository.findById(userId).orElse(null);
+        }
+        if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
+            customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);
+        }
+
+        if (customer != null && membershipService != null) {
+            MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
+            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                fnbDiscountPercent = tier.getFnbDiscountPercent();
+                memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
+                memberTierCode = tier.getCode();
+                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+            }
+        }
+        double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
 
         String reference = generateBookingReference();
@@ -257,6 +281,11 @@ public class BookingService {
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
                 .foodItems(bookedFoods)
+                .rawFoodSubtotal(rawFoodSubtotal)
+                .foodDiscountAmount(foodDiscountAmount)
+                .fnbDiscountPercent(fnbDiscountPercent)
+                .memberTierName(memberTierName)
+                .memberTierCode(memberTierCode)
                 .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .discountAmount(0.0)
@@ -353,7 +382,30 @@ public class BookingService {
                     .build());
         }
 
-        double foodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double rawFoodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double fnbDiscountPercent = 0.0;
+        double foodDiscountAmount = 0.0;
+        String memberTierName = null;
+        String memberTierCode = null;
+
+        User customer = null;
+        if (userId != null && !userId.isBlank() && !"anonymousUser".equals(userId)) {
+            customer = userRepository.findById(userId).orElse(null);
+        }
+        if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
+            customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);
+        }
+
+        if (customer != null && membershipService != null) {
+            MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
+            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                fnbDiscountPercent = tier.getFnbDiscountPercent();
+                memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
+                memberTierCode = tier.getCode();
+                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+            }
+        }
+        double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
 
         double discount = 0.0;
@@ -369,6 +421,11 @@ public class BookingService {
 
         return CalculatePriceRequest.PriceResult.builder()
                 .seatSubtotal(Money.vnd(seatSubtotal))
+                .rawFoodSubtotal(rawFoodSubtotal)
+                .foodDiscountAmount(foodDiscountAmount)
+                .fnbDiscountPercent(fnbDiscountPercent)
+                .memberTierName(memberTierName)
+                .memberTierCode(memberTierCode)
                 .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .discountAmount(discount)
@@ -649,10 +706,33 @@ public class BookingService {
                     .build());
         }
 
-        double foodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        double rawFoodSubtotal = calculateFoodSubtotal(req.getSelectedFoods());
+        String counterCustomerId = counterCustomer(req.getCustomerEmail());
+        User customer = counterCustomerId != null ? userRepository.findById(counterCustomerId).orElse(null) : null;
+        if (customer == null && req.getCustomerPhone() != null && !req.getCustomerPhone().isBlank()) {
+            customer = userRepository.findByPhoneNumber(req.getCustomerPhone().trim()).orElse(null);
+            if (customer != null && counterCustomerId == null) {
+                counterCustomerId = customer.getId();
+            }
+        }
+
+        double fnbDiscountPercent = 0.0;
+        double foodDiscountAmount = 0.0;
+        String memberTierName = null;
+        String memberTierCode = null;
+
+        if (customer != null && membershipService != null) {
+            MembershipTier tier = membershipService.getTierByCode(customer.getMembershipTier());
+            if (tier != null && tier.getFnbDiscountPercent() != null && tier.getFnbDiscountPercent() > 0) {
+                fnbDiscountPercent = tier.getFnbDiscountPercent();
+                memberTierName = tier.getName() != null ? tier.getName() : tier.getCode();
+                memberTierCode = tier.getCode();
+                foodDiscountAmount = Money.vnd(rawFoodSubtotal * (fnbDiscountPercent / 100.0));
+            }
+        }
+        double foodSubtotal = Math.max(0.0, Money.vnd(rawFoodSubtotal - foodDiscountAmount));
         double subtotal = Money.vnd(seatSubtotal + foodSubtotal);
 
-        String counterCustomerId = counterCustomer(req.getCustomerEmail());
         double discount = 0.0;
         if (req.getPromoCode() != null && !req.getPromoCode().isBlank()) {
             Promotion promo = promotionValidationService.validateCode(req.getPromoCode());
@@ -684,6 +764,11 @@ public class BookingService {
                 .showtimeFormat(showtime.getFormat())
                 .seats(seatList)
                 .foodItems(bookedFoods)
+                .rawFoodSubtotal(rawFoodSubtotal)
+                .foodDiscountAmount(foodDiscountAmount)
+                .fnbDiscountPercent(fnbDiscountPercent)
+                .memberTierName(memberTierName)
+                .memberTierCode(memberTierCode)
                 .foodSubtotal(foodSubtotal)
                 .subtotal(subtotal)
                 .promoCode(discount > 0 ? PromotionRules.code(req.getPromoCode()) : null)

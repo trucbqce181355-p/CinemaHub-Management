@@ -30,6 +30,11 @@ public class CalculatePriceRequest {
     public static class PriceResult {
         private Double seatSubtotal;
         private Double foodSubtotal;
+        private Double rawFoodSubtotal;
+        private Double foodDiscountAmount;
+        private Double fnbDiscountPercent;
+        private String memberTierName;
+        private String memberTierCode;
         private Double subtotal;
         private Double discountAmount;
         private Double totalAmount;

@@ -51,6 +51,11 @@ public class Booking {
     @Builder.Default
     private List<BookedFoodItem> foodItems = new ArrayList<>();
 
+    private Double rawFoodSubtotal;
+    private Double foodDiscountAmount;
+    private Double fnbDiscountPercent;
+    private String memberTierName;
+    private String memberTierCode;
     private Double foodSubtotal;
     private Double subtotal;
     private String promoCode;
