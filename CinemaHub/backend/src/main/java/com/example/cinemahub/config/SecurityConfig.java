@@ -38,8 +38,8 @@ public class SecurityConfig {
                 .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
-                .requestMatchers("/api/news/**").hasAnyRole("Staff", "Manager", "Admin")
+                .requestMatchers(HttpMethod.GET, "/api/news", "/api/news/**").permitAll()
+                .requestMatchers("/api/news", "/api/news/**").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers(HttpMethod.GET, "/api/cinemas/*/showtimes").hasAnyRole("Manager", "Admin")
                 .requestMatchers(HttpMethod.GET, "/api/cinemas/**").permitAll()
                 .requestMatchers("/api/cinemas/**").hasAnyRole("Manager", "Admin")
@@ -73,7 +73,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
+        config.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         

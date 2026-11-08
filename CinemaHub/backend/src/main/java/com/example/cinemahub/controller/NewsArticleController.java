@@ -2,11 +2,14 @@ package com.example.cinemahub.controller;
 
 import com.example.cinemahub.dto.NewsArticleRequest;
 import com.example.cinemahub.model.NewsArticle;
+import com.example.cinemahub.model.User;
+import com.example.cinemahub.repository.UserRepository;
 import com.example.cinemahub.service.NewsArticleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,11 +17,11 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/news")
-@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
 @RequiredArgsConstructor
 public class NewsArticleController {
 
     private final NewsArticleService newsArticleService;
+    private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<List<NewsArticle>> getAllNews(
@@ -46,9 +49,13 @@ public class NewsArticleController {
     public ResponseEntity<NewsArticle> createNews(
             @Valid @RequestBody NewsArticleRequest request,
             Authentication authentication) {
-        String author = (authentication != null && authentication.isAuthenticated())
-                ? authentication.getName()
-                : "CinemaHub Admin";
+        String author = "CinemaHub Admin";
+        if (authentication != null && authentication.isAuthenticated() && authentication.getName() != null) {
+            author = userRepository.findById(authentication.getName())
+                    .map(User::getUsername)
+                    .filter(name -> !name.isBlank())
+                    .orElse("CinemaHub Admin");
+        }
         return ResponseEntity.ok(newsArticleService.createNews(request, author));
     }
 
@@ -70,6 +77,21 @@ public class NewsArticleController {
             @PathVariable String id,
             @RequestParam(required = false) Boolean active) {
         return ResponseEntity.ok(newsArticleService.toggleActiveStatus(id, active));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationError(MethodArgumentNotValidException ex) {
+        String msg = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(err -> err.getDefaultMessage() != null ? err.getDefaultMessage() : "Dữ liệu bài viết không hợp lệ")
+                .orElse("Dữ liệu bài viết không hợp lệ");
+        return ResponseEntity.badRequest().body(Map.of("message", msg, "error", msg));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleRuntimeError(RuntimeException ex) {
+        String msg = ex.getMessage() != null ? ex.getMessage() : "Không thể xử lý bài viết tin tức";
+        return ResponseEntity.badRequest().body(Map.of("message", msg, "error", msg));
     }
 }
 

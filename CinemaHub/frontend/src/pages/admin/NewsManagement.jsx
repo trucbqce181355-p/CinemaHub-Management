@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE = 'http://localhost:5000/api/news';
+const API_BASE = `${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')}/news`;
 
 const CATEGORIES = [
   { value: 'ALL', label: 'Tất cả danh mục' },
@@ -58,7 +58,14 @@ export default function NewsManagement() {
   };
 
   const getAuthHeaders = () => {
-    const token = user?.token;
+    let token = user?.token;
+    if (!token) {
+      try {
+        token = JSON.parse(localStorage.getItem('user') || '{}')?.token;
+      } catch {
+        token = null;
+      }
+    }
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -188,7 +195,16 @@ export default function NewsManagement() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || 'Lỗi khi lưu bài viết');
+        if (res.status === 401) {
+          throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại');
+        }
+        if (res.status === 404) {
+          throw new Error('API Tin tức chưa sẵn sàng (404) — vui lòng khởi động lại Backend');
+        }
+        if (res.status === 403) {
+          throw new Error(errData.message || errData.error || 'Không có quyền thực hiện hoặc Backend chưa khởi động lại sau khi cập nhật');
+        }
+        throw new Error(errData.message || errData.error || `Lỗi khi lưu bài viết (${res.status})`);
       }
 
       showToast(editingArticle ? 'Cập nhật bài viết thành công!' : 'Tạo bài viết mới thành công!');
@@ -260,7 +276,7 @@ export default function NewsManagement() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-md animate-in slide-in-from-top-3 ${
+        <div className={`fixed top-6 right-6 z-[100] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-md animate-in slide-in-from-top-3 ${
           toast.type === 'error' 
             ? 'bg-red-500/20 text-red-300 border-red-500/30 shadow-red-500/10' 
             : 'bg-green-500/20 text-green-300 border-green-500/30 shadow-green-500/10'
@@ -613,7 +629,7 @@ export default function NewsManagement() {
                   Link ảnh bìa bài viết (URL)
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   placeholder="https://images.unsplash.com/photo-..."
                   value={formData.imageUrl}
                   onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}

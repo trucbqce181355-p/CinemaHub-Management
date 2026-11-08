@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -110,7 +111,7 @@ public class NewsArticleService {
         List<Criteria> criteriaList = new ArrayList<>();
 
         if (search != null && !search.trim().isEmpty()) {
-            String regex = search.trim();
+            String regex = Pattern.quote(search.trim());
             criteriaList.add(new Criteria().orOperator(
                     Criteria.where("title").regex(regex, "i"),
                     Criteria.where("summary").regex(regex, "i"),
