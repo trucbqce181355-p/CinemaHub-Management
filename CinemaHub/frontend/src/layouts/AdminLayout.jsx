@@ -25,10 +25,6 @@ const AdminLayout = () => {
       { name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> }
     ];
 
-    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
-      items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
-    }
-
     // Quyền Admin
     if (user.role === 'Admin') {
       items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });
@@ -46,14 +42,14 @@ const AdminLayout = () => {
       items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> });
     }
 
-    // Quyền Manager & Admin: Quản lý khuyến mãi, tin tức
-    if (user.role === 'Manager' || user.role === 'Admin') {
+    // Quyền Manager: Quản lý khuyến mãi, tin tức
+    if (user.role === 'Manager') {
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
       items.push({ name: 'Tin tức & Bài viết', path: '/admin/news', icon: <Newspaper className="w-5 h-5" /> });
     }
 
-    // Admin, Manager & Staff
-    if (user.role === 'Admin' || user.role === 'Manager' || user.role === 'Staff') {
+    // Quyền Manager & Staff: Suất chiếu & Soát vé
+    if (user.role === 'Manager' || user.role === 'Staff') {
       items.push({ name: 'Suất chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
@@ -63,7 +59,12 @@ const AdminLayout = () => {
       items.push({ name: 'Đánh giá & Bình luận', path: '/admin/reviews', icon: <MessageSquare className="w-5 h-5" /> });
     }
 
-    // Thứ tự hiển thị menu chuẩn của hệ thống: Đưa Hội viên & Điểm xuống dưới cùng
+    // Hoàn tiền vé: Admin, Manager & Staff (đưa xuống cuối cùng)
+    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
+      items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
+    }
+
+    // Thứ tự hiển thị menu chuẩn của hệ thống: Đưa Hội viên & Điểm và Hoàn tiền vé xuống dưới cùng
     const order = [
       '/admin',
       '/admin/users',
@@ -76,10 +77,15 @@ const AdminLayout = () => {
       '/admin/news',
       '/admin/reviews',
       '/admin/settings',
-      '/admin/membership'
+      '/admin/membership',
+      '/admin/refunds'
     ];
 
-    items.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
+    items.sort((a, b) => {
+      const idxA = order.indexOf(a.path) !== -1 ? order.indexOf(a.path) : 999;
+      const idxB = order.indexOf(b.path) !== -1 ? order.indexOf(b.path) : 999;
+      return idxA - idxB;
+    });
     return items;
   };
 
