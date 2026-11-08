@@ -38,6 +38,8 @@ public class SecurityConfig {
                 .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/news/**").permitAll()
+                .requestMatchers("/api/news/**").hasAnyRole("Staff", "Manager", "Admin")
                 .requestMatchers(HttpMethod.GET, "/api/cinemas/*/showtimes").hasAnyRole("Manager", "Admin")
                 .requestMatchers(HttpMethod.GET, "/api/cinemas/**").permitAll()
                 .requestMatchers("/api/cinemas/**").hasAnyRole("Manager", "Admin")

@@ -20,7 +20,8 @@ public class DatabaseSeeder {
             ScreenRoomRepository screenRoomRepository,
             PromotionRepository promotionRepository,
             MovieRepository movieRepository,
-            ReviewRepository reviewRepository) {
+            ReviewRepository reviewRepository,
+            NewsArticleRepository newsArticleRepository) {
         return args -> {
             if (cinemaRepository.count() == 0) {
                 Cinema cgv = new Cinema();
@@ -164,9 +165,55 @@ public class DatabaseSeeder {
                     }
                 }
             }
+
+            if (newsArticleRepository.count() == 0) {
+                NewsArticle n1 = NewsArticle.builder()
+                        .title("Bom tấn siêu anh hùng đổ bộ cụm rạp CinemaHub tháng này")
+                        .summary("Loạt bom tấn hành động đỉnh cao với định dạng IMAX và 4DX đã chính thức mở bán vé sớm tại CinemaHub.")
+                        .content("Người yêu điện ảnh chuẩn bị đón nhận cơn bão phim hành động đỉnh cao đổ bộ vào tất cả các cụm rạp CinemaHub trên toàn quốc.\n\nVới công nghệ chiếu phim chuẩn quốc tế cùng hệ thống âm thanh vòm Dolby Atmos sống động, khán giả sẽ có trải nghiệm chân thực nhất như đang sống trong từng khung hình điện ảnh.\n\nĐặc biệt, các thành viên VIP của CinemaHub sẽ được nhận ưu đãi giảm 20% khi mua vé sớm và tặng kèm combo bắp nước độc quyền.")
+                        .imageUrl("https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop")
+                        .category("DIEN_ANH")
+                        .author("HuyTG - CinemaHub Editor")
+                        .tags(Arrays.asList("Bom tấn", "IMAX", "Phim Mới", "CinemaHub"))
+                        .active(true)
+                        .views(1280L)
+                        .createdAt(LocalDateTime.now().minusDays(2))
+                        .updatedAt(LocalDateTime.now().minusDays(2))
+                        .build();
+                newsArticleRepository.save(n1);
+
+                NewsArticle n2 = NewsArticle.builder()
+                        .title("Khám phá công nghệ phòng chiếu IMAX Laser thế hệ mới tại CinemaHub")
+                        .summary("Hệ thống máy chiếu Laser 4K thế hệ mới mang đến độ sắc nét vượt trội cùng tỷ lệ khung hình siêu rộng cho người xem.")
+                        .content("CinemaHub tự hào nâng cấp phòng chiếu IMAX Laser hiện đại nhất khu vực. Độ tương phản cực cao và dải màu rộng gấp đôi chuẩn thông thường giúp tái hiện màu sắc sống động và chiều sâu không gian vượt trội.\n\nHãy ghé ngay cụm rạp CinemaHub gần nhất để thưởng thức sự khác biệt của công nghệ tương lai này!")
+                        .imageUrl("https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=1200&auto=format&fit=crop")
+                        .category("SU_KIEN")
+                        .author("HuyTG - CinemaHub Editor")
+                        .tags(Arrays.asList("Công nghệ", "IMAX Laser", "Trải nghiệm"))
+                        .active(true)
+                        .views(850L)
+                        .createdAt(LocalDateTime.now().minusDays(5))
+                        .updatedAt(LocalDateTime.now().minusDays(5))
+                        .build();
+                newsArticleRepository.save(n2);
+
+                NewsArticle n3 = NewsArticle.builder()
+                        .title("Chương trình Tri ân Thành viên CinemaHub: Tích điểm đổi bắp nước miễn phí")
+                        .summary("Chương trình ưu đãi nhân đôi điểm thưởng và tặng voucher miễn phí bắp nước cho khách hàng đặt vé qua website.")
+                        .content("Nhằm tri ân khách hàng thân thiết, CinemaHub triển khai chương trình nhân đôi điểm thưởng khi đặt vé trực tuyến.\n\nChỉ cần tích đủ điểm hội viên Silver hoặc Gold, bạn sẽ đổi được combo bắp nước miễn phí và vé xem phim 2D/3D tại quầy.")
+                        .imageUrl("https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?q=80&w=1200&auto=format&fit=crop")
+                        .category("KHUYEN_MAI")
+                        .author("CinemaHub Marketing")
+                        .tags(Arrays.asList("Hội viên", "Khuyến mãi", "Bắp nước"))
+                        .active(true)
+                        .views(640L)
+                        .createdAt(LocalDateTime.now().minusDays(7))
+                        .updatedAt(LocalDateTime.now().minusDays(7))
+                        .build();
+                newsArticleRepository.save(n3);
+            }
             
             System.out.println("====== SEEDER COMPLETED: Mock data has been inserted into MongoDB ======");
         };
     }
 }
-
