@@ -58,4 +58,24 @@ public class FoodItemController {
     public ResponseEntity<FoodItem> configureAttributes(@PathVariable String id, @RequestBody Map<String, Object> attributes) {
         return ResponseEntity.ok(foodItemService.configureAttributes(id, attributes));
     }
+    @Autowired
+private CinemaInventoryRepository inventoryRepo;
+
+// View F&B khả dụng theo từng rạp chiếu
+@GetMapping("/cinema/{cinemaId}")
+public ResponseEntity<List<FoodItem>> getFoodsByCinema(@PathVariable String cinemaId) {
+    List<FoodItem> allActiveFoods = foodItemRepository.findByActiveTrue();
+    List<CinemaInventory> availableStock = inventoryRepo.findByCinemaIdAndIsAvailableTrue(cinemaId);
+
+    // Lọc chỉ trả về các món còn tồn kho tại rạp đó
+    List<String> availableFoodIds = availableStock.stream()
+            .map(CinemaInventory::getFoodItemId)
+            .toList();
+
+    List<FoodItem> cinemaFoods = allActiveFoods.stream()
+            .filter(food -> availableFoodIds.contains(food.getId()))
+            .toList();
+
+    return ResponseEntity.ok(cinemaFoods);
+}
 }

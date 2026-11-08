@@ -4,19 +4,143 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Film, MapPin, Calendar, Clock, Monitor, ChevronRight, ChevronLeft, 
   Check, Ticket, QrCode, Tag, AlertTriangle, UserCheck, 
-  RefreshCw, X, Sparkles, CreditCard, Heart, ArrowLeft, Printer
+  RefreshCw, X, Sparkles, CreditCard, Heart, ArrowLeft, Printer,
+  Plus, Minus, ShoppingBag, Utensils
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:5000/api';
 
+/* ========================================================================= */
+/* COMPONENT CON: CHỌN BẮP NƯỚC & COMBO THEO RẠP (F&B SELECTION)              */
+/* ========================================================================= */
+const FoodBookingSelect = ({ cinemaId, onFoodSelected }) => {
+  const [foods, setFoods] = useState([]);
+  const [selectedItems, setSelectedItems] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!cinemaId) return;
+    setLoading(true);
+    // Gọi API lấy món theo rạp hoặc fallback về toàn bộ menu F&B
+    fetch(`${API_BASE}/food-beverage/cinema/${cinemaId}`)
+      .then(res => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then(data => setFoods(data || []))
+      .catch(() => {
+        fetch(`${API_BASE}/food-beverage`)
+          .then(res => res.json())
+          .then(data => setFoods((data || []).filter(item => item.active !== false)))
+          .catch(() => setFoods([]));
+      })
+      .finally(() => setLoading(false));
+  }, [cinemaId]);
+
+  const updateQuantity = (item, delta) => {
+    const id = item.id || item._id?.$oid || item._id;
+    const currentQty = selectedItems[id]?.quantity || 0;
+    const newQty = Math.max(0, currentQty + delta);
+
+    const updated = { ...selectedItems };
+    if (newQty === 0) {
+      delete updated[id];
+    } else {
+      updated[id] = {
+        foodItemId: id,
+        name: item.name,
+        price: item.basePrice || 0,
+        quantity: newQty
+      };
+    }
+    setSelectedItems(updated);
+    if (onFoodSelected) {
+      onFoodSelected(Object.values(updated));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 my-6 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+        <RefreshCw className="w-4 h-4 animate-spin text-primary" /> Đang tải danh sách bắp nước...
+      </div>
+    );
+  }
+
+  if (foods.length === 0) return null;
+
+  return (
+    <div className="bg-[#141414] p-6 rounded-3xl border border-white/10 my-6">
+      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <ShoppingBag className="w-5 h-5 text-amber-500" /> Chọn Bắp Nước & Combo Khuyến Mãi Cùng Vé
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {foods.map(item => {
+          const id = item.id || item._id?.$oid || item._id;
+          const qty = selectedItems[id]?.quantity || 0;
+          const isCombo = item.isCombo || item.category === 'COMBO';
+
+          return (
+            <div key={id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-3 hover:border-white/20 transition">
+              <img 
+                src={item.imageUrl || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=500'} 
+                alt={item.name} 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=500';
+                }}
+                className="w-16 h-16 rounded-xl object-cover shrink-0 shadow-sm"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCombo ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {item.category}
+                  </span>
+                </div>
+                <h4 className="font-bold text-sm text-white truncate mt-0.5">{item.name}</h4>
+                <div className="text-primary font-black text-xs mt-0.5">
+                  {(item.basePrice || 0).toLocaleString()} đ
+                </div>
+              </div>
+
+              {/* Nút tăng giảm số lượng */}
+              <div className="flex items-center gap-2 bg-[#1a1a1a] px-2.5 py-1.5 rounded-xl border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => updateQuantity(item, -1)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="text-xs font-bold w-4 text-center text-white">{qty}</span>
+                <button
+                  type="button"
+                  onClick={() => updateQuantity(item, 1)}
+                  className="text-primary hover:text-red-400 transition"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ========================================================================= */
+/* COMPONENT CHÍNH: BOOKING PAGE                                            */
+/* ========================================================================= */
 const Booking = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // CGV Stepper: 1: Chọn Phim/Rạp/Suất, 2: Chọn Ghế, 3: Thanh Toán (Hold 10p), 4: Vé Điện Tử (E-Ticket)
+  // CGV Stepper: 1: Chọn Phim/Rạp/Suất, 2: Chọn Ghế & Bắp Nước, 3: Thanh Toán (Hold 10p), 4: Vé Điện Tử (E-Ticket)
   const [currentStep, setCurrentStep] = useState(1);
 
   // Selection states (Step 1)
@@ -37,6 +161,10 @@ const Booking = () => {
   const [seatMatrix, setSeatMatrix] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatLoading, setSeatLoading] = useState(false);
+
+  // F&B Selection state (Tích hợp F&B)
+  const [selectedFoods, setSelectedFoods] = useState([]);
+  const foodTotal = selectedFoods.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   // Hold & Timer (Step 3)
   const [activeBooking, setActiveBooking] = useState(null);
@@ -68,26 +196,7 @@ const Booking = () => {
     }
   }, [user]);
 
-  // CGV F&B Concession Combos (Bắp Nước CGV)
-  const [combos, setCombos] = useState([
-    { id: 'CGV_COMBO', name: 'CGV Combo', desc: '1 Bắp lớn 64oz + 2 Nước ngọt lớn 32oz', price: 115000, qty: 0, icon: '🍿🥤🥤' },
-    { id: 'MY_COMBO', name: 'My Combo', desc: '1 Bắp vừa 44oz + 1 Nước ngọt vừa 22oz', price: 89000, qty: 0, icon: '🍿🥤' },
-    { id: 'POPCORN_CHEESE', name: 'Bắp Phô Mai / Caramel', desc: '1 Bắp lớn 64oz lắc phô mai thơm giòn', price: 65000, qty: 0, icon: '🍿' },
-    { id: 'SOFT_DRINK', name: 'Nước Ngọt (Coca / Sprite)', desc: '1 Ly nước ngọt mát lạnh 32oz', price: 35000, qty: 0, icon: '🥤' }
-  ]);
-
-  const comboTotal = combos.reduce((acc, c) => acc + (c.price * c.qty), 0);
-
-  const updateComboQty = (id, delta) => {
-    setCombos(prev => prev.map(c => {
-      if (c.id === id) {
-        return { ...c, qty: Math.max(0, c.qty + delta) };
-      }
-      return c;
-    }));
-  };
-
-  // Counter mode for staff (Task 14)
+  // Counter mode for staff
   const [isCounterMode, setIsCounterMode] = useState(false);
   const isStaffOrAdmin = user?.role === 'Staff' || user?.role === 'Admin';
 
@@ -140,7 +249,6 @@ const Booking = () => {
         );
         const data = await res.json();
 
-        // Check if selectedDate is today; if so, filter out past showtimes
         const todayStr = getLocalDateString();
         const isToday = selectedDate === todayStr;
         const now = new Date();
@@ -176,6 +284,7 @@ const Booking = () => {
     if (!selectedShowtime) {
       setSeatMatrix([]);
       setSelectedSeats([]);
+      setSelectedFoods([]);
       return;
     }
     fetchSeatAvailability();
@@ -197,7 +306,7 @@ const Booking = () => {
     }
   };
 
-  // Live polling for seat status on Step 2 (Real-time seat holds and release)
+  // Live polling for seat status on Step 2
   useEffect(() => {
     if (currentStep !== 2 || !selectedShowtime) return;
     const interval = setInterval(() => {
@@ -213,10 +322,10 @@ const Booking = () => {
     return () => clearInterval(interval);
   }, [currentStep, selectedShowtime]);
 
-  // 4. Calculate Price dynamically when selected seats change
+  // 4. Calculate Price dynamically when selected seats or foods change
   useEffect(() => {
     if (!selectedShowtime || selectedSeats.length === 0) {
-      setPricing({ subtotal: 0, discount: 0, total: 0 });
+      setPricing({ subtotal: foodTotal, discount: 0, total: foodTotal });
       return;
     }
 
@@ -233,10 +342,15 @@ const Booking = () => {
         });
         const data = await res.json();
         if (res.ok) {
+          const seatSubtotal = data.subtotal || 0;
+          const discount = data.discountAmount || 0;
+          const totalSubtotal = seatSubtotal + foodTotal;
+          const finalTotal = Math.max(0, totalSubtotal - discount);
+
           setPricing({
-            subtotal: data.subtotal || 0,
-            discount: data.discountAmount || 0,
-            total: data.totalAmount || 0
+            subtotal: totalSubtotal,
+            discount: discount,
+            total: finalTotal
           });
         }
       } catch (err) {
@@ -245,7 +359,7 @@ const Booking = () => {
     };
 
     calcPrice();
-  }, [selectedSeats, selectedShowtime, appliedPromo]);
+  }, [selectedSeats, selectedShowtime, appliedPromo, foodTotal]);
 
   // 5. 10-Minute Hold Countdown Timer
   useEffect(() => {
@@ -269,6 +383,7 @@ const Booking = () => {
     setIsHolding(false);
     setActiveBooking(null);
     setSelectedSeats([]);
+    setSelectedFoods([]);
     setCurrentStep(2);
     setErrorMessage('Thời gian giữ ghế (10 phút) đã hết hạn! Vui lòng chọn lại ghế.');
     fetchSeatAvailability();
@@ -305,7 +420,7 @@ const Booking = () => {
                 total: b.totalAmount
               });
             }
-            setCurrentStep(3); // Jump right to Payment step!
+            setCurrentStep(3);
           } else {
             setErrorMessage('Phiên giữ chỗ này đã hết hạn 10 phút. Vui lòng chọn lại ghế.');
           }
@@ -318,10 +433,10 @@ const Booking = () => {
     resumeBooking();
   }, [searchParams]);
 
-  // CGV Orphan Seat Rule (Không được chừa lại 1 ghế trống đơn độc)
+  // CGV Orphan Seat Rule
   const wouldCauseOrphanSeat = (seatId, currentSelected) => {
     const row = seatId.charAt(0);
-    if (row === 'E' || row === 'F') return false; // Couple rows are paired
+    if (row === 'E' || row === 'F') return false;
 
     const rowSeats = seatMatrix
       .filter(s => s.row === row)
@@ -334,7 +449,7 @@ const Booking = () => {
       : [...currentSelected, seatId];
 
     const isOccupied = (s) => {
-      if (!s) return true; // wall/boundary
+      if (!s) return true;
       if (s.status === 'BOOKED') return true;
       if (s.status === 'HELD' && !candidateSelection.includes(s.seatId)) return true;
       return candidateSelection.includes(s.seatId);
@@ -354,28 +469,25 @@ const Booking = () => {
     return false;
   };
 
-  // Sweetbox & Seat Selection Logic (CGV Standard)
+  // Toggle seat selection
   const toggleSeat = (seat) => {
     if (seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.seatId)) return;
     setErrorMessage('');
 
     const isCouple = seat.seatType === 'COUPLE' || seat.row === 'E' || seat.row === 'F';
 
-    // If it's a couple seat, pair with adjacent seat
     if (isCouple) {
       const colNum = parseInt(seat.col, 10);
       const partnerCol = colNum % 2 === 1 ? colNum + 1 : colNum - 1;
       const partnerSeatId = `${seat.row}${partnerCol}`;
       const partnerSeat = seatMatrix.find(s => s.seatId === partnerSeatId);
 
-      // Check partner availability
       if (partnerSeat && partnerSeat.status !== 'AVAILABLE' && !selectedSeats.includes(partnerSeatId)) {
         setErrorMessage(`Ghế đôi ${seat.seatId}-${partnerSeatId} không thể chọn vì ghế ${partnerSeatId} không khả dụng!`);
         return;
       }
 
       if (selectedSeats.includes(seat.seatId)) {
-        // Deselect pair
         setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId && id !== partnerSeatId));
       } else {
         if (selectedSeats.length + 2 > 8) {
@@ -385,11 +497,9 @@ const Booking = () => {
         setSelectedSeats([...selectedSeats, seat.seatId, partnerSeatId]);
       }
     } else {
-      // Standard / VIP seat toggle
       if (selectedSeats.includes(seat.seatId)) {
         setSelectedSeats(selectedSeats.filter(id => id !== seat.seatId));
       } else {
-        // CGV Orphan Seat Check (chỉ áp dụng khi khách tự đặt online)
         if (!isCounterMode && wouldCauseOrphanSeat(seat.seatId, selectedSeats)) {
           setErrorMessage('⚠️ Quy tắc CGV: Bạn không thể để lại 1 ghế trống đơn lẻ bên cạnh. Vui lòng chọn ghế liền kề hoặc đổi vị trí khác!');
           return;
@@ -404,7 +514,7 @@ const Booking = () => {
     }
   };
 
-  // Step 1 -> Step 2: Require Login Check (Bắt buộc đăng nhập để chọn ghế)
+  // Step 1 -> Step 2
   const handleProceedToStep2 = () => {
     if (!selectedShowtime) {
       setErrorMessage('Vui lòng chọn một suất chiếu để tiếp tục.');
@@ -417,7 +527,7 @@ const Booking = () => {
     setCurrentStep(2);
   };
 
-  // Step 2 -> Step 3: Hold seats and proceed to payment
+  // Step 2 -> Step 3
   const handleProceedToPayment = async () => {
     if (!selectedShowtime || selectedSeats.length === 0) {
       setErrorMessage('Vui lòng chọn ít nhất 1 ghế.');
@@ -425,7 +535,6 @@ const Booking = () => {
     }
 
     if (isCounterMode) {
-      // Staff counter skips online hold countdown
       setCurrentStep(3);
       return;
     }
@@ -446,7 +555,8 @@ const Booking = () => {
           seatIds: selectedSeats,
           customerName: customerName || user?.name || user?.username || 'Khách hàng',
           customerEmail: customerEmail || user?.email || 'guest@cinemahub.com',
-          customerPhone: customerPhone || user?.phone || '0900000000'
+          customerPhone: customerPhone || user?.phone || '0900000000',
+          selectedFoods: selectedFoods
         })
       });
 
@@ -457,7 +567,7 @@ const Booking = () => {
 
       setActiveBooking(data);
       setIsHolding(true);
-      setRemainingSeconds(600); // 10 minutes
+      setRemainingSeconds(600);
       setCurrentStep(3);
       fetchSeatAvailability();
     } catch (err) {
@@ -467,7 +577,7 @@ const Booking = () => {
     }
   };
 
-  // Step 3: Apply Promo Code
+  // Apply Promo Code
   const handleApplyPromo = async () => {
     if (!promoCodeInput.trim()) return;
     setPromoMessage(null);
@@ -491,7 +601,7 @@ const Booking = () => {
       setPricing(prev => ({
         ...prev,
         discount: data.discountAmount,
-        total: data.newTotal
+        total: Math.max(0, prev.subtotal - data.discountAmount)
       }));
       setPromoMessage({ type: 'success', text: `Áp dụng thành công mã ${data.code}: -${data.discountAmount.toLocaleString()}đ` });
     } catch (err) {
@@ -500,7 +610,7 @@ const Booking = () => {
     }
   };
 
-  // Step 3: Confirm Booking (Customer Online)
+  // Step 3: Confirm Booking
   const handleConfirmBooking = async () => {
     if (!activeBooking) return;
     setIsProcessing(true);
@@ -511,7 +621,6 @@ const Booking = () => {
       const finalCustomerEmail = customerEmail || user?.email || activeBooking.customerEmail || 'customer@cinemahub.com';
       const finalCustomerPhone = customerPhone || user?.phone || activeBooking.customerPhone || '0900000000';
 
-      // If user selected VNPAY payment gateway, redirect to VNPAY Sandbox
       if (paymentMethod === 'VNPAY') {
         const vnpRes = await fetch(`${API_BASE}/payment/create-vnpay-url`, {
           method: 'POST',
@@ -531,7 +640,6 @@ const Booking = () => {
           throw new Error(vnpData.error || 'Khởi tạo thanh toán VNPAY thất bại');
         }
 
-        // Redirect directly to VNPAY Sandbox payment gateway
         window.location.href = vnpData.paymentUrl;
         return;
       }
@@ -544,7 +652,8 @@ const Booking = () => {
           customerName: finalCustomerName,
           customerEmail: finalCustomerEmail,
           customerPhone: finalCustomerPhone,
-          promoCode: appliedPromo?.code || null
+          promoCode: appliedPromo?.code || null,
+          selectedFoods: selectedFoods
         })
       });
 
@@ -556,7 +665,7 @@ const Booking = () => {
       setConfirmedData(data);
       setIsHolding(false);
       setActiveBooking(null);
-      setCurrentStep(4); // Move to E-Ticket screen
+      setCurrentStep(4);
       fetchSeatAvailability();
     } catch (err) {
       setErrorMessage(err.message);
@@ -565,8 +674,7 @@ const Booking = () => {
     }
   };
 
-
-  // Step 3 (Staff): Counter Booking at counter
+  // Step 3 (Staff): Counter Booking
   const handleCounterBooking = async () => {
     if (!selectedShowtime || selectedSeats.length === 0) return;
     if (!customerName.trim()) {
@@ -593,6 +701,7 @@ const Booking = () => {
           customerEmail: customerEmail || '',
           paymentMethod,
           promoCode: appliedPromo?.code || null,
+          selectedFoods: selectedFoods,
           staffNotes: `Xuất vé trực tiếp tại quầy bởi ${user?.username || 'Staff'}`
         })
       });
@@ -604,7 +713,8 @@ const Booking = () => {
 
       setConfirmedData(data);
       setSelectedSeats([]);
-      setCurrentStep(4); // Move to E-Ticket screen
+      setSelectedFoods([]);
+      setCurrentStep(4);
       fetchSeatAvailability();
     } catch (err) {
       setErrorMessage(err.message);
@@ -628,19 +738,18 @@ const Booking = () => {
     setIsHolding(false);
     setActiveBooking(null);
     setSelectedSeats([]);
+    setSelectedFoods([]);
     setAppliedPromo(null);
     setCurrentStep(2);
     fetchSeatAvailability();
   };
 
-  // Format seconds MM:SS
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Helper date tabs for CGV style
   const getDatesList = () => {
     const dates = [];
     const today = new Date();
@@ -686,7 +795,7 @@ const Booking = () => {
           </div>
         </div>
 
-        {/* STEPPER PROGRESS BAR (Chuẩn Flow CGV 4 bước) */}
+        {/* STEPPER PROGRESS BAR */}
         <div className="mb-8 bg-[#141414] p-4 rounded-2xl border border-white/10">
           <div className="grid grid-cols-4 gap-2 text-center text-xs md:text-sm font-bold">
             <div className={`py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${currentStep === 1 ? 'bg-primary text-white shadow-lg' : currentStep > 1 ? 'text-green-400 bg-white/5' : 'text-gray-500'}`}>
@@ -695,7 +804,7 @@ const Booking = () => {
             </div>
             <div className={`py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${currentStep === 2 ? 'bg-primary text-white shadow-lg' : currentStep > 2 ? 'text-green-400 bg-white/5' : 'text-gray-500'}`}>
               <Monitor className="w-4 h-4 hidden sm:inline" />
-              <span>2. Chọn Ghế Ngồi</span>
+              <span>2. Chọn Ghế & Bắp Nước</span>
             </div>
             <div className={`py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${currentStep === 3 ? 'bg-primary text-white shadow-lg' : currentStep > 3 ? 'text-green-400 bg-white/5' : 'text-gray-500'}`}>
               <CreditCard className="w-4 h-4 hidden sm:inline" />
@@ -720,12 +829,10 @@ const Booking = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 1: CHỌN PHIM, RẠP, NGÀY & SUẤT CHIẾU (CGV STYLE) */}
+        {/* STEP 1: CHỌN PHIM, RẠP, NGÀY & SUẤT CHIẾU */}
         {/* ========================================================================= */}
         {currentStep === 1 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            
-            {/* Phim đang chọn & Đổi phim nhanh (CGV Style Header) */}
             {selectedMovie && (
               <div className="bg-[#141414] p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                 <div className="flex items-center gap-4">
@@ -750,7 +857,6 @@ const Booking = () => {
                   </div>
                 </div>
 
-                {/* Quick Movie Switcher Dropdown */}
                 {movies.length > 1 && (
                   <div className="flex items-center gap-2 self-start md:self-center shrink-0">
                     <label htmlFor="movie-select" className="text-xs text-gray-400 font-medium shrink-0">
@@ -764,6 +870,7 @@ const Booking = () => {
                         if (m) {
                           setSelectedMovie(m);
                           setSelectedSeats([]);
+                          setSelectedFoods([]);
                           setSelectedShowtime(null);
                         }
                       }}
@@ -780,9 +887,7 @@ const Booking = () => {
               </div>
             )}
 
-            {/* Chọn Cụm Rạp & Dải Ngày Chiếu */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-[#141414] p-6 rounded-2xl border border-white/10">
-              
               {/* Chọn Rạp */}
               <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-white/10 pb-6 lg:pb-0 lg:pr-6">
                 <h3 className="text-sm uppercase font-bold text-gray-400 mb-3 flex items-center gap-2">
@@ -797,6 +902,7 @@ const Booking = () => {
                         onClick={() => {
                           setSelectedCinema(c);
                           setSelectedSeats([]);
+                          setSelectedFoods([]);
                           setSelectedShowtime(null);
                         }}
                         className={`w-full text-left p-3.5 rounded-xl border text-sm font-semibold transition-all ${
@@ -813,7 +919,7 @@ const Booking = () => {
                 </div>
               </div>
 
-              {/* Dải Ngày Chiếu (CGV Date Picker) */}
+              {/* Dải Ngày Chiếu */}
               <div className="lg:col-span-2">
                 <h3 className="text-sm uppercase font-bold text-gray-400 mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-primary" /> 2. Ngày Chiếu Phim
@@ -838,7 +944,7 @@ const Booking = () => {
                   })}
                 </div>
 
-                {/* Suất Chiếu Khả Dụng Nhóm Theo Định Dạng (2D, 3D, IMAX) */}
+                {/* Suất Chiếu Khả Dụng */}
                 <h3 className="text-sm uppercase font-bold text-gray-400 mb-3 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-primary" /> 3. Suất Chiếu Khả Dụng ({showtimes.length})
                 </h3>
@@ -849,13 +955,11 @@ const Booking = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Phân nhóm theo định dạng */}
                     {Array.from(new Set(showtimes.map(s => s.format || '2D'))).sort().map(fmt => {
                       const fmtShowtimes = showtimes.filter(s => (s.format || '2D') === fmt);
                       if (fmtShowtimes.length === 0) return null;
                       return (
                         <div key={fmt} className="bg-white/5 p-4 rounded-xl border border-white/5">
-
                           <div className="flex flex-wrap gap-3 mt-2">
                             {fmtShowtimes.map(st => {
                               const isSelected = selectedShowtime?.id === st.id;
@@ -887,28 +991,25 @@ const Booking = () => {
               </div>
             </div>
 
-            {/* Chuyển sang Bước 2 */}
             <div className="flex justify-end pt-4">
               <button
                 disabled={!selectedShowtime}
                 onClick={handleProceedToStep2}
                 className="px-8 py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5"
               >
-                <span>Tiếp tục: Chọn ghế ngồi</span>
+                <span>Tiếp tục: Chọn ghế & bắp nước</span>
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
-
           </motion.div>
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2: SƠ ĐỒ CHỌN GHẾ CHUẨN CGV (SEAT MAP & SWEETBOX) */}
+        {/* STEP 2: SƠ ĐỒ CHỌN GHẾ & BẮP NƯỚC THEO RẠP */}
         {/* ========================================================================= */}
         {currentStep === 2 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             
-            {/* Thanh thông tin suất chiếu đã chọn */}
             <div className="bg-[#141414] p-4 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <button
@@ -935,9 +1036,8 @@ const Booking = () => {
               </div>
             </div>
 
-            {/* Màn hình chiếu cong CGV SCREEN */}
+            {/* Màn hình chiếu cong SCREEN */}
             <div className="bg-[#141414] p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col items-center">
-              
               <div className="w-full max-w-2xl text-center mb-10">
                 <div className="relative w-full h-12 border-t-4 border-secondary/60 rounded-t-[50%] flex items-center justify-center shadow-[0_-20px_35px_rgba(14,165,233,0.25)]">
                   <span className="text-gray-300 text-xs tracking-[0.6em] mt-3 font-bold flex items-center gap-2">
@@ -1006,7 +1106,7 @@ const Booking = () => {
                 </div>
               )}
 
-              {/* Chú thích loại ghế (Legend) */}
+              {/* Chú thích loại ghế */}
               <div className="flex flex-wrap justify-center gap-6 text-xs text-gray-400 border-t border-white/10 pt-6 w-full max-w-3xl">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-t bg-white/10 border-b-2 border-white/20"></div> Ghế thường
@@ -1017,7 +1117,7 @@ const Booking = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-t bg-purple-600/20 border-b-2 border-purple-500/40 text-purple-300 flex items-center justify-center">
                     <Heart className="w-2.5 h-2.5 text-purple-400" />
-                  </div> Ghế Đôi Sweetbox (Đi theo cặp)
+                  </div> Ghế Đôi Sweetbox
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-t bg-primary border-b-2 border-red-700 shadow-[0_0_8px_rgba(229,9,20,0.6)]"></div> Đang chọn
@@ -1031,26 +1131,44 @@ const Booking = () => {
               </div>
             </div>
 
-            {/* CGV FLOATING BOTTOM BAR (Thanh tóm tắt nổi cố định ở dưới) */}
+            {/* TÍCH HỢP BƯỚC CHỌN BẮP NƯỚC & COMBO THEO RẠP */}
+            <FoodBookingSelect 
+              cinemaId={selectedShowtime?.cinemaId || selectedCinema?.id} 
+              onFoodSelected={(foods) => setSelectedFoods(foods)} 
+            />
+
+            {/* FLOATING BOTTOM BAR */}
             <div className="sticky bottom-4 z-40 bg-[#181818]/95 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="hidden sm:block">
-                  <span className="text-xs text-gray-400 uppercase font-semibold">Ghế đang chọn:</span>
-                  <div className="text-lg font-black text-primary">
+                  <span className="text-xs text-gray-400 uppercase font-semibold">Ghế ({selectedSeats.length}):</span>
+                  <div className="text-base font-black text-primary">
                     {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'Chưa chọn'}
                   </div>
                 </div>
+                {selectedFoods.length > 0 && (
+                  <div className="border-l border-white/10 pl-4 hidden sm:block">
+                    <span className="text-xs text-gray-400 uppercase font-semibold">Bắp nước ({selectedFoods.reduce((acc, f) => acc + f.quantity, 0)}):</span>
+                    <div className="text-base font-black text-amber-400">
+                      +{foodTotal.toLocaleString()} đ
+                    </div>
+                  </div>
+                )}
                 <div className="border-l border-white/10 pl-4 hidden sm:block">
-                  <span className="text-xs text-gray-400 uppercase font-semibold">Tạm tính:</span>
+                  <span className="text-xs text-gray-400 uppercase font-semibold">Tạm tính tổng:</span>
                   <div className="text-xl font-black text-white">
                     {pricing.subtotal.toLocaleString()} đ
                   </div>
                 </div>
+
                 {/* Mobile version */}
                 <div className="sm:hidden flex justify-between w-full">
                   <div>
                     <span className="text-xs text-gray-400">Ghế: </span>
-                    <span className="font-bold text-primary">{selectedSeats.join(', ') || 'Chưa chọn'}</span>
+                    <span className="font-bold text-primary">{selectedSeats.join(', ') || '0'}</span>
+                    {selectedFoods.length > 0 && (
+                      <span className="text-xs text-amber-400 ml-2">+{foodTotal.toLocaleString()}đ F&B</span>
+                    )}
                   </div>
                   <div>
                     <span className="text-xs text-gray-400">Tổng: </span>
@@ -1081,12 +1199,12 @@ const Booking = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 3: THANH TOÁN & GIỮ CHỖ 10 PHÚT (CHECKOUT & PROMO) */}
+        {/* STEP 3: THANH TOÁN & GIỮ CHỖ 10 PHÚT */}
         {/* ========================================================================= */}
         {currentStep === 3 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             
-            {/* Banner đếm ngược thời gian giữ ghế (10:00 Countdown) */}
+            {/* Banner đếm ngược thời gian giữ ghế */}
             {isHolding && (
               <div className="bg-gradient-to-r from-amber-500/20 via-primary/20 to-amber-500/20 border border-amber-500/40 p-4 rounded-2xl flex items-center justify-between shadow-lg">
                 <div className="flex items-center gap-3">
@@ -1114,10 +1232,9 @@ const Booking = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              {/* Cột trái: Thông tin nhận vé, Voucher & Cổng thanh toán */}
               <div className="lg:col-span-2 space-y-6">
                 
-                {/* 3.1 Thông tin người nhận vé (Tự động từ tài khoản đã đăng nhập) */}
+                {/* 3.1 Thông tin khách hàng */}
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -1175,8 +1292,7 @@ const Booking = () => {
                   </div>
                 </div>
 
-                {/* Combo Bắp Nước CGV removed */}
-                {/* 3.3 Mã giảm giá (Voucher CGV) */}
+                {/* 3.2 Mã giảm giá */}
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10">
                   <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
                     <Tag className="w-5 h-5 text-primary" /> Mã Khuyến Mãi / Voucher CGV
@@ -1204,7 +1320,7 @@ const Booking = () => {
                   )}
                 </div>
 
-                {/* 3.4 Phương thức thanh toán chuẩn CGV */}
+                {/* 3.3 Phương thức thanh toán */}
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 space-y-4">
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     <CreditCard className="w-5 h-5 text-primary" /> Chọn Cổng Thanh Toán
@@ -1242,7 +1358,7 @@ const Booking = () => {
 
               </div>
 
-              {/* Cột phải: Tóm tắt hóa đơn vé (Order Summary) */}
+              {/* Cột phải: Tóm tắt hóa đơn vé & Bắp nước */}
               <div className="lg:col-span-1">
                 <div className="bg-[#141414] p-6 rounded-2xl border border-white/10 sticky top-28 space-y-6">
                   <h3 className="text-lg font-bold text-white border-b border-white/10 pb-4">
@@ -1264,8 +1380,8 @@ const Booking = () => {
                     </div>
                   </div>
 
-                  {/* Suất & Ghế */}
-                  <div className="space-y-2 text-sm border-t border-b border-white/10 py-4 text-gray-300">
+                  {/* Suất, Ghế & Bắp Nước */}
+                  <div className="space-y-2.5 text-sm border-t border-b border-white/10 py-4 text-gray-300">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Suất chiếu:</span>
                       <span className="font-bold text-white">
@@ -1276,14 +1392,35 @@ const Booking = () => {
                       <span className="text-gray-400">Ghế ({selectedSeats.length}):</span>
                       <span className="font-bold text-primary">{selectedSeats.join(', ')}</span>
                     </div>
+
+                    {/* Danh sách bắp nước đã chọn */}
+                    {selectedFoods.length > 0 && (
+                      <div className="pt-2 border-t border-white/5 space-y-1">
+                        <span className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                          <Utensils className="w-3.5 h-3.5" /> Bắp nước & Combo:
+                        </span>
+                        {selectedFoods.map(food => (
+                          <div key={food.foodItemId} className="flex justify-between text-xs text-gray-300 pl-2">
+                            <span>• {food.name} (x{food.quantity})</span>
+                            <span className="font-medium text-white">{(food.price * food.quantity).toLocaleString()} đ</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Bảng tính tiền */}
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between text-gray-400">
-                      <span>Tạm tính vé</span>
-                      <span>{pricing.subtotal.toLocaleString()} đ</span>
+                      <span>Tiền vé ghế</span>
+                      <span>{(pricing.subtotal - foodTotal).toLocaleString()} đ</span>
                     </div>
+                    {foodTotal > 0 && (
+                      <div className="flex justify-between text-amber-400">
+                        <span>Tiền bắp nước & combo</span>
+                        <span>+{foodTotal.toLocaleString()} đ</span>
+                      </div>
+                    )}
                     {pricing.discount > 0 && (
                       <div className="flex justify-between text-green-400 font-bold">
                         <span>Voucher ({appliedPromo?.code})</span>
@@ -1296,7 +1433,7 @@ const Booking = () => {
                     </div>
                   </div>
 
-                  {/* Nút hành động */}
+                  {/* Nút thanh toán */}
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
@@ -1317,12 +1454,11 @@ const Booking = () => {
                     </button>
                   )}
 
-
                   <button
                     onClick={() => setCurrentStep(2)}
                     className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 font-semibold rounded-xl text-xs transition-all"
                   >
-                    Quay lại chọn lại ghế
+                    Quay lại chọn lại ghế & bắp nước
                   </button>
                 </div>
               </div>
@@ -1333,7 +1469,7 @@ const Booking = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 4: VÉ ĐIỆN TỬ CGV E-TICKET (BOARDING PASS STYLE) */}
+        {/* STEP 4: VÉ ĐIỆN TỬ CGV E-TICKET */}
         {/* ========================================================================= */}
         {currentStep === 4 && confirmedData && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto space-y-6">
@@ -1349,7 +1485,6 @@ const Booking = () => {
             {/* CGV E-TICKET CARD */}
             <div className="bg-[#141414] rounded-3xl border border-white/15 overflow-hidden shadow-2xl relative">
               
-              {/* Ticket Header */}
               <div className="bg-primary p-6 text-center text-white relative">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] bg-black/20 px-3 py-1 rounded-full">
                   VÉ ĐIỆN TỬ • CGV CINEMAHUB E-TICKET
@@ -1358,10 +1493,9 @@ const Booking = () => {
                 <p className="text-xs opacity-90">{confirmedData.cinemaName} • {confirmedData.roomName}</p>
               </div>
 
-              {/* Ticket Body */}
               <div className="p-8 space-y-6">
                 
-                {/* QR Code Section */}
+                {/* QR Code */}
                 <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner text-black">
                   <QRCodeSVG 
                     value={confirmedData.ticket?.qrCode || confirmedData.qrCode || `CINEMAHUB|${confirmedData.bookingReference || confirmedData.booking?.bookingReference}`} 
@@ -1375,7 +1509,7 @@ const Booking = () => {
                   <p className="text-[11px] text-gray-500 mt-0.5 text-center">Xuất trình mã này tại quầy hoặc cửa soát vé để vào rạp</p>
                 </div>
 
-                {/* Ticket Details Grid */}
+                {/* Details Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center border-t border-b border-white/10 py-4 text-xs">
                   <div>
                     <span className="text-gray-400 block mb-0.5">Ngày Chiếu</span>
@@ -1403,14 +1537,25 @@ const Booking = () => {
                   </div>
                 </div>
 
-                {/* Meta details */}
+                {/* Danh sách bắp nước trong hóa đơn xác nhận */}
+                {selectedFoods.length > 0 && (
+                  <div className="bg-white/5 p-3 rounded-xl text-xs space-y-1">
+                    <span className="text-amber-400 font-semibold block">Bắp nước nhận tại quầy bar:</span>
+                    {selectedFoods.map(f => (
+                      <div key={f.foodItemId} className="flex justify-between text-gray-300">
+                        <span>• {f.name}</span>
+                        <span className="font-bold text-white">x{f.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>Người nhận: <strong className="text-white">{confirmedData.customerName || confirmedData.booking?.customerName}</strong></span>
-                  <span>Tổng tiền: <strong className="text-white text-sm font-bold">{(confirmedData.totalAmount || confirmedData.booking?.totalAmount)?.toLocaleString()} đ</strong></span>
+                  <span>Tổng tiền: <strong className="text-white text-sm font-bold">{(confirmedData.totalAmount || confirmedData.booking?.totalAmount || pricing.total)?.toLocaleString()} đ</strong></span>
                 </div>
               </div>
 
-              {/* Action buttons */}
               <div className="bg-[#1a1a1a] p-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10">
                 <button
                   onClick={() => window.print()}
@@ -1429,6 +1574,7 @@ const Booking = () => {
                     onClick={() => {
                       setCurrentStep(1);
                       setSelectedSeats([]);
+                      setSelectedFoods([]);
                       setConfirmedData(null);
                     }}
                     className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white font-extrabold text-xs rounded-xl shadow-md"
@@ -1443,7 +1589,7 @@ const Booking = () => {
           </motion.div>
         )}
 
-        {/* LOGIN REQUIRED MODAL (Bắt buộc đăng nhập để chọn ghế & giữ chỗ) */}
+        {/* LOGIN REQUIRED MODAL */}
         <AnimatePresence>
           {showLoginModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

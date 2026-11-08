@@ -144,4 +144,25 @@ public class BookingController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    @Autowired
+private InventoryService inventoryService;
+
+@Autowired
+private BookingRepository bookingRepository;
+
+@PostMapping("/select-food")
+public ResponseEntity<?> selectFoodInBooking(@RequestBody SelectFoodBookingRequest req) {
+    Booking booking = bookingRepository.findById(req.getBookingId())
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy Booking ID"));
+
+    // Kiểm tra và trừ tồn kho tạm tính
+    for (SelectFoodBookingRequest.SelectedFoodItem item : req.getItems()) {
+        boolean success = inventoryService.deductStockAndAutoDisable(req.getCinemaId(), item.getFoodItemId(), item.getQuantity());
+        if (!success) {
+            return ResponseEntity.badRequest().body("Món ăn với ID " + item.getFoodItemId() + " không đủ số lượng tồn kho tại rạp!");
+        }
+    }
+
+    return ResponseEntity.ok("Chọn bắp nước thành công!");
+}
 }
