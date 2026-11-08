@@ -585,21 +585,51 @@ const Booking = () => {
       })
       .then(data => {
         if (!controller.signal.aborted) {
-          const seatSub = data.seatSubtotal != null ? data.seatSubtotal : Math.max(0, data.subtotal - (data.foodSubtotal || 0));
-          const foodSub = data.foodSubtotal != null ? data.foodSubtotal : foodTotal;
-          const sub = data.subtotal != null ? data.subtotal : (seatSub + foodSub);
+          const rawSeatSub = (data.rawSeatSubtotal != null && data.rawSeatSubtotal > 0)
+            ? data.rawSeatSubtotal
+            : (rawSeatTotal > 0 ? rawSeatTotal : (data.seatSubtotal || 0));
+
+          const activeTicketPercent = (data.ticketDiscountPercent != null && data.ticketDiscountPercent > 0)
+            ? data.ticketDiscountPercent
+            : effectiveTicketDiscountPercent;
+
+          const seatDisc = (data.seatDiscountAmount != null && data.seatDiscountAmount > 0)
+            ? data.seatDiscountAmount
+            : (activeTicketPercent > 0 && rawSeatSub > 0 ? Math.round(rawSeatSub * (activeTicketPercent / 100)) : 0);
+
+          const seatSub = (data.seatDiscountAmount != null && data.seatDiscountAmount > 0)
+            ? data.seatSubtotal
+            : (seatDisc > 0 ? Math.max(0, rawSeatSub - seatDisc) : (data.seatSubtotal != null ? data.seatSubtotal : rawSeatSub));
+
+          const rawFoodSub = (data.rawFoodSubtotal != null && data.rawFoodSubtotal > 0)
+            ? data.rawFoodSubtotal
+            : rawFoodTotal;
+
+          const activeFnbPercent = (data.fnbDiscountPercent != null && data.fnbDiscountPercent > 0)
+            ? data.fnbDiscountPercent
+            : effectiveFnbDiscountPercent;
+
+          const foodDisc = (data.foodDiscountAmount != null && data.foodDiscountAmount > 0)
+            ? data.foodDiscountAmount
+            : (activeFnbPercent > 0 && rawFoodSub > 0 ? Math.round(rawFoodSub * (activeFnbPercent / 100)) : 0);
+
+          const foodSub = (data.foodDiscountAmount != null && data.foodDiscountAmount > 0)
+            ? data.foodSubtotal
+            : (foodDisc > 0 ? Math.max(0, rawFoodSub - foodDisc) : (data.foodSubtotal != null ? data.foodSubtotal : foodTotal));
+
+          const sub = seatSub + foodSub;
           const disc = data.discountAmount || 0;
-          const tot = data.totalAmount != null ? data.totalAmount : Math.max(0, sub - disc);
+          const tot = Math.max(0, sub - disc);
 
           setPricing({
             seatSubtotal: seatSub,
-            rawSeatSubtotal: data.rawSeatSubtotal != null ? data.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : seatSub),
-            seatDiscountAmount: data.seatDiscountAmount || 0,
-            ticketDiscountPercent: data.ticketDiscountPercent != null ? data.ticketDiscountPercent : effectiveTicketDiscountPercent,
+            rawSeatSubtotal: rawSeatSub,
+            seatDiscountAmount: seatDisc,
+            ticketDiscountPercent: activeTicketPercent,
             foodSubtotal: foodSub,
-            rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
-            foodDiscountAmount: data.foodDiscountAmount || 0,
-            fnbDiscountPercent: data.fnbDiscountPercent != null ? data.fnbDiscountPercent : effectiveFnbDiscountPercent,
+            rawFoodSubtotal: rawFoodSub,
+            foodDiscountAmount: foodDisc,
+            fnbDiscountPercent: activeFnbPercent,
             memberTierName: data.memberTierName || effectiveMemberTierName,
             subtotal: sub,
             discount: disc,
@@ -862,23 +892,59 @@ const Booking = () => {
       setAppliedPromo(null); setPromoMessage(null);
       setIsHolding(true);
       setRemainingSeconds(600);
-      const holdSeatSub = data.seatSubtotal != null
+      const rawHoldSeat = (data.rawSeatSubtotal != null && data.rawSeatSubtotal > 0)
+        ? data.rawSeatSubtotal
+        : (rawSeatTotal > 0 ? rawSeatTotal : (data.seats?.reduce((s, x) => s + (x.rawPrice || x.price || 0), 0) || (data.subtotal || 0)));
+
+      const activeTicketPct = (data.ticketDiscountPercent != null && data.ticketDiscountPercent > 0)
+        ? data.ticketDiscountPercent
+        : effectiveTicketDiscountPercent;
+
+      const holdSeatDisc = (data.seatDiscountAmount != null && data.seatDiscountAmount > 0)
+        ? data.seatDiscountAmount
+        : (activeTicketPct > 0 && rawHoldSeat > 0 ? Math.round(rawHoldSeat * (activeTicketPct / 100)) : 0);
+
+      const holdSeatSub = (data.seatDiscountAmount != null && data.seatDiscountAmount > 0)
         ? data.seatSubtotal
-        : (data.seats?.reduce((s, x) => s + (x.price || 0), 0) || Math.max(0, (data.subtotal || 0) - (data.foodSubtotal || 0)));
-      const holdFoodSub = data.foodSubtotal != null ? data.foodSubtotal : foodTotal;
+        : (data.seatSubtotal != null && data.seatSubtotal < rawHoldSeat
+            ? data.seatSubtotal
+            : (holdSeatDisc > 0 ? Math.max(0, rawHoldSeat - holdSeatDisc) : rawHoldSeat));
+
+      const rawHoldFood = (data.rawFoodSubtotal != null && data.rawFoodSubtotal > 0)
+        ? data.rawFoodSubtotal
+        : rawFoodTotal;
+
+      const activeFnbPct = (data.fnbDiscountPercent != null && data.fnbDiscountPercent > 0)
+        ? data.fnbDiscountPercent
+        : effectiveFnbDiscountPercent;
+
+      const holdFoodDisc = (data.foodDiscountAmount != null && data.foodDiscountAmount > 0)
+        ? data.foodDiscountAmount
+        : (activeFnbPct > 0 && rawHoldFood > 0 ? Math.round(rawHoldFood * (activeFnbPct / 100)) : 0);
+
+      const holdFoodSub = (data.foodDiscountAmount != null && data.foodDiscountAmount > 0)
+        ? data.foodSubtotal
+        : (data.foodSubtotal != null && data.foodSubtotal < rawHoldFood
+            ? data.foodSubtotal
+            : (holdFoodDisc > 0 ? Math.max(0, rawHoldFood - holdFoodDisc) : rawHoldFood));
+
+      const holdSubtotal = holdSeatSub + holdFoodSub;
+      const holdDiscount = data.discountAmount || 0;
+      const holdTotal = Math.max(0, holdSubtotal - holdDiscount);
+
       setPricing({
         seatSubtotal: holdSeatSub,
-        rawSeatSubtotal: data.rawSeatSubtotal != null ? data.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : holdSeatSub),
-        seatDiscountAmount: data.seatDiscountAmount || 0,
-        ticketDiscountPercent: data.ticketDiscountPercent != null ? data.ticketDiscountPercent : effectiveTicketDiscountPercent,
+        rawSeatSubtotal: rawHoldSeat,
+        seatDiscountAmount: holdSeatDisc,
+        ticketDiscountPercent: activeTicketPct,
         foodSubtotal: holdFoodSub,
-        rawFoodSubtotal: data.rawFoodSubtotal != null ? data.rawFoodSubtotal : rawFoodTotal,
-        foodDiscountAmount: data.foodDiscountAmount || 0,
-        fnbDiscountPercent: data.fnbDiscountPercent != null ? data.fnbDiscountPercent : effectiveFnbDiscountPercent,
+        rawFoodSubtotal: rawHoldFood,
+        foodDiscountAmount: holdFoodDisc,
+        fnbDiscountPercent: activeFnbPct,
         memberTierName: data.memberTierName || effectiveMemberTierName,
-        subtotal: data.subtotal,
-        discount: data.discountAmount || 0,
-        total: data.totalAmount
+        subtotal: holdSubtotal,
+        discount: holdDiscount,
+        total: holdTotal
       });
       setCurrentStep(3);
       fetchSeatAvailability();
@@ -1619,25 +1685,25 @@ const Booking = () => {
 
             {/* FLOATING BOTTOM BAR */}
             {(() => {
-              const effectiveRawSeatTotal = pricing.rawSeatSubtotal > 0
-                ? pricing.rawSeatSubtotal
-                : (rawSeatTotal > 0 ? rawSeatTotal : pricing.seatSubtotal);
+              const effectiveRawSeatTotal = (pricing.rawSeatSubtotal > 0 ? pricing.rawSeatSubtotal : rawSeatTotal) || pricing.seatSubtotal;
 
-              const effectiveSeatTotal = pricing.seatSubtotal > 0
+              const effectiveSeatTotal = (pricing.seatDiscountAmount > 0 && pricing.seatSubtotal < effectiveRawSeatTotal)
                 ? pricing.seatSubtotal
                 : (effectiveTicketDiscountPercent > 0 && effectiveRawSeatTotal > 0
                     ? Math.max(0, Math.round(effectiveRawSeatTotal * (1 - effectiveTicketDiscountPercent / 100)))
-                    : effectiveRawSeatTotal);
+                    : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : effectiveRawSeatTotal));
 
-              const effectiveRawFoodTotal = pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal;
+              const effectiveRawFoodTotal = (pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal) || pricing.foodSubtotal;
 
-              const effectiveFoodTotal = pricing.foodSubtotal > 0
+              const effectiveFoodTotal = (pricing.foodDiscountAmount > 0 && pricing.foodSubtotal < effectiveRawFoodTotal)
                 ? pricing.foodSubtotal
-                : (effectiveFnbDiscountPercent > 0
-                    ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
-                    : foodTotal);
+                : (effectiveFnbDiscountPercent > 0 && effectiveRawFoodTotal > 0
+                    ? Math.max(0, Math.round(effectiveRawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
+                    : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : effectiveRawFoodTotal));
 
-              const effectiveSubtotal = pricing.subtotal > 0 ? pricing.subtotal : (effectiveSeatTotal + effectiveFoodTotal);
+              const effectiveSubtotal = (pricing.subtotal > 0 && pricing.seatSubtotal === effectiveSeatTotal && pricing.foodSubtotal === effectiveFoodTotal)
+                ? pricing.subtotal
+                : (effectiveSeatTotal + effectiveFoodTotal);
 
               return (
                 <div className="sticky bottom-4 z-40 bg-[#181818]/95 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1973,31 +2039,33 @@ const Booking = () => {
 
                   {/* Bảng tính tiền */}
                   {(() => {
-                    const displayFoodPrice = activeBooking?.foodSubtotal != null
-                      ? activeBooking.foodSubtotal
-                      : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : (
-                        effectiveFnbDiscountPercent > 0
-                          ? Math.max(0, Math.round(rawFoodTotal * (1 - effectiveFnbDiscountPercent / 100)))
-                          : foodTotal
-                      ));
+                    const displayRawSeatPrice = (activeBooking?.rawSeatSubtotal != null && activeBooking.rawSeatSubtotal > 0)
+                      ? activeBooking.rawSeatSubtotal
+                      : (pricing.rawSeatSubtotal > 0 ? pricing.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : pricing.seatSubtotal));
 
-                    const displayRawFoodPrice = activeBooking?.rawFoodSubtotal != null
+                    const displaySeatPrice = (activeBooking?.seatDiscountAmount > 0 && activeBooking?.seatSubtotal < displayRawSeatPrice)
+                      ? activeBooking.seatSubtotal
+                      : (pricing.seatDiscountAmount > 0 && pricing.seatSubtotal < displayRawSeatPrice)
+                        ? pricing.seatSubtotal
+                        : (effectiveTicketDiscountPercent > 0 && displayRawSeatPrice > 0
+                            ? Math.max(0, Math.round(displayRawSeatPrice * (1 - effectiveTicketDiscountPercent / 100)))
+                            : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : displayRawSeatPrice));
+
+                    const displayRawFoodPrice = (activeBooking?.rawFoodSubtotal != null && activeBooking.rawFoodSubtotal > 0)
                       ? activeBooking.rawFoodSubtotal
                       : (pricing.rawFoodSubtotal > 0 ? pricing.rawFoodSubtotal : rawFoodTotal);
 
-                    const displaySeatPrice = activeBooking?.seatSubtotal != null
-                      ? activeBooking.seatSubtotal
-                      : (activeBooking?.seats && activeBooking.seats.length > 0)
-                        ? activeBooking.seats.reduce((s, x) => s + (x.price || 0), 0)
-                        : (pricing.seatSubtotal > 0 ? pricing.seatSubtotal : Math.max(0, (pricing.subtotal || 0) - displayFoodPrice));
+                    const displayFoodPrice = (activeBooking?.foodDiscountAmount > 0 && activeBooking?.foodSubtotal < displayRawFoodPrice)
+                      ? activeBooking.foodSubtotal
+                      : (pricing.foodDiscountAmount > 0 && pricing.foodSubtotal < displayRawFoodPrice)
+                        ? pricing.foodSubtotal
+                        : (effectiveFnbDiscountPercent > 0 && displayRawFoodPrice > 0
+                            ? Math.max(0, Math.round(displayRawFoodPrice * (1 - effectiveFnbDiscountPercent / 100)))
+                            : (pricing.foodSubtotal > 0 ? pricing.foodSubtotal : displayRawFoodPrice));
 
-                    const displayRawSeatPrice = activeBooking?.rawSeatSubtotal != null
-                      ? activeBooking.rawSeatSubtotal
-                      : (pricing.rawSeatSubtotal > 0 ? pricing.rawSeatSubtotal : (rawSeatTotal > 0 ? rawSeatTotal : displaySeatPrice));
-
-                    const displaySubtotal = pricing.subtotal > 0 ? pricing.subtotal : (displaySeatPrice + displayFoodPrice);
+                    const displaySubtotal = displaySeatPrice + displayFoodPrice;
                     const displayDiscount = pricing.discount || activeBooking?.discountAmount || 0;
-                    const displayFinalTotal = pricing.total > 0 ? pricing.total : Math.max(0, displaySubtotal - displayDiscount);
+                    const displayFinalTotal = Math.max(0, displaySubtotal - displayDiscount);
 
                     return (
                       <div className="space-y-2 text-sm">

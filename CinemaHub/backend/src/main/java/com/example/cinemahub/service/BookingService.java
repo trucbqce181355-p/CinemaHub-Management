@@ -249,7 +249,9 @@ public class BookingService {
 
         User customer = null;
         if (userId != null && !userId.isBlank() && !"anonymousUser".equals(userId)) {
-            customer = userRepository.findById(userId).orElse(null);
+            customer = userRepository.findById(userId)
+                    .orElseGet(() -> userRepository.findByEmail(userId)
+                            .orElseGet(() -> userRepository.findByUsername(userId).orElse(null)));
         }
         if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
             customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);
@@ -423,7 +425,9 @@ public class BookingService {
 
         User customer = null;
         if (userId != null && !userId.isBlank() && !"anonymousUser".equals(userId)) {
-            customer = userRepository.findById(userId).orElse(null);
+            customer = userRepository.findById(userId)
+                    .orElseGet(() -> userRepository.findByEmail(userId)
+                            .orElseGet(() -> userRepository.findByUsername(userId).orElse(null)));
         }
         if (customer == null && req.getCustomerEmail() != null && !req.getCustomerEmail().isBlank()) {
             customer = userRepository.findByEmail(req.getCustomerEmail().trim()).orElse(null);

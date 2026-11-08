@@ -326,12 +326,64 @@ public class MembershipService {
     // =========================================================================
     // 3. TIERS MANAGEMENT & BENEFITS (Admin & Public)
     // =========================================================================
+    public void applyDefaultTierDiscounts(MembershipTier tier) {
+        if (tier == null) return;
+        boolean changed = false;
+        String code = tier.getCode() != null ? tier.getCode().toUpperCase().trim() : "";
+        if ("SILVER".equals(code)) {
+            if (tier.getTicketDiscountPercent() == null || tier.getTicketDiscountPercent() <= 0.0) {
+                tier.setTicketDiscountPercent(5.0);
+                changed = true;
+            }
+            if (tier.getFnbDiscountPercent() == null || tier.getFnbDiscountPercent() <= 0.0) {
+                tier.setFnbDiscountPercent(5.0);
+                changed = true;
+            }
+        } else if ("GOLD".equals(code)) {
+            if (tier.getTicketDiscountPercent() == null || tier.getTicketDiscountPercent() <= 0.0) {
+                tier.setTicketDiscountPercent(10.0);
+                changed = true;
+            }
+            if (tier.getFnbDiscountPercent() == null || tier.getFnbDiscountPercent() <= 0.0) {
+                tier.setFnbDiscountPercent(10.0);
+                changed = true;
+            }
+        } else if ("PLATINUM".equals(code)) {
+            if (tier.getTicketDiscountPercent() == null || tier.getTicketDiscountPercent() <= 0.0) {
+                tier.setTicketDiscountPercent(15.0);
+                changed = true;
+            }
+            if (tier.getFnbDiscountPercent() == null || tier.getFnbDiscountPercent() <= 0.0) {
+                tier.setFnbDiscountPercent(15.0);
+                changed = true;
+            }
+        } else if ("BRONZE".equals(code)) {
+            if (tier.getTicketDiscountPercent() == null) {
+                tier.setTicketDiscountPercent(0.0);
+                changed = true;
+            }
+            if (tier.getFnbDiscountPercent() == null) {
+                tier.setFnbDiscountPercent(0.0);
+                changed = true;
+            }
+        }
+        if (changed && tier.getId() != null) {
+            try {
+                tierRepository.save(tier);
+            } catch (Exception ignored) {}
+        }
+    }
+
     public List<MembershipTier> getAllTiers() {
-        return tierRepository.findAllByOrderByLevelAsc();
+        List<MembershipTier> list = tierRepository.findAllByOrderByLevelAsc();
+        list.forEach(this::applyDefaultTierDiscounts);
+        return list;
     }
 
     public List<MembershipTier> getActiveTiers() {
-        return tierRepository.findByStatusOrderByLevelAsc("Active");
+        List<MembershipTier> list = tierRepository.findByStatusOrderByLevelAsc("Active");
+        list.forEach(this::applyDefaultTierDiscounts);
+        return list;
     }
 
     public MembershipTier saveTier(MembershipTier tier) {
@@ -370,9 +422,13 @@ public class MembershipService {
 
     public MembershipTier getTierByCode(String code) {
         if (code == null) code = "BRONZE";
-        return tierRepository.findByCode(code.toUpperCase())
+        MembershipTier tier = tierRepository.findByCode(code.toUpperCase().trim())
                 .orElseGet(() -> tierRepository.findByCode("BRONZE")
                         .orElse(null));
+        if (tier != null) {
+            applyDefaultTierDiscounts(tier);
+        }
+        return tier;
     }
 
     // =========================================================================
