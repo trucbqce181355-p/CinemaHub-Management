@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
   Edit2, Trash2, Plus, Search, Filter, Image as ImageIcon,
-  PlaySquare, X, Film, Check, AlertCircle, AlertTriangle, Calendar, Eye, EyeOff
+  PlaySquare, X, Film, Check, AlertCircle, AlertTriangle, Calendar, Eye, EyeOff, Bell
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 
@@ -253,6 +253,21 @@ const MovieManagement = () => {
     setMovieToDelete(movie);
   };
 
+  const handleNotifyTicketOpening = async (movie) => {
+    if (!window.confirm(`Gửi thông báo mở bán vé cho phim "${movie.title}" tới tất cả khán giả?`)) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/notifications/notify-ticket-opening/${movie.id || movie._id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user?.token || ''}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Lỗi khi gửi thông báo');
+      alert(`Đã gửi thông báo mở bán vé cho phim "${movie.title}" thành công!`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const executeDelete = async () => {
     if (!movieToDelete) return;
     if (movieHasShowtimes(movieToDelete)) {
@@ -416,6 +431,13 @@ const MovieManagement = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleNotifyTicketOpening(movie)}
+                            title="Thông báo mở bán vé cho khán giả"
+                            className="p-2 text-purple-400 hover:bg-purple-400/20 rounded-lg transition-colors"
+                          >
+                            <Bell className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => openEditModal(movie)}
                             title="Chỉnh sửa thông tin"
@@ -753,9 +775,9 @@ const MovieManagement = () => {
                   <p className="font-semibold flex items-center gap-1.5 text-amber-400">
                     <AlertCircle className="w-4 h-4 shrink-0" /> Không thể xóa khi đã có suất chiếu:
                   </p>
-                  <p>Hệ thống không cho phép xóa phim đã lên lịch chiếu để đảm bảo không làm mất thông tin vé và lịch phòng của rạp.</p>
+                  <p>Hệ thống không cho phép xóa phim đã lên suất chiếu để đảm bảo không làm mất thông tin vé và lịch phòng của rạp.</p>
                   <p className="text-gray-400 pt-1 border-t border-amber-500/20">
-                    💡 <em>Gợi ý: Nếu muốn ngừng chiếu phim, bạn có thể chuyển trạng thái sang <strong>"Đã ẩn"</strong> (biểu tượng con mắt), hoặc vào mục <strong>Lịch chiếu</strong> để xóa hết các suất chiếu trước.</em>
+                    💡 <em>Gợi ý: Nếu muốn ngừng chiếu phim, bạn có thể chuyển trạng thái sang <strong>"Đã ẩn"</strong> (biểu tượng con mắt), hoặc vào mục <strong>Suất chiếu</strong> để xóa hết các suất chiếu trước.</em>
                   </p>
                 </div>
                 {deleteError && (
@@ -778,7 +800,7 @@ const MovieManagement = () => {
                     className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex-1 flex items-center justify-center gap-2 text-sm"
                   >
                     <Calendar className="w-4 h-4" />
-                    Xem Lịch Chiếu
+                    Xem Suất Chiếu
                   </button>
                 </div>
               </>

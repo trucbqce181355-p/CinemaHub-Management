@@ -47,6 +47,9 @@ export default function ReviewManagement() {
   const [reviewReportsList, setReviewReportsList] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
 
+  // Modal Xem chi tiết Đánh giá (Review Detail Modal)
+  const [selectedReviewForDetail, setSelectedReviewForDetail] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -650,6 +653,14 @@ export default function ReviewManagement() {
                         </td>
 
                         <td className="py-3 px-4 text-right space-x-1">
+                          <button
+                            onClick={() => setSelectedReviewForDetail(r)}
+                            title="Xem chi tiết đánh giá"
+                            className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
                           {r.status !== 'PUBLISHED' && (
                             <button
                               onClick={() => handleApprove(r.id)}
@@ -878,6 +889,131 @@ export default function ReviewManagement() {
               <button
                 type="button"
                 onClick={() => setViewingReportsReview(null)}
+                className="px-5 py-2 rounded-xl text-xs bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL 4: XEM CHI TIẾT ĐÁNH GIÁ */}
+      {selectedReviewForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#141414] border border-white/10 w-full max-w-lg rounded-2xl p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Chi tiết Đánh giá</h3>
+                  <p className="text-[11px] text-gray-500">ID: {selectedReviewForDetail.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedReviewForDetail(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Phim & Rating */}
+              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 flex justify-between items-start">
+                <div>
+                  <span className="text-gray-400 block mb-1">Bộ phim</span>
+                  <span className="text-sm font-bold text-white">
+                    {getMovieTitle(selectedReviewForDetail.movieId)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-gray-400 block mb-1">Số sao</span>
+                  <div className="flex items-center gap-1 text-amber-400 font-bold">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span>{selectedReviewForDetail.rating} / 5</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tác giả */}
+              <div className="grid grid-cols-2 gap-3 p-3.5 bg-white/5 rounded-xl border border-white/5">
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Khán giả</span>
+                  <span className="text-white font-medium flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-gray-400" />
+                    {selectedReviewForDetail.authorName || 'Khán giả'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Xác thực người xem</span>
+                  {selectedReviewForDetail.verifiedWatcher ? (
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Đã xác thực (Đã mua vé)
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Chưa xác thực vé</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Nội dung nhận xét */}
+              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5">
+                <span className="text-gray-400 block mb-1.5 font-medium">Nội dung nhận xét</span>
+                <p className="text-gray-200 text-xs leading-relaxed whitespace-pre-wrap">
+                  {selectedReviewForDetail.content || 'Không có bình luận chữ'}
+                </p>
+                {selectedReviewForDetail.containsSpoiler && (
+                  <div className="mt-2 text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded text-[11px] inline-flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Chứa Spoilers (Nội dung cốt truyện)
+                  </div>
+                )}
+              </div>
+
+              {/* Trạng thái & AI Kiểm duyệt */}
+              <div className="grid grid-cols-2 gap-3 p-3.5 bg-white/5 rounded-xl border border-white/5">
+                <div>
+                  <span className="text-gray-400 block mb-1">Trạng thái</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                    selectedReviewForDetail.status === 'PUBLISHED'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : selectedReviewForDetail.status === 'REJECTED'
+                      ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>
+                    {selectedReviewForDetail.status}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block mb-1">AI Phân tích</span>
+                  <span className="text-gray-300">
+                    Cảm xúc: {selectedReviewForDetail.sentiment || 'NEUTRAL'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Lý do từ chối nếu có */}
+              {selectedReviewForDetail.rejectionReason && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300">
+                  <span className="font-semibold block mb-0.5">Lý do từ chối kiểm duyệt:</span>
+                  <p>{selectedReviewForDetail.rejectionReason}</p>
+                </div>
+              )}
+
+              {/* Thời gian */}
+              <div className="flex justify-between items-center text-gray-500 text-[11px] pt-1">
+                <span>Ngày đăng: {formatDateTime(selectedReviewForDetail.createdAt)}</span>
+                {selectedReviewForDetail.isEdited && (
+                  <span className="text-amber-400">Đã qua chỉnh sửa</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-white/10 mt-4">
+              <button
+                type="button"
+                onClick={() => setSelectedReviewForDetail(null)}
                 className="px-5 py-2 rounded-xl text-xs bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
               >
                 Đóng

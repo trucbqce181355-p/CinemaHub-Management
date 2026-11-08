@@ -1,20 +1,99 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award } from 'lucide-react';
+import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award, CheckCheck, Film, Clock, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+
+const API_URL = 'http://localhost:5000/api';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const fetchNotifications = async () => {
+    if (!user?.token) return;
+    try {
+      const res = await fetch(`${API_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(Array.isArray(data) ? data : []);
+        const unread = (Array.isArray(data) ? data : []).filter(n => !n.isRead).length;
+        setUnreadCount(unread);
+      }
+    } catch (e) {
+      console.error('Failed to load notifications', e);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.token) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 20000);
+      return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [user]);
+
+  const handleMarkAsRead = async (notif) => {
+    try {
+      if (!notif.isRead) {
+        await fetch(`${API_URL}/notifications/${notif.id}/read`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      setIsNotificationsOpen(false);
+      if (notif.link) {
+        navigate(notif.link);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await fetch(`${API_URL}/notifications/read-all`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const formatNotificationTime = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   useEffect(() => {
@@ -67,11 +146,17 @@ const Navbar = () => {
                     onClick={() => {
                       setIsNotificationsOpen(!isNotificationsOpen);
                       setIsProfileOpen(false);
+                      if (!isNotificationsOpen) fetchNotifications();
                     }}
                     className="relative flex items-center justify-center w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 transition-all duration-300"
+                    title="Thông báo"
                   >
                     <Bell className="w-4 h-4 text-gray-300" />
-                    <span className="absolute top-2 right-2.5 w-2 h-2 bg-primary rounded-full border border-surface"></span>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#121212] animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </button>
 
                   <AnimatePresence>
@@ -81,15 +166,77 @@ const Navbar = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 15, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute right-0 mt-3 w-72 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
+                        className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[480px]"
                       >
-                        <div className="px-4 py-3 border-b border-white/5 bg-white/5">
-                          <h3 className="font-bold text-white text-sm">Thông báo</h3>
+                        <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-white text-sm">Thông báo</h3>
+                            {unreadCount > 0 && (
+                              <span className="bg-primary/20 text-primary border border-primary/30 text-xs px-2 py-0.5 rounded-full font-semibold">
+                                {unreadCount} mới
+                              </span>
+                            )}
+                          </div>
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={handleMarkAllAsRead}
+                              className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
+                            </button>
+                          )}
                         </div>
-                        <div className="py-8 px-4 flex flex-col items-center justify-center text-center">
-                          <Bell className="w-8 h-8 text-gray-600 mb-3" />
-                          <p className="text-sm font-medium text-gray-300">Tính năng đang phát triển</p>
-                          <p className="text-xs text-gray-500 mt-1">Sẽ sớm ra mắt trong tương lai.</p>
+
+                        <div className="overflow-y-auto divide-y divide-white/5 flex-1">
+                          {notifications.length > 0 ? (
+                            notifications.map((notif) => (
+                              <div
+                                key={notif.id}
+                                onClick={() => handleMarkAsRead(notif)}
+                                className={`p-4 flex gap-3 cursor-pointer hover:bg-white/5 transition-colors relative ${
+                                  !notif.isRead ? 'bg-primary/5' : ''
+                                }`}
+                              >
+                                <div className="mt-1 shrink-0">
+                                  {notif.type === 'SHOWTIME_REMINDER' ? (
+                                    <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                                      <Clock className="w-4 h-4" />
+                                    </div>
+                                  ) : notif.type === 'TICKET_OPENING' ? (
+                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+                                      <Film className="w-4 h-4" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                                      <Sparkles className="w-4 h-4" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <h4 className={`text-xs truncate ${!notif.isRead ? 'font-bold text-white' : 'font-medium text-gray-300'}`}>
+                                      {notif.title}
+                                    </h4>
+                                    {!notif.isRead && (
+                                      <span className="w-2 h-2 rounded-full bg-primary shrink-0"></span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">
+                                    {notif.message}
+                                  </p>
+                                  <span className="text-[10px] text-gray-500 mt-1.5 block">
+                                    {formatNotificationTime(notif.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="py-10 px-4 flex flex-col items-center justify-center text-center">
+                              <Bell className="w-8 h-8 text-gray-600 mb-2" />
+                              <p className="text-sm font-medium text-gray-400">Bạn chưa có thông báo nào</p>
+                              <p className="text-xs text-gray-600 mt-1">Thông báo lịch chiếu và vé mới sẽ hiển thị tại đây.</p>
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     )}

@@ -114,6 +114,15 @@ public class ReviewService {
 
         result.put("hasReviewed", false);
 
+        // Cho phép Admin / Manager đánh giá để kiểm thử và quản trị
+        if (userOpt.isPresent() && ("Admin".equalsIgnoreCase(userOpt.get().getRole()) || "Manager".equalsIgnoreCase(userOpt.get().getRole()))) {
+            result.put("canReview", true);
+            result.put("reason", "ELIGIBLE_ADMIN");
+            result.put("isVerifiedWatcher", true);
+            result.put("message", "Quản trị viên có quyền đánh giá và quản lý phim.");
+            return result;
+        }
+
         // 3. Quy tắc "Verified Watcher": Kiểm tra giao dịch mua vé của User
         List<Booking> userBookings = bookingRepository.findByUserIdAndMovieId(userId, movieId);
         if (userBookings.isEmpty() && userOpt.isPresent() && userOpt.get().getEmail() != null) {
@@ -237,6 +246,11 @@ public class ReviewService {
         updateMovieRatingScore(movie.getId());
 
         return saved;
+    }
+
+    public Review getReviewById(String reviewId) throws Exception {
+        return reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new Exception("Không tìm thấy bài đánh giá với ID: " + reviewId));
     }
 
     /**

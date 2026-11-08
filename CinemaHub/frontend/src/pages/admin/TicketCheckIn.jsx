@@ -58,15 +58,15 @@ export default function TicketCheckIn() {
     const timeout = setTimeout(() => controller.abort(), 15000);
     const load = async () => {
       try {
-        if (!token) throw new Error('Vui lòng đăng nhập lại để tải lịch chiếu.');
+        if (!token) throw new Error('Vui lòng đăng nhập lại để tải danh sách suất chiếu.');
         if (!scanDate) throw new Error('Vui lòng chọn ngày soát vé.');
         const params = new URLSearchParams({ date: scanDate, includePast: 'true', allStatuses: 'true' });
         const response = await fetch(API_BASE + '/showtimes?' + params, {
           signal: controller.signal, headers: { Authorization: 'Bearer ' + token },
         });
-        if (!response.ok) throw new Error('Không tải được lịch chiếu. Vui lòng thử lại.');
+        if (!response.ok) throw new Error('Không tải được danh sách suất chiếu. Vui lòng thử lại.');
         const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('Dữ liệu lịch chiếu không hợp lệ.');
+        if (!Array.isArray(data)) throw new Error('Dữ liệu suất chiếu không hợp lệ.');
         if (!disposed) {
           setShowtimes(data);
           if (!data.some(showtime => showtime.id === selectedShowtimeRef.current)) {
@@ -80,8 +80,8 @@ export default function TicketCheckIn() {
           setShowtimes([]);
           selectedShowtimeRef.current = '';
           setSelectedShowtimeId('');
-          setShowtimesError(error.name === 'AbortError' ? 'Tải lịch chiếu quá lâu. Vui lòng thử lại.'
-            : error instanceof TypeError || error instanceof SyntaxError ? 'Không tải được lịch chiếu. Vui lòng kiểm tra kết nối và thử lại.' : error.message);
+          setShowtimesError(error.name === 'AbortError' ? 'Tải suất chiếu quá lâu. Vui lòng thử lại.'
+            : error instanceof TypeError || error instanceof SyntaxError ? 'Không tải được suất chiếu. Vui lòng kiểm tra kết nối và thử lại.' : error.message);
         }
       } finally {
         clearTimeout(timeout);
@@ -197,12 +197,12 @@ export default function TicketCheckIn() {
               value={selectedShowtimeId} disabled={loading || showtimesLoading}
               onChange={value => { resetResult(); selectedShowtimeRef.current = value; setSelectedShowtimeId(value); }}
               options={[
-                { value: '', label: showtimesLoading ? 'Đang tải lịch chiếu...' : 'Chọn suất chiếu đang soát' },
+                { value: '', label: showtimesLoading ? 'Đang tải suất chiếu...' : 'Chọn suất chiếu đang soát' },
                 ...showtimes.map(showtime => ({ value: showtime.id, label: showtimeLabel(showtime) })),
               ]} />
           </div>
           <button type="button" onClick={refreshShowtimes} disabled={loading || showtimesLoading}
-            className="flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium hover:bg-white/15 disabled:opacity-50 sm:col-span-2 lg:col-span-1"><RefreshCcw className={'h-4 w-4 shrink-0' + (showtimesLoading ? ' animate-spin' : '')} />Tải lại lịch</button>
+            className="flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium hover:bg-white/15 disabled:opacity-50 sm:col-span-2 lg:col-span-1"><RefreshCcw className={'h-4 w-4 shrink-0' + (showtimesLoading ? ' animate-spin' : '')} />Tải lại suất chiếu</button>
         </div>
         {showtimesError && <p role="alert" className="text-sm text-red-400">{showtimesError}</p>}
         {!showtimesLoading && !showtimesError && showtimes.length === 0 && <p className="text-sm text-gray-400">Không có suất chiếu trong ngày đã chọn.</p>}
@@ -262,9 +262,9 @@ export default function TicketCheckIn() {
                   <p>Suất chiếu hiện tại: <strong>{formatScanTime(result.showtime.startTime)} – {formatScanTime(result.showtime.endTime)}</strong></p>
                   <p>Rạp / phòng: <strong>{result.showtime.cinemaName || result.showtime.cinemaId} / {result.showtime.roomName || result.showtime.roomId}</strong></p>
                   {result.ticket.showtimeStart && result.ticket.showtimeStart !== result.showtime.startTime && <p className="text-sm text-amber-400">
-                    Lịch chiếu đã thay đổi. Giờ lưu trên vé lúc phát hành: {formatScanTime(result.ticket.showtimeStart)}.
+                    Suất chiếu đã thay đổi. Giờ lưu trên vé lúc phát hành: {formatScanTime(result.ticket.showtimeStart)}.
                   </p>}
-                </div> : <p className="text-sm text-amber-400">Không có lịch chiếu hiện tại. Giờ lưu trên vé lúc phát hành: {formatScanTime(result.ticket.showtimeStart)}.</p>}
+                </div> : <p className="text-sm text-amber-400">Không có suất chiếu hiện tại. Giờ lưu trên vé lúc phát hành: {formatScanTime(result.ticket.showtimeStart)}.</p>}
                 <p>Ghế: <strong className="text-primary">{seats.map(seat => seat.seatNumber).join(', ')}</strong></p>
                 <p className="text-sm text-gray-300">Đã dùng: {usedCount}/{seats.length} ghế</p>
                 {latestScan ? <p className="text-sm text-gray-300" data-testid="latest-scan">

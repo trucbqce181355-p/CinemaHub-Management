@@ -41,9 +41,9 @@ const AdminLayout = () => {
 
     if (user.role === 'Admin') items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
 
-    // Manager & Staff
-    if (user.role === 'Manager' || user.role === 'Staff') {
-      items.push({ name: 'Lịch chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
+    // Admin, Manager & Staff
+    if (user.role === 'Admin' || user.role === 'Manager' || user.role === 'Staff') {
+      items.push({ name: 'Suất chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
       items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
     }
 

@@ -241,6 +241,19 @@ public class ReviewController {
     }
 
     /**
+     * XEM CHI TIẾT REVIEW
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getReviewById(@PathVariable String id) {
+        try {
+            Review review = reviewService.getReviewById(id);
+            return ResponseEntity.ok(review);
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * 17. GỢI Ý PHIM CHO KHÁCH HÀNG
      */
     @GetMapping("/recommendations")
