@@ -1,4 +1,6 @@
 import { requestPromoChange } from '../utils/promotionPricing';
+import { dynamicPricingSummary } from '../utils/dynamicPricingSummary';
+import BookingPromotionPicker from '../components/BookingPromotionPicker';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -324,6 +326,7 @@ const Booking = () => {
   const promoInFlight = useRef(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoMessage, setPromoMessage] = useState(null);
+  const [promotionPickerOpen, setPromotionPickerOpen] = useState(false);
 
   // Customer & Payment Info
   const [customerName, setCustomerName] = useState(user?.name || user?.username || '');
@@ -623,6 +626,7 @@ const Booking = () => {
 
           setPricing({
             seatSubtotal: seatSub,
+            seats: data.seats,
             rawSeatSubtotal: rawSeatSub,
             seatDiscountAmount: seatDisc,
             ticketDiscountPercent: activeTicketPercent,
@@ -985,39 +989,41 @@ const Booking = () => {
     });
   };
 
-  const changeSavedPromo = async (operation) => {
-    if (!activeBooking) return;
+  const changeSavedPromo = async (operation, code = promoCodeInput) => {
+    if (!activeBooking) return false;
     const bookingId = activeBooking.id;
     const result = await requestPromoChange({
       base: API_BASE,
       token: user?.token,
       bookingId,
       operation,
-      code: promoCodeInput.trim().toUpperCase(),
+      code: code.trim().toUpperCase(),
       subtotal: activeBooking.subtotal
     });
-    if (activeBookingRef.current?.id !== bookingId) return;
+    if (activeBookingRef.current?.id !== bookingId) return false;
     if (result.uncertain) {
       setPromoUncertain(true);
       setPromoMessage({
         type: 'error',
         text: 'Chưa xác định được kết quả thay đổi mã. Hãy kiểm tra lại giá đã lưu trước khi thanh toán.'
       });
-      return;
+      return false;
     }
     savedPromo(result.data, result.reconciled);
     if (operation === 'clear') setPromoCodeInput('');
+    return true;
   };
 
-  const handleApplyPromo = async () => {
-    if (!promoCodeInput.trim() || promoInFlight.current || promoUncertain) return;
+  const handleApplyPromo = async (selectedCode) => {
+    const code = typeof selectedCode === 'string' ? selectedCode : promoCodeInput;
+    if (!code.trim() || promoInFlight.current || promoUncertain || priceLoading || priceError || isProcessing) return false;
+    setPromoCodeInput(code);
     promoInFlight.current = true;
     setPromoBusy(true);
     setPromoMessage(null);
     try {
       if (!isCounterMode) {
-        await changeSavedPromo('apply');
-        return;
+        return await changeSavedPromo('apply', code);
       }
       const res = await fetch(`${API_BASE}/bookings/counter-price`, {
         method: 'POST',
@@ -1028,7 +1034,7 @@ const Booking = () => {
         body: JSON.stringify({
           showtimeId: selectedShowtime.id,
           seatIds: selectedSeats,
-          promoCode: promoCodeInput.trim().toUpperCase(),
+          promoCode: code.trim().toUpperCase(),
           customerEmail: customerEmail || undefined,
           selectedFoods: selectedFoods.map(f => ({
             foodItemId: f.foodItemId,
@@ -1050,9 +1056,11 @@ const Booking = () => {
         total: raw.totalAmount
       });
       setPromoMessage({ type: 'success', text: `Áp dụng thành công mã ${data.code}: -${(data.discountAmount || 0).toLocaleString()}đ` });
+      return true;
     } catch (e) {
       setPromoMessage({ type: 'error', text: e.message });
       setAppliedPromo(null);
+      return false;
     } finally {
       promoInFlight.current = false;
       setPromoBusy(false);
@@ -1923,6 +1931,11 @@ const Booking = () => {
                   <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
                     <Tag className="w-5 h-5 text-primary" /> Mã Khuyến Mãi / Voucher CGV
                   </h3>
+                  <button type="button" onClick={() => setPromotionPickerOpen(true)}
+                    disabled={promoBusy || promoUncertain || priceLoading || !!priceError || isProcessing || (!isCounterMode && !activeBooking?.id)}
+                    className="mb-3 inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40">
+                    <Ticket className="h-4 w-4" /> Chọn mã khuyến mãi
+                  </button>
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -1932,20 +1945,27 @@ const Booking = () => {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white uppercase text-sm font-semibold focus:outline-none focus:border-primary"
                     />
                     <button
-                      onClick={handleApplyPromo}
-                      disabled={promoBusy || promoUncertain || priceLoading || !promoCodeInput.trim() || pricing.subtotal === 0}
-                      className="px-6 py-3 bg-secondary hover:bg-secondary-hover text-white font-bold rounded-xl text-sm shrink-0 disabled:opacity-40 transition-all"
+                      type="button"
+                      onClick={(appliedPromo?.code || activeBooking?.promoCode) ? handleRemovePromo : handleApplyPromo}
+                      disabled={promoBusy || promoUncertain || priceLoading || isProcessing || (!(appliedPromo?.code || activeBooking?.promoCode) && (!promoCodeInput.trim() || pricing.subtotal === 0 || !!priceError))}
+                      className="px-6 py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl text-sm shrink-0 disabled:opacity-40 transition-all"
                     >
-                      Áp dụng
+                      {(appliedPromo?.code || activeBooking?.promoCode) ? 'Bỏ mã' : 'Áp dụng'}
                     </button>
                   </div>
                   {promoUncertain && <button disabled={promoBusy} onClick={recoverPromo} className="mt-3 text-sm text-yellow-400">Kiểm tra lại giá đã lưu</button>}
-                  {(appliedPromo || activeBooking?.promoCode) && <button disabled={promoBusy} onClick={handleRemovePromo} className="mt-3 text-sm text-primary">Bỏ mã khuyến mãi</button>}
                   {promoMessage && (
                     <p className={`text-xs mt-2.5 font-semibold ${promoMessage.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
                       {promoMessage.text}
                     </p>
                   )}
+                  {promotionPickerOpen && <BookingPromotionPicker
+                    base={API_BASE} token={user?.token} bookingId={activeBooking?.id}
+                    counterBody={isCounterMode ? JSON.stringify({ showtimeId: selectedShowtime?.id, seatIds: selectedSeats, customerEmail: customerEmail || undefined, selectedFoods }) : null}
+                    busy={promoBusy} blocked={promoUncertain || priceLoading || !!priceError || isProcessing}
+                    appliedCode={appliedPromo?.code || activeBooking?.promoCode}
+                    onApply={handleApplyPromo} onClose={() => setPromotionPickerOpen(false)}
+                  />}
                 </div>
 
                 {/* 3.3 Phương thức thanh toán */}
@@ -2074,6 +2094,7 @@ const Booking = () => {
                     const displaySubtotal = displaySeatPrice + displayFoodPrice;
                     const displayDiscount = pricing.discount || activeBooking?.discountAmount || 0;
                     const displayFinalTotal = Math.max(0, displaySubtotal - displayDiscount);
+                    const dynamicPrice = dynamicPricingSummary(activeBooking ? activeBooking.seats : pricing.seats);
 
                     return (
                       <div className="space-y-2 text-sm">
@@ -2095,6 +2116,12 @@ const Booking = () => {
                             <span className="text-white">{displaySeatPrice.toLocaleString()} đ</span>
                           </div>
                         </div>
+                        {dynamicPrice && (
+                          <div className={`flex justify-between gap-3 font-bold ${dynamicPrice.adjustment < 0 ? 'text-green-400' : 'text-amber-400'}`}>
+                            <span>{dynamicPrice.labels.join(' · ')}</span>
+                            <span className="shrink-0">{dynamicPrice.adjustment > 0 ? '+' : ''}{dynamicPrice.adjustment.toLocaleString('vi-VN')} đ</span>
+                          </div>
+                        )}
                         {displayFoodPrice > 0 && (
                           <div className="flex justify-between text-amber-400">
                             <span className="flex items-center gap-1.5">

@@ -57,5 +57,7 @@ public class CalculatePriceRequest {
         private String seatType;
         private Double price;
         private Double rawPrice;
+        private Double basePrice;
+        private List<String> pricingRuleTypes;
     }
 }

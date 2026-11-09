@@ -65,9 +65,13 @@ public class DynamicPricingService {
     public List<PricingRule> rules() { return repository.findApplicableRules(); }
     public double price(Showtime showtime, double base) { return price(showtime, base, rules()); }
     public double price(Showtime showtime, double base, List<PricingRule> rules) {
+        double adjustment = matchingRules(showtime, rules).stream().mapToDouble(PricingRule::getAdjustmentValue).sum();
         Money.vnd(base);
+        return Money.vnd(Math.max(FLOOR, Math.min(CEILING, base + adjustment)));
+    }
+    public List<PricingRule> matchingRules(Showtime showtime, List<PricingRule> rules) {
         if (showtime.getStartTime() == null) throw new IllegalArgumentException("Suất chiếu thiếu thời gian bắt đầu");
-        double adjustment = 0;
+        List<PricingRule> matched = new ArrayList<>();
         for (PricingRule r : rules) {
             if (r.isArchived() || !"Active".equals(r.getStatus())) continue;
             validate(r); // Fail explicitly for invalid legacy configuration; never silently misprice.
@@ -80,8 +84,8 @@ public class DynamicPricingService {
                 case "SNEAK_SHOW" -> strings(c.get("showtimeIds")).contains(showtime.getId());
                 default -> false;
             };
-            if (match) adjustment += r.getAdjustmentValue();
+            if (match) matched.add(r);
         }
-        return Money.vnd(Math.max(FLOOR, Math.min(CEILING, base + adjustment)));
+        return matched;
     }
 }

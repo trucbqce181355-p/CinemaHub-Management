@@ -98,6 +98,9 @@ public class Booking {
         private String seatType;     // STANDARD, VIP, COUPLE
         private Double price;
         private Double rawPrice;
+        // Held price breakdown before dynamic pricing and membership discounts.
+        private Double basePrice;
+        private List<String> pricingRuleTypes;
     }
 
     @Data

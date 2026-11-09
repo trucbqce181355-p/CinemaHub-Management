@@ -79,6 +79,22 @@ public class BookingController {
         catch (RuntimeException ex) { return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage())); }
     }
 
+    @GetMapping("/{id}/promotions")
+    public ResponseEntity<?> promotionOptions(@PathVariable String id, Authentication authentication) {
+        try {
+            return ResponseEntity.ok(bookingService.promotionOptions(payments.owned(id, authentication.getName())));
+        } catch (RuntimeException ex) {
+            if (ex instanceof org.springframework.web.server.ResponseStatusException status) throw status;
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/counter-promotions")
+    public ResponseEntity<?> counterPromotionOptions(@Valid @RequestBody CalculatePriceRequest req) {
+        try { return ResponseEntity.ok(bookingService.counterPromotionOptions(req)); }
+        catch (RuntimeException ex) { return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage())); }
+    }
+
     // 5. Apply promo code
     @PostMapping("/apply-promo")
     public ResponseEntity<?> applyPromo(@Valid @RequestBody ApplyPromoRequest req, Authentication authentication) {
