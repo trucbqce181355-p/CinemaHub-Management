@@ -16,7 +16,8 @@ export function listFilterOptions(items, field) {
 
 export function matchesCinemaFilters(cinema, { search = '', facility = '', service = '' }) {
   const hasItem = (items, selected) => !selected || (Array.isArray(items) && items.some(item => normalizeSearch(item) === normalizeSearch(selected)));
-  return normalizeSearch(cinema.name).includes(normalizeSearch(search))
+  const term = normalizeSearch(search);
+  return [cinema.name, cinema.address].some(value => normalizeSearch(value).includes(term))
     && hasItem(cinema.facilities, facility) && hasItem(cinema.services, service);
 }
 

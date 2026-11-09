@@ -78,7 +78,7 @@ export default function CinemaManagement() {
     const query = search.trim().toLocaleLowerCase('vi-VN');
     return !cinema.deleted && (filterStatus === 'All' || cinema.status === filterStatus) && (!query ||
       String(cinema.name || '').toLocaleLowerCase('vi-VN').includes(query));
-  });
+  }).sort((a, b) => Number(b.status === 'Active') - Number(a.status === 'Active'));
   function openForm(cinema = null) {
     setEditing(cinema);
     setForm(cinema ? { name: cinema.name || '', address: cinema.address || '', contactEmail: cinema.contactEmail || '',
