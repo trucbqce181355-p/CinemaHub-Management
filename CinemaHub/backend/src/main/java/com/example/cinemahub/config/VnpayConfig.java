@@ -10,10 +10,10 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class VnpayConfig {
 
-    @Value("${vnpay.tmnCode:}")
+    @Value("${vnpay.tmnCode:1HJW7RTO}")
     private String tmnCode;
 
-    @Value("${vnpay.hashSecret:}")
+    @Value("${vnpay.hashSecret:VBBBDAZMGNSFVTAQPCQXSXIDASDWVGTY}")
     private String hashSecret;
 
     @Value("${vnpay.payUrl:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")

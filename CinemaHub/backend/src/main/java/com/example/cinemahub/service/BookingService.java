@@ -113,7 +113,7 @@ public class BookingService {
             throw new RuntimeException("Phòng chiếu này chưa được cấu hình sơ đồ ghế!");
         }
 
-        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        Movie movie = resolveMovie(showtime);
         List<SeatAvailabilityDTO.SeatItem> seatItems = new ArrayList<>();
 
         for (Seat seat : actualSeats) {
@@ -208,7 +208,7 @@ public class BookingService {
             }
         }
 
-        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        Movie movie = resolveMovie(showtime);
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
@@ -395,7 +395,7 @@ public class BookingService {
         Showtime showtime = showtimeRepository.findById(req.getShowtimeId())
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không tồn tại"));
 
-        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        Movie movie = resolveMovie(showtime);
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
@@ -744,7 +744,7 @@ public class BookingService {
             }
         }
 
-        Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(new Movie());
+        Movie movie = resolveMovie(showtime);
         List<Seat> actualSeats = seatRepository.findByRoomId(showtime.getRoomId());
         List<PricingRule> priceRules = dynamicPricingService.rules();
 
@@ -999,23 +999,32 @@ public class BookingService {
         return "STANDARD";
     }
 
+    private Movie resolveMovie(Showtime showtime) {
+        if (showtime == null) return new Movie();
+        Movie movie = null;
+        if (showtime.getMovieId() != null && !showtime.getMovieId().isBlank()) {
+            movie = movieRepository.findById(showtime.getMovieId()).orElse(null);
+        }
+        if (movie == null && showtime.getMovieTitle() != null && !showtime.getMovieTitle().isBlank()) {
+            List<Movie> matched = movieRepository.searchByTitle(showtime.getMovieTitle().trim());
+            if (matched != null && !matched.isEmpty()) {
+                movie = matched.get(0);
+            }
+        }
+        return movie != null ? movie : new Movie();
+    }
+
     private Double calculateSingleSeatPrice(Showtime showtime, Movie movie, String seatType, List<PricingRule> priceRules) {
-        // Retrieve base prices from the movie configuration, fallback to default if
-        // missing
+        // Lấy giá trực tiếp theo cấu hình các hạng vé của phim
         double base = 90000.0;
         if ("VIP".equalsIgnoreCase(seatType)) {
-            base = movie.getVipPrice() != null ? movie.getVipPrice() : 120000.0;
+            base = movie.getVipPrice() != null && movie.getVipPrice() > 0 ? movie.getVipPrice() : 120000.0;
         } else if ("COUPLE".equalsIgnoreCase(seatType)) {
-            base = movie.getCouplePrice() != null ? movie.getCouplePrice() : 200000.0;
+            // Giá vé couple khi tạo phim là giá cho cả cặp ghế đôi (gồm 2 chỗ ngồi liên kết)
+            double fullCouple = movie.getCouplePrice() != null && movie.getCouplePrice() > 0 ? movie.getCouplePrice() : 200000.0;
+            base = fullCouple / 2.0;
         } else {
-            base = movie.getStandardPrice() != null ? movie.getStandardPrice() : 90000.0;
-        }
-
-        // Format surcharge (if showtime has special format)
-        if ("3D".equalsIgnoreCase(showtime.getFormat())) {
-            base += 20000.0;
-        } else if ("IMAX".equalsIgnoreCase(showtime.getFormat())) {
-            base += 40000.0;
+            base = movie.getStandardPrice() != null && movie.getStandardPrice() > 0 ? movie.getStandardPrice() : 90000.0;
         }
 
         return dynamicPricingService.price(showtime, base, priceRules);

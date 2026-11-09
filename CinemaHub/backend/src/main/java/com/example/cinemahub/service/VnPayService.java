@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VnPayService {
     private final VnpayConfig config;
-    @Value("${vnpay.enabled:false}")
+    @Value("${vnpay.enabled:true}")
     private boolean enabled;
 
     public boolean isConfigured() {

@@ -1135,9 +1135,14 @@ const Booking = () => {
     if (!customerPhone.trim()) errors.customerPhone = 'Vui lòng nhập số điện thoại nhận vé trước khi chuyển tới VNPAY.';
     setContactErrors(errors);
     if (Object.keys(errors).length) {
+      setErrorMessage(errors.customerPhone || errors.customerName);
       const input = errors.customerName ? customerNameInput.current : customerPhoneInput.current;
       input?.focus({ preventScroll: true });
       input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (paymentMethod === 'VNPAY' && gatewayReady === false) {
+      setErrorMessage('Cổng thanh toán VNPAY hiện chưa khả dụng hoặc chưa được cấu hình.');
       return;
     }
     paymentInFlight.current = true;
@@ -1357,7 +1362,7 @@ const Booking = () => {
         </div>
 
         {/* Error Notification */}
-        {errorMessage && currentStep !== 3 && (
+        {errorMessage && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-between text-sm animate-fade-in">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 shrink-0" />
@@ -1635,7 +1640,7 @@ const Booking = () => {
                                 disabled={isBooked || isHeld}
                                 onClick={() => toggleSeat(seat)}
                                 className={seatStyle}
-                                title={`${seat.seatId} (${isCouple ? 'Sweetbox Ghế Đôi' : isVip ? 'VIP' : 'Standard'})`}
+                                title={`${seat.seatId} (${isCouple ? 'Ghế Đôi Sweetbox' : isVip ? 'Ghế VIP' : 'Ghế Thường'}) - ${(seat.price || (isCouple ? Math.round((selectedMovie?.couplePrice || 200000) / 2) : isVip ? (selectedMovie?.vipPrice || 120000) : (selectedMovie?.standardPrice || 90000))).toLocaleString()} đ`}
                               >
                                 {isCouple ? <Heart className="w-3.5 h-3.5 text-purple-400" /> : seat.col}
                               </button>
@@ -1652,15 +1657,18 @@ const Booking = () => {
               {/* Chú thích loại ghế */}
               <div className="flex flex-wrap justify-center gap-6 text-xs text-gray-400 border-t border-white/10 pt-6 w-full max-w-3xl">
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-t bg-white/10 border-b-2 border-white/20"></div> Ghế thường
+                  <div className="w-4 h-4 rounded-t bg-white/10 border-b-2 border-white/20"></div>
+                  <span>Ghế thường ({(selectedMovie?.standardPrice || 90000).toLocaleString()} đ)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-t bg-amber-500/20 border-b-2 border-amber-500/40 text-amber-400"></div> Ghế VIP (+30k)
+                  <div className="w-4 h-4 rounded-t bg-amber-500/20 border-b-2 border-amber-500/40 text-amber-400"></div>
+                  <span>Ghế VIP ({(selectedMovie?.vipPrice || 120000).toLocaleString()} đ)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-t bg-purple-600/20 border-b-2 border-purple-500/40 text-purple-300 flex items-center justify-center">
                     <Heart className="w-2.5 h-2.5 text-purple-400" />
-                  </div> Ghế Đôi Sweetbox
+                  </div>
+                  <span>Ghế Đôi Sweetbox ({(selectedMovie?.couplePrice || 200000).toLocaleString()} đ/cặp)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-t bg-primary border-b-2 border-red-700 shadow-[0_0_8px_rgba(229,9,20,0.6)]"></div> Đang chọn
@@ -2121,12 +2129,30 @@ const Booking = () => {
                     );
                   })()}
 
+                  {/* Cảnh báo cổng VNPAY chưa sẵn sàng hoặc lỗi thanh toán */}
+                  {paymentMethod === 'VNPAY' && gatewayReady === false && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>Cổng VNPAY hiện chưa sẵn sàng hoặc chưa được cấu hình trên hệ thống.</span>
+                    </div>
+                  )}
+
+                  {errorMessage && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>{errorMessage}</span>
+                      </div>
+                      <button onClick={() => setErrorMessage('')}><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
+
                   {/* Nút hành động */}
                   {isCounterMode ? (
                     <button
                       onClick={handleCounterBooking}
                       disabled={isProcessing || promoBusy || promoUncertain || priceLoading || !!priceError}
-                      className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+                      className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-extrabold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
                       <span>In Vé & Hoàn Tất Tại Quầy</span>
@@ -2135,7 +2161,7 @@ const Booking = () => {
                     <button
                       onClick={handleConfirmBooking}
                       disabled={isProcessing || promoBusy || promoUncertain || priceLoading || !!priceError || gatewayReady === false}
-                      className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
+                      className="w-full py-4 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none text-white font-extrabold rounded-xl shadow-[0_0_20px_rgba(229,9,20,0.5)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                       {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
                       <span>{paymentMethod === 'VNPAY' ? 'Chuyển Tới Cổng VNPAY' : 'Xác Nhận & Thanh Toán Ngay'}</span>
