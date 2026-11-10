@@ -142,7 +142,7 @@ public class NotificationService {
                 "Phim mới mở bán vé: " + movie.getTitle(),
                 "Bộ phim siêu phẩm \"" + movie.getTitle() + "\" đã chính thức mở bán vé! Đặt vé ngay hôm nay để chọn cho mình vị trí ngồi đẹp nhất.",
                 "TICKET_OPENING",
-                "/movies/" + movie.getId(),
+                "/movie/" + movie.getId(),
                 metadata
         );
     }

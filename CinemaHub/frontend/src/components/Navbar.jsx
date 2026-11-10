@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award, CheckCheck, Film, Clock, Sparkles } from 'lucide-react';
+import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award, CheckCheck, Check, Film, Clock, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,6 +13,7 @@ const Navbar = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedNotificationForDetail, setSelectedNotificationForDetail] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -29,8 +30,9 @@ const Navbar = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(Array.isArray(data) ? data : []);
-        const unread = (Array.isArray(data) ? data : []).filter(n => !n.isRead).length;
+        const list = Array.isArray(data) ? data : [];
+        setNotifications(list);
+        const unread = list.filter(n => !n.isRead).length;
         setUnreadCount(unread);
       }
     } catch (e) {
@@ -49,22 +51,38 @@ const Navbar = () => {
     }
   }, [user]);
 
-  const handleMarkAsRead = async (notif) => {
+  const handleToggleMarkRead = async (e, notif) => {
+    e.stopPropagation();
+    if (!user?.token || notif.isRead) return;
     try {
-      if (!notif.isRead) {
+      await fetch(`${API_URL}/notifications/${notif.id}/read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      if (selectedNotificationForDetail?.id === notif.id) {
+        setSelectedNotificationForDetail(prev => prev ? { ...prev, isRead: true } : prev);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleOpenNotificationDetail = async (notif) => {
+    setSelectedNotificationForDetail(notif);
+    if (!notif.isRead && user?.token) {
+      try {
         await fetch(`${API_URL}/notifications/${notif.id}/read`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${user.token}` }
         });
         setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
+        setSelectedNotificationForDetail(prev => prev ? { ...prev, isRead: true } : prev);
+      } catch (e) {
+        console.error(e);
       }
-      setIsNotificationsOpen(false);
-      if (notif.link) {
-        navigate(notif.link);
-      }
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -167,25 +185,36 @@ const Navbar = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 15, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[480px]"
+                        className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[500px]"
                       >
                         <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <h3 className="font-bold text-white text-sm">Thông báo</h3>
-                            {unreadCount > 0 && (
+                            {unreadCount > 0 ? (
                               <span className="bg-primary/20 text-primary border border-primary/30 text-xs px-2 py-0.5 rounded-full font-semibold">
                                 {unreadCount} mới
                               </span>
+                            ) : (
+                              <span className="bg-white/5 text-gray-400 border border-white/10 text-[11px] px-2 py-0.5 rounded-full">
+                                Đã xem hết
+                              </span>
                             )}
                           </div>
-                          {unreadCount > 0 && (
-                            <button
-                              onClick={handleMarkAllAsRead}
-                              className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
-                            >
-                              <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
-                            </button>
-                          )}
+                          
+                          {/* Always visible Mark All as Read button */}
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            disabled={unreadCount === 0}
+                            className={`text-xs flex items-center gap-1.5 transition-colors px-2 py-1 rounded-lg ${
+                              unreadCount > 0
+                                ? 'text-primary hover:text-white hover:bg-primary/20 font-semibold'
+                                : 'text-gray-500 cursor-not-allowed opacity-60'
+                            }`}
+                            title={unreadCount > 0 ? "Đánh dấu tất cả thông báo là đã đọc" : "Tất cả thông báo đã được đọc"}
+                          >
+                            <CheckCheck className="w-3.5 h-3.5" />
+                            <span>{unreadCount > 0 ? 'Đọc tất cả' : 'Đã đọc hết'}</span>
+                          </button>
                         </div>
 
                         <div className="overflow-y-auto divide-y divide-white/5 flex-1">
@@ -193,8 +222,8 @@ const Navbar = () => {
                             notifications.map((notif) => (
                               <div
                                 key={notif.id}
-                                onClick={() => handleMarkAsRead(notif)}
-                                className={`p-4 flex gap-3 cursor-pointer hover:bg-white/5 transition-colors relative ${
+                                onClick={() => handleOpenNotificationDetail(notif)}
+                                className={`p-4 flex gap-3 cursor-pointer hover:bg-white/5 transition-colors relative group ${
                                   !notif.isRead ? 'bg-primary/5' : ''
                                 }`}
                               >
@@ -214,20 +243,40 @@ const Navbar = () => {
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <h4 className={`text-xs truncate ${!notif.isRead ? 'font-bold text-white' : 'font-medium text-gray-300'}`}>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className={`text-xs leading-snug line-clamp-1 ${!notif.isRead ? 'font-bold text-white' : 'font-medium text-gray-300'}`}>
                                       {notif.title}
                                     </h4>
-                                    {!notif.isRead && (
-                                      <span className="w-2 h-2 rounded-full bg-primary shrink-0"></span>
-                                    )}
+                                    
+                                    {/* Action button to mark as read directly */}
+                                    <div className="shrink-0 flex items-center gap-1">
+                                      {!notif.isRead ? (
+                                        <button
+                                          onClick={(e) => handleToggleMarkRead(e, notif)}
+                                          title="Bấm để đánh dấu đã đọc"
+                                          className="p-1 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all text-[10px] flex items-center gap-0.5"
+                                        >
+                                          <Check className="w-3 h-3" />
+                                          <span className="hidden group-hover:inline text-[10px]">Đã đọc</span>
+                                        </button>
+                                      ) : (
+                                        <span title="Đã đọc" className="text-emerald-500/60 p-0.5">
+                                          <CheckCheck className="w-3.5 h-3.5" />
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                   <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">
                                     {notif.message}
                                   </p>
-                                  <span className="text-[10px] text-gray-500 mt-1.5 block">
-                                    {formatNotificationTime(notif.createdAt)}
-                                  </span>
+                                  <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-[10px] text-gray-500">
+                                      {formatNotificationTime(notif.createdAt)}
+                                    </span>
+                                    <span className="text-[10px] text-primary/80 group-hover:underline font-medium">
+                                      Xem chi tiết &rarr;
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             ))
@@ -370,6 +419,79 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal Xem chi tiết Thông báo */}
+      {selectedNotificationForDetail && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#181818] border border-white/10 w-full max-w-md rounded-2xl p-6 relative shadow-2xl">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
+                  {selectedNotificationForDetail.type === 'SHOWTIME_REMINDER' ? (
+                    <Clock className="w-5 h-5 text-orange-400" />
+                  ) : selectedNotificationForDetail.type === 'TICKET_OPENING' ? (
+                    <Film className="w-5 h-5 text-primary" />
+                  ) : (
+                    <Sparkles className="w-5 h-5 text-blue-400" />
+                  )}
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold tracking-wider uppercase text-primary block">
+                    {selectedNotificationForDetail.type === 'SHOWTIME_REMINDER'
+                      ? 'Nhắc nhở suất chiếu sắp tới'
+                      : selectedNotificationForDetail.type === 'TICKET_OPENING'
+                      ? 'Thông báo mở bán vé phim'
+                      : 'Thông báo từ CinemaHub'}
+                  </span>
+                  <h3 className="text-base font-bold text-white leading-snug">
+                    {selectedNotificationForDetail.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedNotificationForDetail(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 my-4">
+              <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {selectedNotificationForDetail.message}
+              </div>
+              <div className="flex justify-between items-center text-xs text-gray-400 px-1">
+                <span>Thời gian: {formatNotificationTime(selectedNotificationForDetail.createdAt)}</span>
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                  <CheckCheck className="w-3.5 h-3.5" /> Đã đọc
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-white/10">
+              <button
+                onClick={() => setSelectedNotificationForDetail(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-gray-300 transition-colors"
+              >
+                Đóng
+              </button>
+              {selectedNotificationForDetail.link && (
+                <button
+                  onClick={() => {
+                    const target = selectedNotificationForDetail.link.replace('/movies/', '/movie/');
+                    setSelectedNotificationForDetail(null);
+                    setIsNotificationsOpen(false);
+                    navigate(target);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white transition-all shadow-lg shadow-primary/20 flex items-center gap-1.5"
+                >
+                  <Film className="w-3.5 h-3.5" /> Đến trang phim / Đặt vé
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

@@ -260,6 +260,12 @@ export default function ReviewManagement() {
     });
   };
 
+  const getMovieTitle = (movieId) => {
+    if (!movieId) return 'Phim không xác định';
+    const found = movies.find(m => (m.id || m._id) === movieId);
+    return found ? found.title : (selectedReviewForDetail?.movieTitle || 'Phim');
+  };
+
   if (isLoading) return <div className="text-white p-6">Đang tải dữ liệu kiểm duyệt...</div>;
 
   return (
@@ -908,12 +914,12 @@ export default function ReviewManagement() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Chi tiết Đánh giá</h3>
-                  <p className="text-[11px] text-gray-500">ID: {selectedReviewForDetail.id}</p>
+                  <p className="text-[11px] text-gray-500 font-mono">ID: {selectedReviewForDetail.id}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedReviewForDetail(null)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -925,53 +931,84 @@ export default function ReviewManagement() {
                 <div>
                   <span className="text-gray-400 block mb-1">Bộ phim</span>
                   <span className="text-sm font-bold text-white">
-                    {getMovieTitle(selectedReviewForDetail.movieId)}
+                    {selectedReviewForDetail.movieTitle || getMovieTitle(selectedReviewForDetail.movieId)}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-gray-400 block mb-1">Số sao</span>
-                  <div className="flex items-center gap-1 text-amber-400 font-bold">
+                  <span className="text-gray-400 block mb-1">Điểm đánh giá</span>
+                  <div className="flex items-center gap-1.5 text-amber-400 font-bold">
                     <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span>{selectedReviewForDetail.rating} / 5</span>
+                    <span>
+                      {selectedReviewForDetail.rating <= 5
+                        ? `${selectedReviewForDetail.rating} / 5 sao`
+                        : `${selectedReviewForDetail.rating} / 10 điểm (${(selectedReviewForDetail.rating / 2).toFixed(1)} ⭐)`}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Tác giả */}
+              {/* Tác giả & Xác thực */}
               <div className="grid grid-cols-2 gap-3 p-3.5 bg-white/5 rounded-xl border border-white/5">
                 <div>
                   <span className="text-gray-400 block mb-0.5">Khán giả</span>
                   <span className="text-white font-medium flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-gray-400" />
-                    {selectedReviewForDetail.authorName || 'Khán giả'}
+                    {selectedReviewForDetail.userName || selectedReviewForDetail.authorName || 'Khán giả'}
                   </span>
+                  {selectedReviewForDetail.userEmail && (
+                    <span className="text-[11px] text-gray-400 block mt-0.5 truncate">
+                      {selectedReviewForDetail.userEmail}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <span className="text-gray-400 block mb-0.5">Xác thực người xem</span>
-                  {selectedReviewForDetail.verifiedWatcher ? (
+                  {selectedReviewForDetail.isVerifiedWatcher || selectedReviewForDetail.verifiedWatcher ? (
                     <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Đã xác thực (Đã mua vé)
+                      <ShieldCheck className="w-3.5 h-3.5" /> Đã xác thực vé (Verified)
                     </span>
                   ) : (
                     <span className="text-gray-400">Chưa xác thực vé</span>
                   )}
+                  {selectedReviewForDetail.bookingId && (
+                    <span className="text-[10px] text-gray-500 block mt-0.5 font-mono">
+                      Vé: {selectedReviewForDetail.bookingId}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Nội dung nhận xét */}
-              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5">
-                <span className="text-gray-400 block mb-1.5 font-medium">Nội dung nhận xét</span>
-                <p className="text-gray-200 text-xs leading-relaxed whitespace-pre-wrap">
-                  {selectedReviewForDetail.content || 'Không có bình luận chữ'}
-                </p>
-                {selectedReviewForDetail.containsSpoiler && (
-                  <div className="mt-2 text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded text-[11px] inline-flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> Chứa Spoilers (Nội dung cốt truyện)
+              {/* Tiêu đề & Nội dung nhận xét */}
+              <div className="p-3.5 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                {selectedReviewForDetail.title && (
+                  <div>
+                    <span className="text-gray-400 block mb-1 font-medium">Tiêu đề đánh giá</span>
+                    <h4 className="text-sm font-bold text-white">{selectedReviewForDetail.title}</h4>
+                  </div>
+                )}
+                <div>
+                  <span className="text-gray-400 block mb-1 font-medium">Nội dung nhận xét</span>
+                  <p className="text-gray-200 text-xs leading-relaxed whitespace-pre-wrap bg-black/40 p-3 rounded-xl border border-white/5">
+                    {selectedReviewForDetail.comment || selectedReviewForDetail.content || 'Không có bình luận chữ'}
+                  </p>
+                </div>
+                {(selectedReviewForDetail.isSpoiler || selectedReviewForDetail.containsSpoiler) && (
+                  <div className="text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg text-[11px] flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Chứa Spoilers (Nội dung tiết lộ cốt truyện phim)
+                  </div>
+                )}
+                {selectedReviewForDetail.tags && selectedReviewForDetail.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedReviewForDetail.tags.map((tag, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded-md bg-white/5 text-gray-400 border border-white/10 text-[10px]">
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Trạng thái & AI Kiểm duyệt */}
+              {/* Trạng thái & Báo cáo */}
               <div className="grid grid-cols-2 gap-3 p-3.5 bg-white/5 rounded-xl border border-white/5">
                 <div>
                   <span className="text-gray-400 block mb-1">Trạng thái</span>
@@ -986,26 +1023,40 @@ export default function ReviewManagement() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block mb-1">AI Phân tích</span>
-                  <span className="text-gray-300">
-                    Cảm xúc: {selectedReviewForDetail.sentiment || 'NEUTRAL'}
+                  <span className="text-gray-400 block mb-1">Báo cáo vi phạm</span>
+                  <span className={`font-semibold ${selectedReviewForDetail.reportCount > 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                    {selectedReviewForDetail.reportCount || 0} lượt báo cáo
                   </span>
                 </div>
               </div>
 
               {/* Lý do từ chối nếu có */}
-              {selectedReviewForDetail.rejectionReason && (
+              {(selectedReviewForDetail.violationReason || selectedReviewForDetail.rejectionReason) && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300">
-                  <span className="font-semibold block mb-0.5">Lý do từ chối kiểm duyệt:</span>
-                  <p>{selectedReviewForDetail.rejectionReason}</p>
+                  <span className="font-semibold block mb-0.5">Lý do từ chối / vi phạm tiêu chuẩn:</span>
+                  <p>{selectedReviewForDetail.violationReason || selectedReviewForDetail.rejectionReason}</p>
+                </div>
+              )}
+
+              {/* Từ khóa bị gắn cờ nếu có */}
+              {selectedReviewForDetail.flaggedKeywords && selectedReviewForDetail.flaggedKeywords.length > 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300">
+                  <span className="font-semibold block mb-1">Từ khóa phát hiện bởi Pre-Moderation:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedReviewForDetail.flaggedKeywords.map((kw, idx) => (
+                      <span key={idx} className="bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded text-[10px] font-mono">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {/* Thời gian */}
               <div className="flex justify-between items-center text-gray-500 text-[11px] pt-1">
                 <span>Ngày đăng: {formatDateTime(selectedReviewForDetail.createdAt)}</span>
-                {selectedReviewForDetail.isEdited && (
-                  <span className="text-amber-400">Đã qua chỉnh sửa</span>
+                {selectedReviewForDetail.updatedAt && selectedReviewForDetail.updatedAt !== selectedReviewForDetail.createdAt && (
+                  <span className="text-amber-400">Đã cập nhật: {formatDateTime(selectedReviewForDetail.updatedAt)}</span>
                 )}
               </div>
             </div>

@@ -414,10 +414,11 @@ export default function ShowtimeManagement() {
           <button 
             onClick={handleTriggerReminders}
             disabled={isReminding}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-200 px-4 py-2 rounded-xl transition-all border border-white/10 font-medium text-sm disabled:opacity-50"
-            title="Quét và gửi lời nhắc cho các suất chiếu diễn ra trong 2 giờ tới"
+            className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-xl transition-all font-semibold text-sm disabled:opacity-50 shadow-sm shadow-amber-500/10"
+            title="Quét và gửi lời nhắc tự động cho các suất chiếu diễn ra trong 2 giờ tới (UC-98: Send Automated Showtime Reminder)"
           >
-            <Bell className="w-4 h-4 text-amber-400" /> {isReminding ? 'Đang gửi...' : 'Gửi lời nhắc suất chiếu'}
+            <Clock className={`w-4 h-4 text-amber-400 ${isReminding ? 'animate-spin' : ''}`} />
+            {isReminding ? 'Đang quét & gửi...' : 'Gửi lời nhắc suất chiếu (UC-98)'}
           </button>
           <button 
             onClick={() => handleOpenAutoGenModal()}

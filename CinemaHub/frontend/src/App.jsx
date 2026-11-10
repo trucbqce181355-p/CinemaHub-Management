@@ -21,6 +21,7 @@ import ShowtimeManagement from './pages/admin/ShowtimeManagement';
 import ReviewManagement from './pages/admin/ReviewManagement';
 import FoodManagement from './pages/admin/FoodManagement';
 import NewsManagement from './pages/admin/NewsManagement';
+import NotificationManagement from './pages/admin/NotificationManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetOtp from './pages/VerifyResetOtp';
 import ResetPassword from './pages/ResetPassword';
@@ -126,6 +127,7 @@ function App() {
           <Route path="reviews" element={<ReviewManagement />} />
           <Route path="food" element={<FoodManagement />} />
           <Route path="news" element={<NewsManagement />} />
+          <Route path="notifications" element={<NotificationManagement />} />
         </Route>
 
         <Route element={<CustomerLayout />}>
@@ -137,6 +139,7 @@ function App() {
           <Route path="/news/:id" element={<NewsDetails />} />
           <Route path="/membership" element={<Navigate to="/profile?tab=membership" replace />} />
           <Route path="/movie/:id" element={<MovieDetails />} />
+          <Route path="/movies/:id" element={<MovieDetails />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking/:id" element={<Booking />} />
           

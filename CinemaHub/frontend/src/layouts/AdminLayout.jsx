@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin, Award, MessageSquare, UtensilsCrossed, Newspaper } from 'lucide-react';
+import { Clapperboard, Users, Film, Calendar, LogOut, LayoutDashboard, Settings, Ticket, Tag, MapPin, Award, MessageSquare, UtensilsCrossed, Newspaper, Bell } from 'lucide-react';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -53,6 +53,11 @@ const AdminLayout = () => {
       items.push({ name: 'Đánh giá & Bình luận', path: '/admin/reviews', icon: <MessageSquare className="w-5 h-5" /> });
     }
 
+    // Admin & Manager: Quản lý thông báo & tự động hóa (UC-96, 97, 98, 99)
+    if (user.role === 'Admin' || user.role === 'Manager') {
+      items.push({ name: 'Thông báo & Tự động', path: '/admin/notifications', icon: <Bell className="w-5 h-5" /> });
+    }
+
     // Thứ tự hiển thị menu chuẩn của hệ thống: Đưa Hội viên & Điểm xuống dưới cùng
     const order = [
       '/admin',
@@ -65,6 +70,7 @@ const AdminLayout = () => {
       '/admin/promotions',
       '/admin/news',
       '/admin/reviews',
+      '/admin/notifications',
       '/admin/settings',
       '/admin/membership'
     ];

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Edit2, Trash2, Plus, Search, Filter, Image as ImageIcon,
   PlaySquare, X, Film, Check, AlertCircle, AlertTriangle, Calendar, Eye, EyeOff, Bell
@@ -339,6 +339,14 @@ const MovieManagement = () => {
               />
             </div>
 
+            <Link
+              to="/admin/notifications"
+              className="flex items-center gap-2 py-2.5 px-4 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-xl font-medium transition-all text-sm"
+              title="Trung tâm thông báo mở bán vé cho khán giả (UC-99)"
+            >
+              <Bell className="w-4 h-4 text-purple-400" /> Mở bán vé (UC-99)
+            </Link>
+
             <button
               onClick={() => {
                 setFormData(initialFormState);
@@ -433,10 +441,10 @@ const MovieManagement = () => {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleNotifyTicketOpening(movie)}
-                            title="Thông báo mở bán vé cho khán giả"
-                            className="p-2 text-purple-400 hover:bg-purple-400/20 rounded-lg transition-colors"
+                            title="Thông báo mở bán vé cho khán giả (UC-99: Notify Ticket Opening for Coming-Soon Movies)"
+                            className="p-2 text-purple-300 hover:bg-purple-500/25 bg-purple-500/10 border border-purple-500/30 rounded-lg transition-all"
                           >
-                            <Bell className="w-4 h-4" />
+                            <Bell className="w-4 h-4 text-purple-400" />
                           </button>
                           <button
                             onClick={() => openEditModal(movie)}
