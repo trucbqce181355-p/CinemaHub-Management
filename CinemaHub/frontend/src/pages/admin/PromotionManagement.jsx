@@ -104,10 +104,12 @@ export default function PromotionManagement() {
   }
   const promotion = tab === 'promotions';
   const query = search.trim().toLocaleLowerCase('vi-VN');
+  const statusOrder = { Active: 0, Disabled: 1, Expired: 2 };
   const filtered = (promotion ? promotions : rules).filter(item =>
     (filterStatus === 'All' || itemStatus(item, promotion) === filterStatus) &&
     (!query || (promotion ? [item.code, item.title] : [labels[legacy[item.triggerVariable] || item.triggerVariable], item.triggerVariable])
-      .some(value => String(value || '').toLocaleLowerCase('vi-VN').includes(query))));
+      .some(value => String(value || '').toLocaleLowerCase('vi-VN').includes(query))))
+    .sort((a, b) => (statusOrder[itemStatus(a, promotion)] ?? 3) - (statusOrder[itemStatus(b, promotion)] ?? 3));
   return <div className="h-full text-white"><div className="mx-auto max-w-7xl">
     <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <h1 className="flex items-center gap-3 font-display text-3xl font-bold"><Tag className="h-8 w-8 shrink-0 text-primary" />Khuyến mãi & Giá động</h1>

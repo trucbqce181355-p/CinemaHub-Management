@@ -19,12 +19,18 @@ public class PaymentService {
     private final PaymentRepository payments;
     private final VnPayService gateway;
     private final BookingService bookings;
+    private final AdmissionCoordinator admission;
 
     public Payment initiate(String bookingId, String userId, HttpServletRequest request) {
         return initiate(bookingId, userId, request, Map.of());
     }
 
     public Payment initiate(String bookingId, String userId, HttpServletRequest request, Map<String, String> contact) {
+        // Reserve promotion quota together with payment creation, alongside counter sales.
+        return admission.write(() -> initiateInternal(bookingId, userId, request, contact));
+    }
+
+    private Payment initiateInternal(String bookingId, String userId, HttpServletRequest request, Map<String, String> contact) {
         if (userId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập");
         gateway.requireConfigured();
         Booking booking = owned(bookingId, userId);

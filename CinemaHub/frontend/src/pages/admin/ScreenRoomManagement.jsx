@@ -77,7 +77,7 @@ export default function ScreenRoomManagement() {
   const filtered = rooms.filter(room =>
     !room.deleted && (filterStatus === 'All' || room.status === filterStatus) &&
     (!query || [room.name, room.screenType].some(value => String(value || '').toLocaleLowerCase('vi-VN').includes(query)))
-  );
+  ).sort((a, b) => Number(b.status === 'Active') - Number(a.status === 'Active'));
 
   function openForm(room = null) {
     setEditing(room);

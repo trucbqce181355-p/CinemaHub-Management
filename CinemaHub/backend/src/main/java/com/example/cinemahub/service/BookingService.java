@@ -226,6 +226,9 @@ public class BookingService {
                     .seatType(seatType)
                     .price(price)
                     .rawPrice(price)
+                    .basePrice(baseSeatPrice(movie, seatType))
+                    .pricingRuleTypes(dynamicPricingService.matchingRules(showtime, priceRules).stream()
+                            .map(PricingRule::getTriggerVariable).distinct().toList())
                     .build());
         }
         rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
@@ -414,6 +417,9 @@ public class BookingService {
                     .seatType(seatType)
                     .price(price)
                     .rawPrice(price)
+                    .basePrice(baseSeatPrice(movie, seatType))
+                    .pricingRuleTypes(dynamicPricingService.matchingRules(showtime, priceRules).stream()
+                            .map(PricingRule::getTriggerVariable).distinct().toList())
                     .build());
         }
         rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
@@ -495,6 +501,20 @@ public class BookingService {
                 .promoTitle(promoTitle)
                 .seats(seatItems)
                 .build();
+    }
+
+    public List<PromotionValidationService.PromotionOption> promotionOptions(Booking booking) {
+        if (!"PENDING".equals(booking.getStatus()) || booking.getPayment() != null
+                || booking.getHoldExpiresAt() == null || !booking.getHoldExpiresAt().isAfter(LocalDateTime.now()))
+            throw new IllegalArgumentException("Đơn đã hết hạn hoặc đã khởi tạo thanh toán. Vui lòng kiểm tra lại đơn");
+        if (booking.getSubtotal() == null) throw new IllegalArgumentException("Đơn chưa có giá hợp lệ");
+        return promotionValidationService.options(booking.getSubtotal(), booking.getUserId(), booking.getId(), true);
+    }
+
+    public List<PromotionValidationService.PromotionOption> counterPromotionOptions(CalculatePriceRequest req) {
+        req.setPromoCode(null);
+        var quote = calculateCounterPrice(req);
+        return promotionValidationService.options(quote.getSubtotal(), counterCustomer(req.getCustomerEmail()), null, false);
     }
 
     // 5. Apply Promo Code
@@ -766,6 +786,9 @@ public class BookingService {
                     .seatType(seatType)
                     .price(price)
                     .rawPrice(price)
+                    .basePrice(baseSeatPrice(movie, seatType))
+                    .pricingRuleTypes(dynamicPricingService.matchingRules(showtime, priceRules).stream()
+                            .map(PricingRule::getTriggerVariable).distinct().toList())
                     .build());
         }
         rawSeatSubtotal = Money.vnd(rawSeatSubtotal);
@@ -1015,6 +1038,10 @@ public class BookingService {
     }
 
     private Double calculateSingleSeatPrice(Showtime showtime, Movie movie, String seatType, List<PricingRule> priceRules) {
+        return dynamicPricingService.price(showtime, baseSeatPrice(movie, seatType), priceRules);
+    }
+
+    private double baseSeatPrice(Movie movie, String seatType) {
         // Lấy giá trực tiếp theo cấu hình các hạng vé của phim
         double base = 90000.0;
         if ("VIP".equalsIgnoreCase(seatType)) {
@@ -1027,7 +1054,7 @@ public class BookingService {
             base = movie.getStandardPrice() != null && movie.getStandardPrice() > 0 ? movie.getStandardPrice() : 90000.0;
         }
 
-        return dynamicPricingService.price(showtime, base, priceRules);
+        return Money.vnd(base);
     }
 
     private Seat requireSeat(List<Seat> seats, String number) {
