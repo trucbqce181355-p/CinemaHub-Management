@@ -36,6 +36,7 @@ public class NewsArticleService {
                 .author(author)
                 .tags(request.getTags() != null ? request.getTags() : new ArrayList<>())
                 .active(request.getActive() != null ? request.getActive() : true)
+                .deleted(false)
                 .views(0L)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -78,15 +79,24 @@ public class NewsArticleService {
     }
 
     public void deleteNews(String id) {
-        if (!newsArticleRepository.existsById(id)) {
-            throw new RuntimeException("Không tìm thấy bài viết tin tức với ID: " + id);
-        }
-        newsArticleRepository.deleteById(id);
+        NewsArticle existing = newsArticleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài viết tin tức với ID: " + id));
+
+        // Xóa mềm: đánh dấu deleted = true, tắt active và ghi nhận thời điểm xóa
+        existing.setDeleted(true);
+        existing.setDeletedAt(LocalDateTime.now());
+        existing.setActive(false);
+        existing.setUpdatedAt(LocalDateTime.now());
+        newsArticleRepository.save(existing);
     }
 
     public NewsArticle toggleActiveStatus(String id, Boolean active) {
         NewsArticle existing = newsArticleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy bài viết tin tức với ID: " + id));
+
+        if (Boolean.TRUE.equals(existing.getDeleted())) {
+            throw new RuntimeException("Không thể đổi trạng thái bài viết đã bị xóa");
+        }
 
         boolean newStatus = (active != null) ? active : !Boolean.TRUE.equals(existing.getActive());
         existing.setActive(newStatus);
@@ -97,6 +107,10 @@ public class NewsArticleService {
     public NewsArticle getNewsById(String id, boolean incrementViews) {
         NewsArticle existing = newsArticleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy bài viết tin tức với ID: " + id));
+
+        if (Boolean.TRUE.equals(existing.getDeleted())) {
+            throw new RuntimeException("Bài viết này đã được xóa hoặc không còn tồn tại");
+        }
 
         if (incrementViews) {
             long currentViews = existing.getViews() != null ? existing.getViews() : 0L;
@@ -110,6 +124,12 @@ public class NewsArticleService {
         Query query = new Query();
         List<Criteria> criteriaList = new ArrayList<>();
 
+        // Xóa mềm: Loại trừ những bài viết có deleted == true
+        criteriaList.add(new Criteria().orOperator(
+                Criteria.where("deleted").is(false),
+                Criteria.where("deleted").exists(false),
+                Criteria.where("deleted").is(null)
+        ));
         if (search != null && !search.trim().isEmpty()) {
             String regex = Pattern.quote(search.trim());
             criteriaList.add(new Criteria().orOperator(

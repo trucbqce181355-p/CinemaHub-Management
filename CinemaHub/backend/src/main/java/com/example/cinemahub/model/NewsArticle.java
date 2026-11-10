@@ -33,6 +33,11 @@ public class NewsArticle {
     @Builder.Default
     private Long views = 0L;
 
+    @Builder.Default
+    private Boolean deleted = false;
+
+    private LocalDateTime deletedAt;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
