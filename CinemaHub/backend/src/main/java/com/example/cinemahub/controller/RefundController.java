@@ -20,7 +20,7 @@ public class RefundController {
     public record Decision(String reason) {}
 
     private boolean staff(Authentication auth) {
-        return auth.getAuthorities().stream().anyMatch(a -> Set.of("ROLE_Staff", "ROLE_Manager", "ROLE_Admin").contains(a.getAuthority()));
+        return auth.getAuthorities().stream().anyMatch(a -> Set.of("ROLE_Staff", "ROLE_Manager").contains(a.getAuthority()));
     }
 
     @GetMapping("/bookings/{id}/refund")
@@ -34,23 +34,23 @@ public class RefundController {
     }
 
     @GetMapping("/refunds")
-    @PreAuthorize("hasAnyRole('Manager','Admin')")
+    @PreAuthorize("hasRole('Manager')")
     public List<Booking> queue(@RequestParam(required = false) String status) { return refunds.queue(status); }
 
     @PostMapping("/bookings/{id}/refund/approve")
-    @PreAuthorize("hasAnyRole('Manager','Admin')")
+    @PreAuthorize("hasRole('Manager')")
     public Refund approve(@PathVariable String id, Authentication auth, HttpServletRequest request) {
         return refunds.approve(id, auth.getName(), request.getRemoteAddr());
     }
 
     @PostMapping("/bookings/{id}/refund/reject")
-    @PreAuthorize("hasAnyRole('Manager','Admin')")
+    @PreAuthorize("hasRole('Manager')")
     public Refund reject(@PathVariable String id, @RequestBody Decision body, Authentication auth) {
         return refunds.reject(id, auth.getName(), body.reason());
     }
 
     @PostMapping("/bookings/{id}/refund/reconcile")
-    @PreAuthorize("hasAnyRole('Manager','Admin')")
+    @PreAuthorize("hasRole('Manager')")
     public Refund reconcile(@PathVariable String id, Authentication auth, HttpServletRequest request) {
         return refunds.reconcile(id, auth.getName(), request.getRemoteAddr());
     }

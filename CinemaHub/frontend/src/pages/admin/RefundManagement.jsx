@@ -5,7 +5,7 @@ import PaymentBookingActions, { refundLabels } from '../../components/PaymentBoo
 const BASE = 'http://127.0.0.1:5000/api/payment';
 export default function RefundManagement() {
   const { user } = useAuth();
-  const manager = ['Admin', 'Manager'].includes(user?.role);
+  const manager = user?.role === 'Manager';
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState('PENDING_APPROVAL');
   const [message, setMessage] = useState('');
@@ -59,7 +59,7 @@ export default function RefundManagement() {
         </select>
         <button onClick={load} className="rounded-lg border border-white/20 p-3">Làm mới</button>
       </div>
-      <p className="text-sm text-gray-400">Chỉ Manager/Admin được duyệt. Kết quả chưa rõ cần đối soát; không bấm gửi lại lệnh hoàn tiền.</p>
+      <p className="text-sm text-gray-400">Chỉ Manager được duyệt. Kết quả chưa rõ cần đối soát; không bấm gửi lại lệnh hoàn tiền.</p>
       {rows.length === 0 && <p className="text-gray-400">Không có yêu cầu trong nhóm này.</p>}
       {rows.map(booking => <article key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-3">
         <div className="flex justify-between gap-3"><h2 className="font-bold">{booking.bookingReference} — {booking.movieTitle}</h2>

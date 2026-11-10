@@ -85,11 +85,11 @@ export default function PaymentBookingActions({ booking, onChanged, staffRequest
     {open && policy?.eligible && <form className="space-y-3 rounded-xl bg-white/5 p-4" onSubmit={event => {
       event.preventDefault(); act(async () => {
         await request('/refund', { method: 'POST', body: JSON.stringify({ reason, agreeToPolicy: agreed }) });
-        setPolicy(await request('/refund')); setOpen(false); setMessage('Đã gửi yêu cầu đến Manager/Admin. Chưa hoàn tiền.');
+        setPolicy(await request('/refund')); setOpen(false); setMessage('Đã gửi yêu cầu đến Manager. Chưa hoàn tiền.');
         onChanged?.();
       });
     }}>
-      <p>Hoàn toàn bộ số tiền đã trả qua VNPay. Vé chưa sử dụng; yêu cầu gửi trước giờ chiếu ít nhất {policy.cutoffMinutes} phút. Manager/Admin duyệt trước khi gửi lệnh hoàn.</p>
+      <p>Hoàn toàn bộ số tiền đã trả qua VNPay. Vé chưa sử dụng; yêu cầu gửi trước giờ chiếu ít nhất {policy.cutoffMinutes} phút. Manager duyệt trước khi gửi lệnh hoàn.</p>
       <textarea required minLength={5} maxLength={1000} value={reason} onChange={e => setReason(e.target.value)}
         placeholder="Lý do hoàn tiền (5–1000 ký tự)" className="w-full rounded-lg bg-black/30 border border-white/20 p-3" />
       <label className="flex gap-2 items-start"><input required type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} />

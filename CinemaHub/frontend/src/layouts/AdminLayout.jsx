@@ -60,7 +60,7 @@ const AdminLayout = () => {
     }
 
     // Hoàn tiền vé: Admin, Manager & Staff (đưa xuống cuối cùng)
-    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
+    if (['Manager', 'Staff'].includes(user.role)) {
       items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
     }
 
