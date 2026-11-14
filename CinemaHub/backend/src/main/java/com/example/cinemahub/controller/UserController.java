@@ -1,6 +1,8 @@
 package com.example.cinemahub.controller;
 
+import com.example.cinemahub.model.Role;
 import com.example.cinemahub.model.User;
+import com.example.cinemahub.repository.RoleRepository;
 import com.example.cinemahub.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,10 +25,29 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private boolean isProtectedAccount(User user) {
         return user != null && "admin@cinemahub.com".equalsIgnoreCase(user.getEmail());
+    }
+
+    private void applyCustomRoleIfPresent(User target, String customRoleId) {
+        if (customRoleId != null && !customRoleId.isBlank()) {
+            Optional<Role> roleOpt = roleRepository.findById(customRoleId);
+            if (roleOpt.isPresent()) {
+                Role customRole = roleOpt.get();
+                target.setRole(customRole.getBaseRole());
+                target.setCustomRoleId(Boolean.TRUE.equals(customRole.getIsSystem()) ? null : customRole.getId());
+                target.setRoleName(customRole.getName());
+                target.setPermissions(new ArrayList<>(customRole.getPermissions() != null ? customRole.getPermissions() : List.of()));
+                return;
+            }
+        }
+        target.setCustomRoleId(null);
+        target.setRoleName(target.getRole());
     }
 
     @GetMapping
@@ -43,6 +65,7 @@ public class UserController {
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+        applyCustomRoleIfPresent(user, user.getCustomRoleId());
         user.setIsVerified(true);
         user.setCreatedAt(new Date());
         user.setUpdatedAt(new Date());
@@ -71,7 +94,13 @@ public class UserController {
             }
             user.setEmail(userDetails.getEmail());
         }
-        if (userDetails.getRole() != null) user.setRole(userDetails.getRole());
+        if (userDetails.getCustomRoleId() != null && !userDetails.getCustomRoleId().isBlank()) {
+            applyCustomRoleIfPresent(user, userDetails.getCustomRoleId());
+        } else if (userDetails.getRole() != null) {
+            user.setRole(userDetails.getRole());
+            user.setCustomRoleId(null);
+            user.setRoleName(userDetails.getRole());
+        }
         if (userDetails.getStatus() != null) user.setStatus(userDetails.getStatus());
         if (userDetails.getPermissions() != null) user.setPermissions(userDetails.getPermissions());
         if (userDetails.getPhoneNumber() != null) user.setPhoneNumber(userDetails.getPhoneNumber());
@@ -108,8 +137,14 @@ public class UserController {
         if (isProtectedAccount(user)) {
             return ResponseEntity.status(403).body(Map.of("message", "Cannot modify role/permissions of protected core accounts"));
         }
-        if (body.containsKey("role")) {
-            user.setRole((String) body.get("role"));
+        if (body.containsKey("customRoleId")) {
+            String customRoleId = (String) body.get("customRoleId");
+            applyCustomRoleIfPresent(user, customRoleId);
+        } else if (body.containsKey("role")) {
+            String newRole = (String) body.get("role");
+            user.setRole(newRole);
+            user.setCustomRoleId(null);
+            user.setRoleName(newRole);
         }
         if (body.containsKey("permissions")) {
             user.setPermissions((List<String>) body.get("permissions"));

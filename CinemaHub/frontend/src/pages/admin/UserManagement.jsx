@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, Lock, Unlock, UserPlus, Mail, User, Shield, X, Key, CheckSquare, Eye, EyeOff, Filter } from 'lucide-react';
+import { Edit2, Trash2, Lock, Unlock, UserPlus, Mail, User, Shield, X, Key, CheckSquare, Eye, EyeOff, Filter, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CustomSelect from '../../components/CustomSelect';
 
@@ -43,10 +43,25 @@ const UserManagement = () => {
   const adminUsers = users.filter(u => u.role === 'Admin').length;
 
   const filteredUsers = users.filter(u => {
-    const roleMatch = filterRole === 'All' || u.role === filterRole;
+    const displayRole = u.roleName || u.role;
+    const roleMatch = filterRole === 'All' || u.role === filterRole || displayRole === filterRole;
     const statusMatch = filterStatus === 'All' || u.status === filterStatus;
     return roleMatch && statusMatch;
   });
+
+  // Custom Role Management State
+  const [roles, setRoles] = useState([]);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+  const [roleForm, setRoleForm] = useState({
+    name: '',
+    description: '',
+    baseRole: 'Staff',
+    permissions: []
+  });
+  const [roleError, setRoleError] = useState('');
+  const [roleSuccess, setRoleSuccess] = useState('');
+  const [roleLoading, setRoleLoading] = useState(false);
 
   // Permission Modal State
   const [isPermModalOpen, setIsPermModalOpen] = useState(false);
@@ -67,7 +82,8 @@ const UserManagement = () => {
     username: '',
     email: '',
     password: '',
-    role: 'Customer'
+    role: 'Customer',
+    customRoleId: ''
   });
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
@@ -78,7 +94,9 @@ const UserManagement = () => {
     _id: '',
     username: '',
     email: '',
-    password: ''
+    password: '',
+    role: 'Customer',
+    customRoleId: ''
   });
   const [editError, setEditError] = useState('');
   const [editLoading, setEditLoading] = useState(false);
@@ -115,9 +133,117 @@ const UserManagement = () => {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/roles', {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRoles(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching roles:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, [user]);
+
+  const resetRoleForm = () => {
+    setEditingRole(null);
+    setRoleForm({
+      name: '',
+      description: '',
+      baseRole: 'Staff',
+      permissions: []
+    });
+    setRoleError('');
+  };
+
+  const handleOpenRoleModal = () => {
+    resetRoleForm();
+    setRoleSuccess('');
+    setIsRoleModalOpen(true);
+    fetchRoles();
+  };
+
+  const handleEditRoleClick = (r) => {
+    setEditingRole(r);
+    setRoleError('');
+    setRoleSuccess('');
+    setRoleForm({
+      name: r.name || '',
+      description: r.description || '',
+      baseRole: r.baseRole || 'Staff',
+      permissions: Array.isArray(r.permissions) ? [...r.permissions] : []
+    });
+  };
+
+  const handleSaveRole = async (e) => {
+    e.preventDefault();
+    setRoleError('');
+    setRoleSuccess('');
+    setRoleLoading(true);
+    try {
+      const url = editingRole
+        ? `http://localhost:5000/api/roles/${editingRole.id}`
+        : 'http://localhost:5000/api/roles';
+      const method = editingRole ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify(roleForm),
+      });
+
+      if (res.status === 401) { setIsSessionExpired(true); return; }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setRoleSuccess(editingRole ? 'Cập nhật Custom Role thành công!' : 'Tạo Custom Role mới thành công!');
+        resetRoleForm();
+        fetchRoles();
+        fetchUsers();
+      } else {
+        setRoleError(data.message || 'Không thể lưu vai trò');
+      }
+    } catch (err) {
+      setRoleError('Lỗi kết nối máy chủ');
+    } finally {
+      setRoleLoading(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleObj) => {
+    setRoleError('');
+    setRoleSuccess('');
+    try {
+      const res = await fetch(`http://localhost:5000/api/roles/${roleObj.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      });
+      if (res.status === 401) { setIsSessionExpired(true); return; }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setRoleSuccess(`Đã xóa vai trò "${roleObj.name}"`);
+        if (editingRole?.id === roleObj.id) resetRoleForm();
+        fetchRoles();
+      } else {
+        setRoleError(data.message || 'Không thể xóa vai trò');
+      }
+    } catch (err) {
+      setRoleError('Lỗi kết nối máy chủ');
+    }
+  };
 
   const handleToggleStatus = async (userId, currentStatus) => {
     try {
@@ -204,7 +330,7 @@ const UserManagement = () => {
       
       if (res.ok) {
         setIsAddModalOpen(false);
-        setNewUserData({ username: '', email: '', password: '', role: 'Customer' });
+        setNewUserData({ username: '', email: '', password: '', role: 'Customer', customRoleId: '' });
         fetchUsers();
       } else {
         setAddError(data.message || 'Thêm người dùng thất bại');
@@ -224,6 +350,8 @@ const UserManagement = () => {
       email: u.email,
       phoneNumber: u.phoneNumber || '',
       role: u.role,
+      customRoleId: u.customRoleId || '',
+      roleName: u.roleName || u.role,
       status: u.status,
       createdAt: u.createdAt
     });
@@ -241,6 +369,7 @@ const UserManagement = () => {
         email: editUserData.email,
         phoneNumber: editUserData.phoneNumber,
         role: editUserData.role,
+        customRoleId: editUserData.customRoleId || '',
       };
 
       const res = await fetch(`http://localhost:5000/api/users/${editUserData._id}`, {
@@ -349,7 +478,10 @@ const UserManagement = () => {
                 { value: 'Customer', label: 'Khách hàng' },
                 { value: 'Staff', label: 'Nhân viên' },
                 { value: 'Manager', label: 'Quản lý' },
-                { value: 'Admin', label: 'Quản trị viên' }
+                { value: 'Admin', label: 'Quản trị viên' },
+                ...roles
+                  .filter(r => !r.isSystem)
+                  .map(r => ({ value: r.name, label: `${r.name} (${r.baseRole})` }))
               ]}
             />
 
@@ -361,14 +493,21 @@ const UserManagement = () => {
                 options={[
                   { value: 'All', label: 'Tất cả trạng thái' },
                   { value: 'Active', label: 'Đang hoạt động' },
-                  { value: 'Disabled', label: 'Bị khóa' }
+                  { value: 'Locked', label: 'Bị khóa' }
                 ]}
               />
             </div>
 
+            <button
+              onClick={handleOpenRoleModal}
+              className="px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-medium flex items-center gap-2 transition-colors whitespace-nowrap"
+            >
+              <Shield className="w-4 h-4" /> Quản lý Role
+            </button>
+
             <button 
               onClick={() => setIsAddModalOpen(true)}
-              className="btn-primary flex items-center gap-2 py-2.5"
+              className="btn-primary flex items-center gap-2 py-2.5 whitespace-nowrap"
             >
               <UserPlus className="w-4 h-4" /> Thêm người dùng
             </button>
@@ -420,6 +559,7 @@ const UserManagement = () => {
                         <button 
                           onClick={() => handleToggleRole(u._id || u.id, u.role)}
                           disabled={isProtectedAccount(u.email)}
+                          title={u.customRoleId ? `Custom Role (nền: ${u.role}) - Click để đổi` : 'Click để xoay vòng Role'}
                           className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
                             u.role === 'Admin' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 
                             u.role === 'Manager' ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30' : 
@@ -427,7 +567,8 @@ const UserManagement = () => {
                             'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
                           } ${isProtectedAccount(u.email) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          {u.role}
+                          {u.roleName || u.role}
+                          {u.customRoleId && <span className="ml-1 opacity-70">({u.role})</span>}
                         </button>
                       </td>
                       <td className="p-4">
@@ -583,14 +724,27 @@ const UserManagement = () => {
                     <Shield className="w-5 h-5" />
                   </div>
                   <select
-                    value={newUserData.role}
-                    onChange={(e) => setNewUserData({...newUserData, role: e.target.value})}
+                    value={newUserData.customRoleId || newUserData.role}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const custom = roles.find(r => !r.isSystem && r.id === val);
+                      if (custom) {
+                        setNewUserData({ ...newUserData, role: custom.baseRole, customRoleId: custom.id });
+                      } else {
+                        setNewUserData({ ...newUserData, role: val, customRoleId: '' });
+                      }
+                    }}
                     className="w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
                   >
                     <option value="Customer">Khách hàng (Customer)</option>
                     <option value="Staff">Nhân viên (Staff)</option>
                     <option value="Manager">Quản lý (Manager)</option>
                     <option value="Admin">Quản trị viên (Admin)</option>
+                    {roles.filter(r => !r.isSystem).map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} (Custom - {r.baseRole})
+                      </option>
+                    ))}
                   </select>
                   <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-500">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -764,8 +918,16 @@ const UserManagement = () => {
                       <Shield className="w-5 h-5" />
                     </div>
                     <select
-                      value={editUserData.role}
-                      onChange={(e) => setEditUserData({...editUserData, role: e.target.value})}
+                      value={editUserData.customRoleId || editUserData.role}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const custom = roles.find(r => !r.isSystem && r.id === val);
+                        if (custom) {
+                          setEditUserData({ ...editUserData, role: custom.baseRole, customRoleId: custom.id });
+                        } else {
+                          setEditUserData({ ...editUserData, role: val, customRoleId: '' });
+                        }
+                      }}
                       disabled={isProtectedAccount(editUserData.email)}
                       className={`w-full bg-[#1a1a1a] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all appearance-none ${isProtectedAccount(editUserData.email) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
@@ -773,6 +935,11 @@ const UserManagement = () => {
                       <option value="Staff">Nhân viên (Staff)</option>
                       <option value="Manager">Quản lý (Manager)</option>
                       <option value="Admin">Quản trị viên (Admin)</option>
+                      {roles.filter(r => !r.isSystem).map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} (Custom - {r.baseRole})
+                        </option>
+                      ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-500">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -1012,6 +1179,207 @@ const UserManagement = () => {
               </button>
             </div>
           </motion.div>
+        </div>
+      )}
+      {/* Custom Role Management & Create Custom Role Modal */}
+      {isRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-5xl bg-[#121212] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#18181b]">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-purple-500/20 text-purple-400 rounded-xl">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-display font-bold text-white">Quản lý & Tạo Custom Role</h2>
+                  <p className="text-xs text-gray-400">Tạo vai trò tùy biến kèm bộ quyền chi tiết để tái sử dụng cho người dùng</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRoleModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left: Create / Edit Custom Role Form */}
+              <div className="lg:col-span-5 bg-[#18181b] border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-purple-400" />
+                    {editingRole ? `Sửa Role: ${editingRole.name}` : 'Tạo Custom Role mới'}
+                  </h3>
+                  {editingRole && (
+                    <button
+                      type="button"
+                      onClick={resetRoleForm}
+                      className="text-xs text-gray-400 hover:text-white underline"
+                    >
+                      Tạo mới
+                    </button>
+                  )}
+                </div>
+
+                {roleError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                    {roleError}
+                  </div>
+                )}
+                {roleSuccess && (
+                  <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-xs">
+                    {roleSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveRole} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Tên vai trò (Role Name) *</label>
+                    <input
+                      type="text"
+                      required
+                      value={roleForm.name}
+                      onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
+                      placeholder="VD: Content Editor, Ticket Supervisor"
+                      className="w-full bg-[#121212] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Vai trò nền (Base Role) *</label>
+                    <select
+                      value={roleForm.baseRole}
+                      onChange={(e) => setRoleForm({ ...roleForm, baseRole: e.target.value })}
+                      className="w-full bg-[#121212] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="Customer">Customer (Khách hàng)</option>
+                      <option value="Staff">Staff (Nhân viên rạp)</option>
+                      <option value="Manager">Manager (Quản lý vận hành)</option>
+                      <option value="Admin">Admin (Quản trị viên)</option>
+                    </select>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Xác định khu vực truy cập mặc định trong hệ thống (Admin/Manager/Staff).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Mô tả</label>
+                    <textarea
+                      rows={2}
+                      value={roleForm.description}
+                      onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
+                      placeholder="Mô tả ngắn gọn trách nhiệm của vai trò này..."
+                      className="w-full bg-[#121212] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Bộ quyền chi tiết mặc định</label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {AVAILABLE_PERMISSIONS.map((perm) => (
+                        <label
+                          key={perm.id}
+                          className="flex items-center gap-3 p-2.5 rounded-xl bg-[#121212] border border-white/5 hover:border-purple-500/40 cursor-pointer text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={roleForm.permissions.includes(perm.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setRoleForm({ ...roleForm, permissions: [...roleForm.permissions, perm.id] });
+                              } else {
+                                setRoleForm({
+                                  ...roleForm,
+                                  permissions: roleForm.permissions.filter(id => id !== perm.id)
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <span className="text-gray-200 block font-medium">{perm.label}</span>
+                            <span className="text-gray-500 font-mono text-[10px]">{perm.id}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={roleLoading}
+                    className="w-full py-3 rounded-xl font-bold text-sm text-white bg-purple-600 hover:bg-purple-500 transition-colors disabled:opacity-50"
+                  >
+                    {roleLoading ? 'Đang lưu...' : (editingRole ? 'Cập nhật Custom Role' : 'Tạo Custom Role')}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right: Existing Roles List */}
+              <div className="lg:col-span-7 space-y-3">
+                <h3 className="text-base font-bold text-white">Danh sách Role hiện có ({roles.length})</h3>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                  {roles.map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-4 rounded-2xl bg-[#18181b] border border-white/10 flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                    >
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-white text-sm">{r.name}</span>
+                          {r.isSystem ? (
+                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-white/10 text-gray-300">
+                              Mặc định
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              Custom · Nền: {r.baseRole}
+                            </span>
+                          )}
+                        </div>
+                        {r.description && (
+                          <p className="text-xs text-gray-400">{r.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {(r.permissions || []).length > 0 ? (
+                            r.permissions.map((p) => (
+                              <span key={p} className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/40 text-gray-300 border border-white/5">
+                                {p}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-gray-500 italic">Không có quyền quản trị đặc biệt</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {!r.isSystem && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditRoleClick(r)}
+                            title="Sửa Custom Role"
+                            className="p-2 text-blue-400 hover:bg-blue-400/20 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRole(r)}
+                            title="Xóa Custom Role"
+                            className="p-2 text-red-400 hover:bg-red-400/20 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
