@@ -16,7 +16,6 @@ import java.util.*;
 public class RoleController {
 
     private static final List<String> SYSTEM_ROLE_NAMES = List.of("Customer", "Staff", "Manager", "Admin");
-    private static final Set<String> VALID_BASE_ROLES = Set.of("Customer", "Staff", "Manager", "Admin");
     private static final Set<String> VALID_PERMISSIONS = Set.of(
             "manage_movies",
             "manage_showtimes",
@@ -49,7 +48,6 @@ public class RoleController {
             if (roleRepository.findByNameIgnoreCase(roleName).isEmpty()) {
                 Role systemRole = new Role();
                 systemRole.setName(roleName);
-                systemRole.setBaseRole(roleName);
                 systemRole.setDescription(defaultDescriptions.getOrDefault(roleName, ""));
                 systemRole.setPermissions(new ArrayList<>(defaultPermissions.getOrDefault(roleName, List.of())));
                 systemRole.setIsSystem(true);
@@ -97,17 +95,9 @@ public class RoleController {
             return ResponseEntity.badRequest().body(Map.of("message", "Tên vai trò đã tồn tại"));
         }
 
-        String baseRole = request.getBaseRole() != null && !request.getBaseRole().isBlank()
-                ? request.getBaseRole().trim()
-                : "Staff";
-        if (!VALID_BASE_ROLES.contains(baseRole)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Vai trò nền không hợp lệ"));
-        }
-
         Role role = new Role();
         role.setName(name);
         role.setDescription(request.getDescription() != null ? request.getDescription().trim() : "");
-        role.setBaseRole(baseRole);
         role.setPermissions(sanitizePermissions(request.getPermissions()));
         role.setIsSystem(false);
         role.setCreatedAt(new Date());
@@ -136,18 +126,10 @@ public class RoleController {
             return ResponseEntity.badRequest().body(Map.of("message", "Tên vai trò đã tồn tại"));
         }
 
-        String baseRole = request.getBaseRole() != null && !request.getBaseRole().isBlank()
-                ? request.getBaseRole().trim()
-                : existing.getBaseRole();
-        if (!VALID_BASE_ROLES.contains(baseRole)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Vai trò nền không hợp lệ"));
-        }
-
         existing.setName(name);
         if (request.getDescription() != null) {
             existing.setDescription(request.getDescription().trim());
         }
-        existing.setBaseRole(baseRole);
         if (request.getPermissions() != null) {
             existing.setPermissions(sanitizePermissions(request.getPermissions()));
         }
@@ -156,8 +138,7 @@ public class RoleController {
 
         List<User> assignedUsers = userRepository.findByCustomRoleId(saved.getId());
         for (User u : assignedUsers) {
-            u.setRole(saved.getBaseRole());
-            u.setRoleName(saved.getName());
+            u.setRole(saved.getName());
             u.setPermissions(new ArrayList<>(saved.getPermissions()));
             u.setUpdatedAt(new Date());
             userRepository.save(u);

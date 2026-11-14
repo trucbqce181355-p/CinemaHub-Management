@@ -43,8 +43,7 @@ const UserManagement = () => {
   const adminUsers = users.filter(u => u.role === 'Admin').length;
 
   const filteredUsers = users.filter(u => {
-    const displayRole = u.roleName || u.role;
-    const roleMatch = filterRole === 'All' || u.role === filterRole || displayRole === filterRole;
+    const roleMatch = filterRole === 'All' || u.role === filterRole;
     const statusMatch = filterStatus === 'All' || u.status === filterStatus;
     return roleMatch && statusMatch;
   });
@@ -56,7 +55,6 @@ const UserManagement = () => {
   const [roleForm, setRoleForm] = useState({
     name: '',
     description: '',
-    baseRole: 'Staff',
     permissions: []
   });
   const [roleError, setRoleError] = useState('');
@@ -159,7 +157,6 @@ const UserManagement = () => {
     setRoleForm({
       name: '',
       description: '',
-      baseRole: 'Staff',
       permissions: []
     });
     setRoleError('');
@@ -179,7 +176,6 @@ const UserManagement = () => {
     setRoleForm({
       name: r.name || '',
       description: r.description || '',
-      baseRole: r.baseRole || 'Staff',
       permissions: Array.isArray(r.permissions) ? [...r.permissions] : []
     });
   };
@@ -351,7 +347,6 @@ const UserManagement = () => {
       phoneNumber: u.phoneNumber || '',
       role: u.role,
       customRoleId: u.customRoleId || '',
-      roleName: u.roleName || u.role,
       status: u.status,
       createdAt: u.createdAt
     });
@@ -481,7 +476,7 @@ const UserManagement = () => {
                 { value: 'Admin', label: 'Quản trị viên' },
                 ...roles
                   .filter(r => !r.isSystem)
-                  .map(r => ({ value: r.name, label: `${r.name} (${r.baseRole})` }))
+                  .map(r => ({ value: r.name, label: `${r.name} (Custom)` }))
               ]}
             />
 
@@ -559,16 +554,16 @@ const UserManagement = () => {
                         <button 
                           onClick={() => handleToggleRole(u._id || u.id, u.role)}
                           disabled={isProtectedAccount(u.email)}
-                          title={u.customRoleId ? `Custom Role (nền: ${u.role}) - Click để đổi` : 'Click để xoay vòng Role'}
+                          title={u.customRoleId ? 'Custom Role - Click để đổi' : 'Click để xoay vòng Role'}
                           className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
                             u.role === 'Admin' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 
                             u.role === 'Manager' ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30' : 
                             u.role === 'Staff' ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 
+                            u.customRoleId ? 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30' :
                             'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
                           } ${isProtectedAccount(u.email) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          {u.roleName || u.role}
-                          {u.customRoleId && <span className="ml-1 opacity-70">({u.role})</span>}
+                          {u.role}
                         </button>
                       </td>
                       <td className="p-4">
@@ -729,7 +724,7 @@ const UserManagement = () => {
                       const val = e.target.value;
                       const custom = roles.find(r => !r.isSystem && r.id === val);
                       if (custom) {
-                        setNewUserData({ ...newUserData, role: custom.baseRole, customRoleId: custom.id });
+                        setNewUserData({ ...newUserData, role: custom.name, customRoleId: custom.id });
                       } else {
                         setNewUserData({ ...newUserData, role: val, customRoleId: '' });
                       }
@@ -742,7 +737,7 @@ const UserManagement = () => {
                     <option value="Admin">Quản trị viên (Admin)</option>
                     {roles.filter(r => !r.isSystem).map(r => (
                       <option key={r.id} value={r.id}>
-                        {r.name} (Custom - {r.baseRole})
+                        {r.name} (Custom)
                       </option>
                     ))}
                   </select>
@@ -923,7 +918,7 @@ const UserManagement = () => {
                         const val = e.target.value;
                         const custom = roles.find(r => !r.isSystem && r.id === val);
                         if (custom) {
-                          setEditUserData({ ...editUserData, role: custom.baseRole, customRoleId: custom.id });
+                          setEditUserData({ ...editUserData, role: custom.name, customRoleId: custom.id });
                         } else {
                           setEditUserData({ ...editUserData, role: val, customRoleId: '' });
                         }
@@ -937,7 +932,7 @@ const UserManagement = () => {
                       <option value="Admin">Quản trị viên (Admin)</option>
                       {roles.filter(r => !r.isSystem).map(r => (
                         <option key={r.id} value={r.id}>
-                          {r.name} (Custom - {r.baseRole})
+                          {r.name} (Custom)
                         </option>
                       ))}
                     </select>
@@ -1247,23 +1242,6 @@ const UserManagement = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Vai trò nền (Base Role) *</label>
-                    <select
-                      value={roleForm.baseRole}
-                      onChange={(e) => setRoleForm({ ...roleForm, baseRole: e.target.value })}
-                      className="w-full bg-[#121212] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="Customer">Customer (Khách hàng)</option>
-                      <option value="Staff">Staff (Nhân viên rạp)</option>
-                      <option value="Manager">Manager (Quản lý vận hành)</option>
-                      <option value="Admin">Admin (Quản trị viên)</option>
-                    </select>
-                    <p className="text-[11px] text-gray-500 mt-1">
-                      Xác định khu vực truy cập mặc định trong hệ thống (Admin/Manager/Staff).
-                    </p>
-                  </div>
-
-                  <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1">Mô tả</label>
                     <textarea
                       rows={2}
@@ -1334,7 +1312,7 @@ const UserManagement = () => {
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                              Custom · Nền: {r.baseRole}
+                              Custom Role
                             </span>
                           )}
                         </div>

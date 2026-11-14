@@ -38,22 +38,35 @@ public class JwtFilter extends OncePerRequestFilter {
             try {
                 var claims = jwtUtil.extractClaims(token);
                 String userId = claims.get("id", String.class);
-                String role = claims.get("role", String.class);
-                List<String> permissions = claims.get("permissions", List.class);
 
-                List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
-                if (permissions != null) {
-                    authorities.addAll(permissions.stream()
-                            .map(SimpleGrantedAuthority::new)
-                            .collect(Collectors.toList()));
-                }
-
-                // Check Database to ensure user is not locked or unverified
+                // Check Database to ensure user is not locked or unverified and load live role/permissions
                 Optional<User> userOpt = userRepository.findById(userId);
                 if (userOpt.isPresent()) {
                     User user = userOpt.get();
                     if (!"Locked".equals(user.getStatus()) && Boolean.TRUE.equals(user.getIsVerified())) {
+                        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                        String userRole = user.getRole() != null ? user.getRole() : "Customer";
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + userRole));
+
+                        List<String> userPermissions = user.getPermissions();
+                        if (userPermissions != null) {
+                            authorities.addAll(userPermissions.stream()
+                                    .map(SimpleGrantedAuthority::new)
+                                    .collect(Collectors.toList()));
+
+                            // Map standalone custom role permissions to internal Spring Security route roles
+                            if (!List.of("Customer", "Staff", "Manager", "Admin").contains(userRole)) {
+                                boolean hasManagerPerm = userPermissions.stream().anyMatch(p ->
+                                        List.of("manage_movies", "manage_showtimes", "view_reports", "manage_users").contains(p));
+                                if (hasManagerPerm) {
+                                    authorities.add(new SimpleGrantedAuthority("ROLE_Manager"));
+                                    authorities.add(new SimpleGrantedAuthority("ROLE_Staff"));
+                                } else if (userPermissions.contains("manage_bookings")) {
+                                    authorities.add(new SimpleGrantedAuthority("ROLE_Staff"));
+                                }
+                            }
+                        }
+
                         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                                 userId, null, authorities);
                         SecurityContextHolder.getContext().setAuthentication(auth);

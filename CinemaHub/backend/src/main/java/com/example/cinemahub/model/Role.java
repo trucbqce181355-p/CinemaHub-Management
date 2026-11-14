@@ -15,7 +15,6 @@ public class Role {
     private String id;
     private String name;
     private String description = "";
-    private String baseRole = "Staff"; // Customer, Staff, Manager, Admin
     private List<String> permissions = new ArrayList<>();
     private Boolean isSystem = false;
     private Date createdAt = new Date();

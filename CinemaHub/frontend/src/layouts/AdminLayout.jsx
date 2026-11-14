@@ -11,7 +11,11 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  if (!user || !['Admin', 'Manager', 'Staff'].includes(user.role)) {
+  const perms = Array.isArray(user?.permissions) ? user.permissions : [];
+  const hasAdminAccess = user && (
+    ['Admin', 'Manager', 'Staff'].includes(user.role) || perms.length > 0
+  );
+  if (!hasAdminAccess) {
     return <Navigate to="/" replace />;
   }
 
@@ -25,47 +29,39 @@ const AdminLayout = () => {
       { name: 'Tổng quan', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> }
     ];
 
-    // Quyền Admin
-    if (user.role === 'Admin') {
+    // Quyền Admin / manage_users
+    if (user.role === 'Admin' || perms.includes('manage_users')) {
       items.push({ name: 'Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" /> });
     }
 
-    // Quyền Manager
-    if (user.role === 'Manager') {
+    // Quyền Manager / manage_movies
+    if (user.role === 'Manager' || perms.includes('manage_movies')) {
       items.push({ name: 'Hội viên & Điểm', path: '/admin/membership', icon: <Award className="w-5 h-5" /> });
-    }
-
-    // Quyền Manager: Quản lý phim, rạp, bắp nước
-    if (user.role === 'Manager') {
       items.push({ name: 'Phim', path: '/admin/movies', icon: <Film className="w-5 h-5" /> });
       items.push({ name: 'Cụm Rạp', path: '/admin/cinemas', icon: <MapPin className="w-5 h-5" /> });
       items.push({ name: 'Bắp Nước & Combo', path: '/admin/food', icon: <UtensilsCrossed className="w-5 h-5" /> });
-    }
-
-    // Quyền Manager: Quản lý khuyến mãi, tin tức
-    if (user.role === 'Manager') {
       items.push({ name: 'Khuyến mãi', path: '/admin/promotions', icon: <Tag className="w-5 h-5" /> });
       items.push({ name: 'Tin tức & Bài viết', path: '/admin/news', icon: <Newspaper className="w-5 h-5" /> });
-    }
-
-    // Quyền Manager & Staff: Suất chiếu & Soát vé
-    if (user.role === 'Manager' || user.role === 'Staff') {
-      items.push({ name: 'Suất chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
-      items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
-    }
-
-    // Quyền Manager: Quản lý đánh giá & kiểm duyệt
-    if (user.role === 'Manager') {
       items.push({ name: 'Đánh giá & Bình luận', path: '/admin/reviews', icon: <MessageSquare className="w-5 h-5" /> });
     }
 
+    // Suất chiếu: Manager, Staff hoặc manage_showtimes
+    if (user.role === 'Manager' || user.role === 'Staff' || perms.includes('manage_showtimes')) {
+      items.push({ name: 'Suất chiếu', path: '/admin/showtimes', icon: <Calendar className="w-5 h-5" /> });
+    }
+
+    // Soát vé: Manager, Staff hoặc manage_bookings
+    if (user.role === 'Manager' || user.role === 'Staff' || perms.includes('manage_bookings')) {
+      items.push({ name: 'Soát vé', path: '/admin/checkin', icon: <Ticket className="w-5 h-5" /> });
+    }
+
     // Admin & Manager: Quản lý thông báo & tự động hóa (UC-96, 97, 98, 99)
-    if (user.role === 'Admin' || user.role === 'Manager') {
+    if (user.role === 'Admin' || user.role === 'Manager' || perms.includes('manage_users') || perms.includes('manage_movies')) {
       items.push({ name: 'Thông báo & Tự động', path: '/admin/notifications', icon: <Bell className="w-5 h-5" /> });
     }
 
-    // Hoàn tiền vé: Admin, Manager & Staff (đưa xuống cuối cùng)
-    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
+    // Hoàn tiền vé: Admin, Manager, Staff hoặc manage_bookings (đưa xuống cuối cùng)
+    if (['Admin', 'Manager', 'Staff'].includes(user.role) || perms.includes('manage_bookings')) {
       items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
     }
 

@@ -39,15 +39,13 @@ public class UserController {
             Optional<Role> roleOpt = roleRepository.findById(customRoleId);
             if (roleOpt.isPresent()) {
                 Role customRole = roleOpt.get();
-                target.setRole(customRole.getBaseRole());
+                target.setRole(customRole.getName());
                 target.setCustomRoleId(Boolean.TRUE.equals(customRole.getIsSystem()) ? null : customRole.getId());
-                target.setRoleName(customRole.getName());
                 target.setPermissions(new ArrayList<>(customRole.getPermissions() != null ? customRole.getPermissions() : List.of()));
                 return;
             }
         }
         target.setCustomRoleId(null);
-        target.setRoleName(target.getRole());
     }
 
     @GetMapping
@@ -99,7 +97,6 @@ public class UserController {
         } else if (userDetails.getRole() != null) {
             user.setRole(userDetails.getRole());
             user.setCustomRoleId(null);
-            user.setRoleName(userDetails.getRole());
         }
         if (userDetails.getStatus() != null) user.setStatus(userDetails.getStatus());
         if (userDetails.getPermissions() != null) user.setPermissions(userDetails.getPermissions());
@@ -144,7 +141,6 @@ public class UserController {
             String newRole = (String) body.get("role");
             user.setRole(newRole);
             user.setCustomRoleId(null);
-            user.setRoleName(newRole);
         }
         if (body.containsKey("permissions")) {
             user.setPermissions((List<String>) body.get("permissions"));
@@ -190,11 +186,8 @@ public class UserController {
         if (body.containsKey("username")) user.setUsername(body.get("username"));
         if (body.containsKey("email")) {
             String newEmail = body.get("email");
-            if (!newEmail.equals(user.getEmail())) {
-                if (userRepository.findByEmail(newEmail).isPresent()) {
-                    return ResponseEntity.badRequest().body(Map.of("message", "Email đã được sử dụng bởi tài khoản khác"));
-                }
-                user.setEmail(newEmail);
+            if (newEmail != null && !newEmail.equalsIgnoreCase(user.getEmail())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email định danh không thể tự thay đổi"));
             }
         }
         if (body.containsKey("phoneNumber")) user.setPhoneNumber(body.get("phoneNumber"));

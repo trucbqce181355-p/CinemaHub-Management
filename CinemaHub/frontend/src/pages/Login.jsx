@@ -44,6 +44,7 @@ const Login = () => {
           email: data.email,
           name: data.username,
           role: data.role,
+          permissions: data.permissions || [],
           token: data.token,
         });
 

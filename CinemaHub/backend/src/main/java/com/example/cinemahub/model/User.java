@@ -20,9 +20,8 @@ public class User {
     private String password;
     private String phoneNumber = "";
     private Date dateOfBirth;
-    private String role = "Customer"; // Customer, Staff, Manager, Admin
+    private String role = "Customer"; // Customer, Staff, Manager, Admin or Custom Role name
     private String customRoleId;
-    private String roleName;
     private String status = "Active"; // Active, Locked
     private Boolean isVerified = false;
     @JsonIgnore

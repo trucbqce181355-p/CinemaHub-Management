@@ -287,7 +287,7 @@ const Profile = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({ username, email, phoneNumber, dateOfBirth }),
+        body: JSON.stringify({ username, phoneNumber, dateOfBirth }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -469,10 +469,15 @@ const Profile = () => {
                         <input
                           type="email"
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                          readOnly
+                          disabled
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-gray-400 cursor-not-allowed select-none"
                         />
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-500" title="Email cố định">
+                          <Lock className="w-4 h-4" />
+                        </div>
                       </div>
+                      <p className="text-[11px] text-gray-500">Email định danh đã xác thực không thể tự thay đổi.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone Number</label>

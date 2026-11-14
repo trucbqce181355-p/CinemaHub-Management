@@ -60,7 +60,6 @@ public class AuthController {
         response.put("username", user.getUsername());
         response.put("email", user.getEmail());
         response.put("role", user.getRole());
-        response.put("roleName", user.getRoleName() != null ? user.getRoleName() : user.getRole());
         response.put("permissions", user.getPermissions());
         response.put("membershipTier", user.getMembershipTier() != null ? user.getMembershipTier() : "BRONZE");
         
