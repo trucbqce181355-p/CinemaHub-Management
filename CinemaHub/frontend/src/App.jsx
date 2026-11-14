@@ -183,7 +183,7 @@ function App() {
           <Route
             index
             element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'STAFF']}>
                 <BusinessDashboard />
               </ProtectedRoute>
             }
@@ -192,7 +192,7 @@ function App() {
           <Route
             path="dashboard"
             element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'STAFF']}>
                 <BusinessDashboard />
               </ProtectedRoute>
             }

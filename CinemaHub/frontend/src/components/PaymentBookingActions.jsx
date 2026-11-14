@@ -11,7 +11,6 @@ export default function PaymentBookingActions({ booking, onChanged, staffRequest
   const { user } = useAuth();
   const id = booking.id || booking._id;
   const [policy, setPolicy] = useState(null);
-  const [email, setEmail] = useState(null);
   const [reason, setReason] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [open, setOpen] = useState(false);
@@ -29,11 +28,10 @@ export default function PaymentBookingActions({ booking, onChanged, staffRequest
 
   useEffect(() => {
     let cancelled = false;
-    setPolicy(null); setEmail(null); setMessage(''); setOpen(false);
+    setPolicy(null); setMessage(''); setOpen(false);
     if (!id || !user?.token) return;
     request('/refund').then(data => { if (!cancelled) setPolicy(data); })
       .catch(error => { if (!cancelled) setMessage(error.message); });
-    if (!staffRequest) request('/ticket/email').then(data => { if (!cancelled) setEmail(data); }).catch(() => {});
     return () => { cancelled = true; };
   }, [request, staffRequest, id, user?.token, booking.refund?.status]);
 
@@ -69,18 +67,12 @@ export default function PaymentBookingActions({ booking, onChanged, staffRequest
         && <p className="text-xs mt-1">Vé đang tạm ngừng check-in. Ghế vẫn được giữ đến khi có kết quả xử lý.</p>}
     </div>}
     <div className="flex flex-wrap gap-3">
-      {!staffRequest && availableTicket && <>
+      {!staffRequest && availableTicket && (
         <button disabled={busy} onClick={() => act(download)} className="rounded-lg border border-white/20 px-3 py-2 disabled:opacity-50">Tải QR vé (PNG)</button>
-        <button disabled={busy} onClick={() => act(async () => {
-          const data = await request('/ticket/email', { method: 'POST' }); setEmail(data);
-          setMessage(data.status === 'SENT' ? 'Vé đã được gửi email, không gửi trùng.' : data.enabled
-            ? 'Đã tiếp nhận yêu cầu gửi vé qua email.' : 'Đã xếp hàng gửi vé. Hệ thống chưa bật dịch vụ email.');
-        })} className="rounded-lg border border-white/20 px-3 py-2 disabled:opacity-50">Gửi vé qua email</button>
-      </>}
+      )}
       {policy?.eligible && !refund && <button disabled={busy} onClick={() => setOpen(!open)}
         className="rounded-lg bg-primary/20 text-primary px-3 py-2">Yêu cầu hoàn tiền</button>}
     </div>
-    {email && !staffRequest && <p className="text-xs text-gray-400">Email vé: {email.status}{!email.enabled ? ' — dịch vụ gửi email chưa bật' : ''}</p>}
     {policy && !policy.eligible && !refund && <p className="text-xs text-gray-400">{policy.message}</p>}
     {open && policy?.eligible && <form className="space-y-3 rounded-xl bg-white/5 p-4" onSubmit={event => {
       event.preventDefault(); act(async () => {

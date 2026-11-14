@@ -287,12 +287,12 @@ const Profile = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({ username, email, phoneNumber, dateOfBirth }),
+        body: JSON.stringify({ username, phoneNumber, dateOfBirth }),
       });
       const data = await res.json();
       if (res.ok) {
         setInfoMessage({ text: 'Cập nhật thông tin thành công!', type: 'success' });
-        login({ ...user, name: data.username, email: data.email });
+        login({ ...user, name: data.username });
       } else {
         setInfoMessage({ text: data.message || 'Cập nhật thất bại', type: 'error' });
       }
@@ -349,7 +349,6 @@ const Profile = () => {
     { id: 'info', icon: <User className="w-5 h-5" />, label: 'Personal Info' },
     { id: 'password', icon: <Lock className="w-5 h-5 text-orange-400" />, label: 'Change Pass' },
     { id: 'booking', icon: <Ticket className="w-5 h-5 text-blue-400" />, label: 'Booking Hist.' },
-    { id: 'favorites', icon: <Heart className="w-5 h-5 text-pink-500" />, label: 'Favorites' },
     { id: 'membership', icon: <Award className="w-5 h-5 text-amber-400" />, label: 'Membership' },
   ];
   const menuItems = ['Admin', 'Manager', 'Staff'].includes(user.role)
@@ -461,17 +460,26 @@ const Profile = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Email</label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        Email
+                        <span className="text-[10px] font-medium normal-case text-gray-500">(Không thể thay đổi)</span>
+                      </label>
+                      <div className="relative cursor-not-allowed">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-600">
                           <Mail className="w-5 h-5" />
                         </div>
                         <input
                           type="email"
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                          disabled
+                          readOnly
+                          tabIndex={-1}
+                          title="Không thể thay đổi địa chỉ Email"
+                          className="w-full bg-black/50 border border-white/5 rounded-xl py-3 pl-12 pr-11 text-gray-500 opacity-60 cursor-not-allowed pointer-events-none select-none focus:outline-none transition-all"
                         />
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-600">
+                          <Lock className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -745,21 +753,6 @@ const Profile = () => {
                 </div>
               </motion.div>
             )}
-            {/* TAB: FAVORITES PLACEHOLDER */}
-            {activeTab === 'favorites' && (
-              <motion.div
-                key="favorites"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full text-center py-20"
-              >
-                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                  <Heart className="w-10 h-10 text-pink-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-300 mb-2">Phim yêu thích của bạn</h2>
-                <p className="text-gray-500 max-w-sm">Danh sách phim đã lưu sẽ xuất hiện tại đây khi bạn bấm thích phim.</p>
-              </motion.div>
-            )}
 
             {/* TAB: MEMBERSHIP & REWARD POINTS */}
             {activeTab === 'membership' && (
@@ -953,8 +946,8 @@ const Profile = () => {
                   <button
                     onClick={() => setMemberSubTab('benefits')}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'benefits'
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
-                        : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
+                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <Award className="w-4 h-4" /> Đặc quyền hội viên
@@ -963,8 +956,8 @@ const Profile = () => {
                   <button
                     onClick={() => setMemberSubTab('redeem')}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'redeem'
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
-                        : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
+                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <Gift className="w-4 h-4" /> Đổi điểm nhận quà ({redeemableRewards.length})
@@ -973,8 +966,8 @@ const Profile = () => {
                   <button
                     onClick={() => setMemberSubTab('my_vouchers')}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'my_vouchers'
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
-                        : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
+                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <Tag className="w-4 h-4" /> Mã ưu đãi của tôi ({myVouchers.filter(v => v.status === 'UNUSED').length})
@@ -983,8 +976,8 @@ const Profile = () => {
                   <button
                     onClick={() => setMemberSubTab('history')}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${memberSubTab === 'history'
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
-                        : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/40'
+                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
                       }`}
                   >
                     <Clock className="w-4 h-4" /> Lịch sử điểm thưởng
@@ -1008,8 +1001,8 @@ const Profile = () => {
                           <div
                             key={tier.id || tier.code}
                             className={`rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden transition-all ${isCurrent
-                                ? 'bg-surface border-2 shadow-2xl shadow-primary/20 scale-[1.02]'
-                                : 'bg-surface/70 border border-white/10 hover:border-white/20'
+                              ? 'bg-surface border-2 shadow-2xl shadow-primary/20 scale-[1.02]'
+                              : 'bg-surface/70 border border-white/10 hover:border-white/20'
                               }`}
                             style={{ borderColor: isCurrent ? (tier.badgeColor || '#EAB308') : undefined }}
                           >
@@ -1146,8 +1139,8 @@ const Profile = () => {
                               onClick={() => setSelectedRewardToRedeem(reward)}
                               disabled={!canAfford}
                               className={`w-full py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${canAfford
-                                  ? 'bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/25 cursor-pointer'
-                                  : 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed'
+                                ? 'bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/25 cursor-pointer'
+                                : 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed'
                                 }`}
                             >
                               <Gift className="w-4 h-4" />
@@ -1180,17 +1173,17 @@ const Profile = () => {
                             <div
                               key={v.id}
                               className={`rounded-3xl p-6 border flex flex-col justify-between relative overflow-hidden ${isUnused && !isExpired
-                                  ? 'bg-surface border-white/15 shadow-xl'
-                                  : 'bg-surface/50 border-white/5 opacity-60'
+                                ? 'bg-surface border-white/15 shadow-xl'
+                                : 'bg-surface/50 border-white/5 opacity-60'
                                 }`}
                             >
                               <div>
                                 <div className="flex items-center justify-between mb-3">
                                   <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isUnused && !isExpired
-                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                      : v.status === 'USED'
-                                        ? 'bg-blue-500/20 text-blue-400'
-                                        : 'bg-gray-500/20 text-gray-400'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : v.status === 'USED'
+                                      ? 'bg-blue-500/20 text-blue-400'
+                                      : 'bg-gray-500/20 text-gray-400'
                                     }`}>
                                     {isUnused && !isExpired ? 'Chưa sử dụng' : v.status === 'USED' ? 'Đã sử dụng' : 'Hết hạn'}
                                   </span>
@@ -1292,10 +1285,10 @@ const Profile = () => {
                                   </td>
                                   <td className="py-4 px-6">
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${tx.type === 'EARN'
-                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                        : tx.type === 'REDEEM'
-                                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                          : 'bg-blue-500/20 text-blue-400'
+                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      : tx.type === 'REDEEM'
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-blue-500/20 text-blue-400'
                                       }`}>
                                       {tx.type === 'EARN' ? 'Tích điểm vé' : tx.type === 'REDEEM' ? 'Đổi voucher' : 'Điều chỉnh điểm'}
                                     </span>

@@ -59,13 +59,13 @@ const AdminLayout = () => {
       items.push({ name: 'Đánh giá & Bình luận', path: '/admin/reviews', icon: <MessageSquare className="w-5 h-5" /> });
     }
 
-    // Admin & Manager: Quản lý thông báo & tự động hóa (UC-96, 97, 98, 99)
-    if (user.role === 'Admin' || user.role === 'Manager') {
+    // Quyền Manager: Quản lý thông báo & tự động hóa
+    if (user.role === 'Manager') {
       items.push({ name: 'Thông báo & Tự động', path: '/admin/notifications', icon: <Bell className="w-5 h-5" /> });
     }
 
-    // Hoàn tiền vé: Admin, Manager & Staff (đưa xuống cuối cùng)
-    if (['Admin', 'Manager', 'Staff'].includes(user.role)) {
+    // Hoàn tiền vé: Manager & Staff (đưa xuống cuối cùng)
+    if (['Manager', 'Staff'].includes(user.role)) {
       items.push({ name: 'Hoàn tiền vé', path: '/admin/refunds', icon: <Ticket className="w-5 h-5" /> });
     }
 

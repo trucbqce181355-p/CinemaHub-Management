@@ -342,9 +342,9 @@ const MovieManagement = () => {
             <Link
               to="/admin/notifications"
               className="flex items-center gap-2 py-2.5 px-4 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-xl font-medium transition-all text-sm"
-              title="Trung tâm thông báo mở bán vé cho khán giả (UC-99)"
+              title="Trung tâm thông báo mở bán vé cho khán giả"
             >
-              <Bell className="w-4 h-4 text-purple-400" /> Mở bán vé (UC-99)
+              <Bell className="w-4 h-4 text-purple-400" /> Mở bán vé
             </Link>
 
             <button
@@ -441,7 +441,7 @@ const MovieManagement = () => {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleNotifyTicketOpening(movie)}
-                            title="Thông báo mở bán vé cho khán giả (UC-99: Notify Ticket Opening for Coming-Soon Movies)"
+                            title="Thông báo mở bán vé cho khán giả"
                             className="p-2 text-purple-300 hover:bg-purple-500/25 bg-purple-500/10 border border-purple-500/30 rounded-lg transition-all"
                           >
                             <Bell className="w-4 h-4 text-purple-400" />
@@ -545,7 +545,23 @@ const MovieManagement = () => {
                     />
                     <div className="absolute z-10 w-full mt-1 bg-[#2a2a2a] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto opacity-0 invisible peer-focus:opacity-100 peer-focus:visible hover:opacity-100 hover:visible transition-all">
                       <div className="p-3 flex flex-wrap gap-2">
-                        {Array.from(new Set([(Array.isArray(movies) ? movies : []).flatMap(m => Array.isArray(m?.genres) ? m.genres : []), 'Hành động', 'Viễn tưởng', 'Kinh dị', 'Hài hước', 'Gia đình', 'Hoạt hình', 'Lãng mạn', 'Phiêu lưu'])).sort().map(g => {
+                        {Array.from(
+                          new Set([
+                            ...(Array.isArray(movies) ? movies : [])
+                              .flatMap(m => (Array.isArray(m?.genres) ? m.genres : []))
+                              .flatMap(g => (typeof g === 'string' ? g.split(',') : []))
+                              .map(g => g.trim())
+                              .filter(g => g && g.length <= 25),
+                            'Hành động',
+                            'Viễn tưởng',
+                            'Kinh dị',
+                            'Hài hước',
+                            'Gia đình',
+                            'Hoạt hình',
+                            'Lãng mạn',
+                            'Phiêu lưu'
+                          ])
+                        ).sort().map(g => {
                           const currentGenres = formData.genres ? formData.genres.split(',').map(s=>s.trim()).filter(Boolean) : [];
                           const isSelected = currentGenres.includes(g);
                           return (

@@ -153,15 +153,6 @@ public class UserController {
         }
         User user = userOpt.get();
         if (body.containsKey("username")) user.setUsername(body.get("username"));
-        if (body.containsKey("email")) {
-            String newEmail = body.get("email");
-            if (!newEmail.equals(user.getEmail())) {
-                if (userRepository.findByEmail(newEmail).isPresent()) {
-                    return ResponseEntity.badRequest().body(Map.of("message", "Email đã được sử dụng bởi tài khoản khác"));
-                }
-                user.setEmail(newEmail);
-            }
-        }
         if (body.containsKey("phoneNumber")) user.setPhoneNumber(body.get("phoneNumber"));
         if (body.containsKey("dateOfBirth")) {
             try {

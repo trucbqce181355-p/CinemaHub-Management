@@ -604,7 +604,7 @@ const Navbar = () => {
 
                     {isStaff && (
                       <Link
-                        to="/admin/users"
+                        to="/admin"
                         onClick={closeMobileMenu}
                         className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md"
                         title="Quản trị"
