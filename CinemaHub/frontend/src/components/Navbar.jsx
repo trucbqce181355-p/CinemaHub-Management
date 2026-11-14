@@ -1,10 +1,31 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Clapperboard, Search, User, Menu, X, LogOut, Settings, Ticket, ChevronDown, Bell, Lock, Award, CheckCheck, Check, Film, Clock, Sparkles } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import {
+  Clapperboard,
+  Search,
+  User,
+  Menu,
+  X,
+  LogOut,
+  Settings,
+  Ticket,
+  ChevronDown,
+  Bell,
+  Lock,
+  Award,
+  CheckCheck,
+  Check,
+  Film,
+  Clock,
+  Sparkles
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = 'http://localhost:5000/api';
+
+const STAFF_ROLES = ['Admin', 'Manager', 'Staff'];
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -16,18 +37,28 @@ const Navbar = () => {
   const [selectedNotificationForDetail, setSelectedNotificationForDetail] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isStaff = STAFF_ROLES.includes(user?.role);
 
   const handleLogout = () => {
+    setIsMobileMenuOpen(false);
+    setIsProfileOpen(false);
+    setIsNotificationsOpen(false);
     logout();
     navigate('/');
   };
 
   const fetchNotifications = async () => {
     if (!user?.token) return;
+
     try {
       const res = await fetch(`${API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${user.token}` }
+        headers: {
+          Authorization: `Bearer ${user.token}`
+        }
       });
+
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -35,20 +66,22 @@ const Navbar = () => {
         const unread = list.filter(n => !n.isRead).length;
         setUnreadCount(unread);
       }
-    } catch (e) {
-      console.error('Failed to load notifications', e);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
     }
   };
 
   useEffect(() => {
     if (user?.token) {
       fetchNotifications();
+
       const interval = setInterval(fetchNotifications, 20000);
+
       return () => clearInterval(interval);
-    } else {
-      setNotifications([]);
-      setUnreadCount(0);
     }
+
+    setNotifications([]);
+    setUnreadCount(0);
   }, [user]);
 
   const handleToggleMarkRead = async (e, notif) => {
@@ -88,21 +121,33 @@ const Navbar = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await fetch(`${API_URL}/notifications/read-all`, {
+      const res = await fetch(`${API_URL}/notifications/read-all`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${user.token}` }
+        headers: {
+          Authorization: `Bearer ${user.token}`
+        }
       });
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+
+      if (!res.ok) {
+        throw new Error('Không thể cập nhật thông báo.');
+      }
+
+      setNotifications((prev) =>
+        prev.map((item) => ({ ...item, isRead: true }))
+      );
+
       setUnreadCount(0);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
     }
   };
 
   const formatNotificationTime = (dateStr) => {
     if (!dateStr) return '';
+
     try {
       const date = new Date(dateStr);
+
       return date.toLocaleDateString('vi-VN', {
         hour: '2-digit',
         minute: '2-digit',
@@ -118,58 +163,118 @@ const Navbar = () => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
+
     window.addEventListener('scroll', handleScroll);
+
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Navigation links
+  // AI Movie Assistant chỉ dành cho khách hàng.
   const navLinks = [
     { name: 'Trang chủ', path: '/' },
     { name: 'Phim', path: '/movies' },
     { name: 'Rạp phim', path: '/cinemas' },
     { name: 'Tin tức', path: '/news' },
+    ...(!isStaff
+      ? [{ name: 'Tư vấn AI', path: '/movie-assistant', icon: Sparkles }]
+      : [])
   ];
 
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const isActiveLink = (path) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+
+    return location.pathname === path ||
+      location.pathname.startsWith(`${path}/`);
+  };
+
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-background/90 backdrop-blur-md shadow-lg border-b border-white/5 py-4' : 'bg-transparent py-6'}`}>
+    <nav
+      className={`fixed w-full z-50 transition-all duration-500 ${
+        isScrolled
+          ? 'bg-background/90 backdrop-blur-md shadow-lg border-b border-white/5 py-4'
+          : 'bg-transparent py-6'
+      }`}
+    >
       <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
+
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 group">
+        <Link
+          to="/"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-2 group"
+        >
           <div className="bg-primary p-2 rounded-lg group-hover:shadow-[0_0_15px_rgba(229,9,20,0.8)] transition-all duration-300">
             <Clapperboard className="w-6 h-6 text-white" />
           </div>
+
           <span className="text-2xl font-display font-bold tracking-wider">
             Cinema<span className="text-primary">Hub</span>
           </span>
         </Link>
 
-        {/* Desktop Nav */}
+        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
-          <div className="flex gap-6">
-            {navLinks.map((link, idx) => (
-              <Link key={idx} to={link.path} className="text-gray-300 hover:text-white font-medium transition-colors hover:scale-105 transform">
-                {link.name}
-              </Link>
-            ))}
+          <div className="flex items-center gap-6">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const active = isActiveLink(link.path);
+
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`flex items-center gap-1.5 font-medium transition-all duration-300 hover:scale-105 ${
+                    active
+                      ? 'text-primary'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {link.name}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-4 border-l border-white/20 pl-6">
-            <button className="text-gray-300 hover:text-white transition-colors">
+
+            {/* Search */}
+            <button
+              type="button"
+              onClick={() => navigate('/movies')}
+              className="text-gray-300 hover:text-white transition-colors"
+              title="Tìm kiếm phim"
+            >
               <Search className="w-5 h-5" />
             </button>
+
             {user ? (
               <div className="flex items-center gap-3">
+
                 {/* Notifications Dropdown */}
                 <div className="relative">
                   <button
+                    type="button"
                     onClick={() => {
                       setIsNotificationsOpen(!isNotificationsOpen);
                       setIsProfileOpen(false);
-                      if (!isNotificationsOpen) fetchNotifications();
+
+                      if (!isNotificationsOpen) {
+                        fetchNotifications();
+                      }
                     }}
                     className="relative flex items-center justify-center w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 transition-all duration-300"
                     title="Thông báo"
                   >
                     <Bell className="w-4 h-4 text-gray-300" />
+
                     {unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#121212] animate-pulse">
                         {unreadCount > 9 ? '9+' : unreadCount}
@@ -241,6 +346,7 @@ const Navbar = () => {
                                     </div>
                                   )}
                                 </div>
+
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-start justify-between gap-2">
                                     <h4 className={`text-xs leading-snug line-clamp-1 ${!notif.isRead ? 'font-bold text-white' : 'font-medium text-gray-300'}`}>
@@ -265,6 +371,7 @@ const Navbar = () => {
                                       )}
                                     </div>
                                   </div>
+
                                   <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">
                                     {notif.message}
                                   </p>
@@ -282,8 +389,12 @@ const Navbar = () => {
                           ) : (
                             <div className="py-10 px-4 flex flex-col items-center justify-center text-center">
                               <Bell className="w-8 h-8 text-gray-600 mb-2" />
-                              <p className="text-sm font-medium text-gray-400">Bạn chưa có thông báo nào</p>
-                              <p className="text-xs text-gray-600 mt-1">Thông báo lịch chiếu và vé mới sẽ hiển thị tại đây.</p>
+                              <p className="text-sm font-medium text-gray-400">
+                                Bạn chưa có thông báo nào
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                Thông báo lịch chiếu và vé mới sẽ hiển thị tại đây.
+                              </p>
                             </div>
                           )}
                         </div>
@@ -295,70 +406,115 @@ const Navbar = () => {
                 {/* User Profile Dropdown */}
                 <div className="relative">
                   <button
+                    type="button"
                     onClick={() => {
                       setIsProfileOpen(!isProfileOpen);
                       setIsNotificationsOpen(false);
                     }}
                     className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-2 py-1.5 pr-4 rounded-full border border-white/10 transition-all duration-300"
                   >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-500 flex items-center justify-center shadow-lg text-white font-bold">
-                    {(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-sm font-medium hidden lg:block">{user?.name || user?.username || user?.email}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
-                </button>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-500 flex items-center justify-center shadow-lg text-white font-bold">
+                      {(user?.name || user?.username || user?.email || 'U')
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
 
-                <AnimatePresence>
-                  {isProfileOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 15, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute right-0 mt-3 w-56 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl py-2 overflow-hidden"
-                    >
-                      <div className="px-4 py-3 border-b border-white/5 mb-1">
-                        <p className="text-sm text-gray-400">Đăng nhập với tư cách</p>
-                        <p className="text-sm font-bold text-white truncate">{user?.email}</p>
-                      </div>
+                    <span className="text-sm font-medium hidden lg:block">
+                      {user?.name || user?.username || user?.email}
+                    </span>
 
-                      {!['Admin', 'Manager', 'Staff'].includes(user?.role) && (
-                        <>
-                          <Link to="/profile" state={{ tab: 'info' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
-                            <Settings className="w-4 h-4" /> Tài khoản của tôi
-                          </Link>
-                          <Link to="/profile" state={{ tab: 'booking' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
-                            <Ticket className="w-4 h-4" /> Lịch sử đặt vé
-                          </Link>
-                        </>
-                      )}
+                    <ChevronDown
+                      className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${
+                        isProfileOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
 
-                      {['Admin', 'Manager', 'Staff'].includes(user.role) && (
-                        <>
-                          <Link to="/profile" state={{ tab: 'password' }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
-                            <Lock className="w-4 h-4" /> Đổi mật khẩu
-                          </Link>
-                          <Link to="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
-                            <User className="w-4 h-4" /> Quản trị hệ thống
-                          </Link>
-                        </>
-                      )}
+                  <AnimatePresence>
+                    {isProfileOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 mt-3 w-56 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl py-2 overflow-hidden"
+                      >
+                        <div className="px-4 py-3 border-b border-white/5 mb-1">
+                          <p className="text-sm text-gray-400">
+                            Đăng nhập với tư cách
+                          </p>
+                          <p className="text-sm font-bold text-white truncate">
+                            {user?.email}
+                          </p>
+                        </div>
 
-                      <div className="border-t border-white/5 mt-1 pt-1">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          <LogOut className="w-4 h-4" /> Đăng xuất
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                        {!isStaff && (
+                          <>
+                            <Link
+                              to="/profile"
+                              state={{ tab: 'info' }}
+                              onClick={() => setIsProfileOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                              <Settings className="w-4 h-4" />
+                              Tài khoản của tôi
+                            </Link>
+
+                            <Link
+                              to="/profile"
+                              state={{ tab: 'booking' }}
+                              onClick={() => setIsProfileOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                              <Ticket className="w-4 h-4" />
+                              Lịch sử đặt vé
+                            </Link>
+                          </>
+                        )}
+
+                        {isStaff && (
+                          <>
+                            <Link
+                              to="/profile"
+                              state={{ tab: 'password' }}
+                              onClick={() => setIsProfileOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                              <Lock className="w-4 h-4" />
+                              Đổi mật khẩu
+                            </Link>
+
+                            <Link
+                              to="/admin"
+                              onClick={() => setIsProfileOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                              <User className="w-4 h-4" />
+                              Quản trị hệ thống
+                            </Link>
+                          </>
+                        )}
+
+                        <div className="border-t border-white/5 mt-1 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Đăng xuất
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
             ) : (
-              <Link to="/login" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/10 transition-all duration-300">
+              <Link
+                to="/login"
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/10 transition-all duration-300"
+              >
                 <User className="w-4 h-4" />
                 <span className="text-sm font-medium">Đăng nhập</span>
               </Link>
@@ -367,7 +523,12 @@ const Navbar = () => {
         </div>
 
         {/* Mobile Toggle */}
-        <button className="md:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        <button
+          type="button"
+          className="md:hidden text-white"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label={isMobileMenuOpen ? 'Đóng menu' : 'Mở menu'}
+        >
           {isMobileMenuOpen ? <X /> : <Menu />}
         </button>
       </div>
@@ -381,38 +542,95 @@ const Navbar = () => {
             exit={{ opacity: 0, y: -20 }}
             className="absolute top-full left-0 w-full bg-surface/95 backdrop-blur-xl border-b border-white/10 md:hidden flex flex-col p-4 shadow-2xl"
           >
-            {navLinks.map((link, idx) => (
-              <Link key={idx} to={link.path} className="py-3 px-4 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
-                {link.name}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const active = isActiveLink(link.path);
+
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  onClick={closeMobileMenu}
+                  className={`py-3 px-4 rounded-lg flex items-center gap-2 transition-colors ${
+                    active
+                      ? 'text-primary bg-primary/10'
+                      : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {link.name}
+                </Link>
+              );
+            })}
+
             <div className="border-t border-white/10 mt-2 pt-4 flex flex-col gap-4 px-4">
-              <button className="w-full btn-secondary text-sm">Tìm kiếm</button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobileMenu();
+                  navigate('/movies');
+                }}
+                className="w-full btn-secondary text-sm"
+              >
+                Tìm kiếm
+              </button>
+
               {user ? (
                 <div className="flex items-center justify-between w-full bg-white/5 p-3 rounded-lg border border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 text-primary font-bold">
-                      {(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 text-primary font-bold shrink-0">
+                      {(user?.name || user?.username || user?.email || 'U')
+                        .charAt(0)
+                        .toUpperCase()}
                     </div>
-                    <span className="text-sm font-medium">{user?.name || user?.username || user?.email}</span>
+
+                    <span className="text-sm font-medium truncate">
+                      {user?.name || user?.username || user?.email}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md relative" title="Thông báo">
-                      <Bell className="w-4 h-4" />
-                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full"></span>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMobileMenu();
+                        navigate('/profile');
+                      }}
+                      className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md"
+                      title="Tài khoản"
+                    >
+                      <User className="w-4 h-4" />
                     </button>
-                    {user.role === 'Admin' && (
-                      <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
+
+                    {isStaff && (
+                      <Link
+                        to="/admin/users"
+                        onClick={closeMobileMenu}
+                        className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md"
+                        title="Quản trị"
+                      >
                         <Settings className="w-4 h-4" />
                       </Link>
                     )}
-                    <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md">
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="p-2 text-gray-400 hover:text-white bg-white/5 rounded-md"
+                      title="Đăng xuất"
+                    >
                       <LogOut className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ) : (
-                <Link to="/login" className="w-full btn-primary text-sm text-center">Đăng nhập</Link>
+                <Link
+                  to="/login"
+                  onClick={closeMobileMenu}
+                  className="w-full btn-primary text-sm text-center"
+                >
+                  Đăng nhập
+                </Link>
               )}
             </div>
           </motion.div>
